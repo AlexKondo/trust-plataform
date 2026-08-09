@@ -6,7 +6,7 @@ Infraestrutura digital de confiança para a economia de serviços locais. O mark
 
 **Módulo 0 (fundação) concluído em 2026-08-08** — ver [docs/MODULO-0.md](docs/MODULO-0.md): monorepo pnpm, `apps/api` (NestJS 11 + Fastify), shared kernel (envelope de API, error handler, JWT ES256 guard global, Correlation/Request ID, logging Pino, Transactional Outbox via pg-boss, `audit_logs` append-only com trigger), migrations aplicadas no Supabase `trust-dev-sp`, CI GitHub Actions. Dev: `pnpm dev` → `http://localhost:3001/api/v1/health`; e2e: `TEST_DATABASE_URL=... pnpm test`.
 
-Próximo passo: **Módulo 1 (IDN — Identity)**, começando por IDN-001 Create Identity. Pendências restantes (escala do score, formato da DSL de regras, provedor de e-mail — necessário no IDN-002) em [INCONSISTENCIAS.md](INCONSISTENCIAS.md).
+**Módulo 1 em andamento**: IDN-001 Create Identity concluído no backend em 2026-08-08 (`POST /api/v1/identities`, tabela `identities`, Argon2id, auditoria, testes, OpenAPI em [docs/openapi.yaml](docs/openapi.yaml)). A página `/register` (frontend) fica para quando o `apps/web` for iniciado. Próximo passo: **IDN-002 Verify Email** — usa **Brevo** como provedor de e-mail (decisão P6b, 2026-08-08; `BREVO_API_KEY` no `.env`) e publica o primeiro evento `Identity.Created`. Pendências restantes (P4 escala do score, P5 DSL de regras) em [INCONSISTENCIAS.md](INCONSISTENCIAS.md).
 
 ## Stack oficial (decidido em 2026-08-08 — detalhes em INCONSISTENCIAS.md P1–P7)
 

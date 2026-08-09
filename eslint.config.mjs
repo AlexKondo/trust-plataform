@@ -32,6 +32,13 @@ export default tseslint.config(
     },
   },
   {
+    // Specs usam expect(mock.method) / vi.mocked(obj.method) — padrão do Vitest
+    files: ['**/*.spec.ts'],
+    rules: {
+      '@typescript-eslint/unbound-method': 'off',
+    },
+  },
+  {
     files: ['**/*.mjs', '**/*.js'],
     ...tseslint.configs.disableTypeChecked,
   },

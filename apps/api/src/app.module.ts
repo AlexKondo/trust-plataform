@@ -11,6 +11,7 @@ import { AuditModule } from './shared/audit/audit.module';
 import { ResponseEnvelopeInterceptor } from './shared/api/response-envelope.interceptor';
 import { GlobalExceptionFilter } from './shared/api/global-exception.filter';
 import { HealthModule } from './modules/health/health.module';
+import { IdentityModule } from './modules/identity/identity.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { HealthModule } from './modules/health/health.module';
     EventsModule,
     AuditModule,
     HealthModule,
+    IdentityModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

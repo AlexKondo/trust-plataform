@@ -15,6 +15,13 @@
       "when": 1786236207826,
       "tag": "0001_audit_logs_immutability",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786237893104,
+      "tag": "0002_cheerful_wallflower",
+      "breakpoints": true
     }
   ]
 }

@@ -8,6 +8,8 @@ export default defineConfig({
     globals: false,
     hookTimeout: 60_000,
     testTimeout: 60_000,
+    // Suítes e2e compartilham o mesmo banco (migrations + pg-boss) — sem paralelismo de arquivos
+    fileParallelism: false,
   },
   plugins: [
     swc.vite({

@@ -1,0 +1,114 @@
+openapi: 3.1.0
+info:
+  title: Trust Platform API
+  version: 0.2.0
+  description: >
+    API do MVP da Trust Platform (monolito modular: IDN, TPS, VRF, TRS, MRK).
+    Todas as respostas usam o envelope {success, data} / {success:false, error:{code,message}}
+    (DOC-003). Datas em UTC ISO 8601. Atualizada a cada feature — mudança de contrato
+    exige atualizar este documento antes da implementação.
+servers:
+  - url: http://localhost:3001/api/v1
+    description: Desenvolvimento local
+tags:
+  - name: Platform
+  - name: Identity
+
+paths:
+  /health:
+    get:
+      tags: [Platform]
+      summary: Health check (público)
+      operationId: getHealth
+      security: []
+      responses:
+        '200':
+          description: Status da aplicação e do banco
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  status: UP
+                  database: UP
+                  timestamp: '2026-08-08T21:00:00.000Z'
+
+  /identities:
+    post:
+      tags: [Identity]
+      summary: IDN-001 — Create Identity (cadastro, público)
+      operationId: createIdentity
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fullName, email, password, confirmPassword, acceptTerms]
+              properties:
+                fullName:
+                  type: string
+                  minLength: 3
+                  maxLength: 150
+                  example: John Doe
+                email:
+                  type: string
+                  format: email
+                  maxLength: 255
+                  example: john@email.com
+                password:
+                  type: string
+                  minLength: 12
+                  description: >
+                    Mínimo 12 caracteres (DOC-002), com maiúscula, minúscula, número e
+                    caractere especial; não pode conter o nome nem o e-mail do usuário.
+                  example: 'Password@1234'
+                confirmPassword:
+                  type: string
+                  description: Deve ser idêntica a password.
+                acceptTerms:
+                  type: boolean
+                  description: Deve ser true (BR-005).
+      responses:
+        '201':
+          description: Identity criada com status PENDING_EMAIL_VERIFICATION
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  identityId: '019fe415-6318-7bfb-a184-3f47c3f0b7e1'
+                  status: PENDING_EMAIL_VERIFICATION
+        '400':
+          description: Validação sintática/política de senha (VALIDATION_ERROR, com details)
+          content:
+            application/json:
+              example:
+                success: false
+                error:
+                  code: VALIDATION_ERROR
+                  message: Request validation failed.
+                  details:
+                    - path: password
+                      message: password must have at least 12 characters
+        '409':
+          description: E-mail já cadastrado (BR-001/006)
+          content:
+            application/json:
+              example:
+                success: false
+                error:
+                  code: EMAIL_ALREADY_EXISTS
+                  message: An identity with this email already exists.
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token ES256, 15 min (IDN-003). Padrão em todas as rotas não públicas.
+
+security:
+  - bearerAuth: []

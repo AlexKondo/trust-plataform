@@ -1,0 +1,5 @@
+# Normaliza tudo para LF no repositório (Windows converte no checkout se preciso)
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.pdf binary
