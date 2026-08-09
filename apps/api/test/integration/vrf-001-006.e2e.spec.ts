@@ -220,6 +220,26 @@ describe.runIf(Boolean(testDatabaseUrl))('VRF-001..006 — Verification e2e', ()
       'Verification.ReviewStarted',
     ]);
 
+    // TPS-004: aprovação propaga para o Passport (documentVerified + completude 50)
+    {
+      const startedAt = Date.now();
+      let synced = false;
+      while (Date.now() - startedAt < 20000 && !synced) {
+        await relay.tick();
+        const [passport] = await db
+          .select()
+          .from(trustPassports)
+          .where(eq(trustPassports.identityId, user.identityId));
+        if (passport?.documentVerified) {
+          expect(Number(passport.profileCompletion)).toBe(50);
+          synced = true;
+        } else {
+          await new Promise((resolveSleep) => setTimeout(resolveSleep, 500));
+        }
+      }
+      expect(synced).toBe(true);
+    }
+
     // VRF-006: dono consulta com review/decisão/evidências (só metadados)
     const details = await app.inject({
       method: 'GET',

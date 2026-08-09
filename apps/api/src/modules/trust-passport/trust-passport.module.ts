@@ -5,6 +5,10 @@ import { UpdateTrustPassportUseCase } from './application/usecases/update-trust-
 import { TrustPassportRepository } from './domain/repositories/trust-passport.repository';
 import { TrustPassportController } from './infrastructure/api/trust-passport.controller';
 import { IdentityCreatedConsumer } from './infrastructure/consumers/identity-created.consumer';
+import {
+  VerificationApprovedConsumer,
+  VerificationRejectedConsumer,
+} from './infrastructure/consumers/verification-decided.consumers';
 import { DrizzleTrustPassportRepository } from './infrastructure/persistence/drizzle-trust-passport.repository';
 
 @Module({
@@ -14,6 +18,8 @@ import { DrizzleTrustPassportRepository } from './infrastructure/persistence/dri
     GetTrustPassportUseCase,
     UpdateTrustPassportUseCase,
     IdentityCreatedConsumer,
+    VerificationApprovedConsumer,
+    VerificationRejectedConsumer,
     { provide: TrustPassportRepository, useClass: DrizzleTrustPassportRepository },
   ],
   exports: [TrustPassportRepository],

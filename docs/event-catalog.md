@@ -40,7 +40,7 @@
 
 - **Descrição**: decisão irreversível da verificação (VRF-004/005). `ReviewCompleted` sempre acompanha a decisão (causationId → evento de decisão).
 - **Produtor**: verification-service
-- **Consumidores**: TPS-004 (projeção no Passport — próximo módulo) e TRS (pontuação — futuro). Rejeição também será consumida (INCONSISTENCIAS #7).
+- **Consumidores**: ✅ `tps.sync-verification-approved` / `tps.sync-verification-rejected` (TPS-004 — projetam o atributo no Passport e recalculam a completude; INCONSISTENCIAS #7). TRS consumirá para pontuação (futuro).
 - **Payloads**: `Approved {verificationId, trustPassportId, type, approvedAt}`; `Rejected {verificationId, trustPassportId, type, reasonCode, rejectedAt}`; `ReviewCompleted {verificationId, reviewId, decision, completedAt}`
 
 ### TrustPassport.Created (v1.0)

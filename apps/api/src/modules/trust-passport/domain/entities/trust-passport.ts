@@ -11,6 +11,28 @@ export type TrustPassportStatus =
 /** Peso de cada atributo verificável na completude (4 × 25 = 100). */
 const ATTRIBUTE_WEIGHT = 25;
 
+export type VerifiableAttribute = 'email' | 'phone' | 'document' | 'address';
+
+/**
+ * TPS-004 BR-002: mapeamento tipo de verificação → atributo do Passport.
+ * Tipos sem atributo consolidado (BANK_ACCOUNT, BUSINESS, BIOMETRIC) retornam
+ * null — o histórico deles vive só no módulo Verification (BR-004).
+ */
+export function attributeForVerificationType(type: string): VerifiableAttribute | null {
+  switch (type) {
+    case 'DOCUMENT':
+      return 'document';
+    case 'ADDRESS':
+      return 'address';
+    case 'PHONE':
+      return 'phone';
+    case 'EMAIL':
+      return 'email';
+    default:
+      return null;
+  }
+}
+
 export interface TrustPassportProfile {
   phone: string | null;
   addressCountry: string | null;
@@ -161,11 +183,24 @@ export class TrustPassport {
     return updatedFields;
   }
 
-  /** Projeções de verificação (TPS-004 futuro; e-mail via criação). */
-  markVerified(attribute: 'email' | 'phone' | 'document' | 'address', now = new Date()): void {
-    this.props[`${attribute}Verified`] = true;
+  /** Projeções de verificação (TPS-004). Idempotente; retorna se algo mudou. */
+  markVerified(attribute: VerifiableAttribute, now = new Date()): boolean {
+    return this.setVerified(attribute, true, now);
+  }
+
+  /** INCONSISTENCIAS #7: rejeição reverte o atributo para não verificado. */
+  markUnverified(attribute: VerifiableAttribute, now = new Date()): boolean {
+    return this.setVerified(attribute, false, now);
+  }
+
+  private setVerified(attribute: VerifiableAttribute, value: boolean, now: Date): boolean {
+    if (this.props[`${attribute}Verified`] === value) {
+      return false;
+    }
+    this.props[`${attribute}Verified`] = value;
     this.recalculateCompletion();
     this.props.updatedAt = now;
+    return true;
   }
 
   private recalculateCompletion(): void {
