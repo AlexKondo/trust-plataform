@@ -5,3 +5,4 @@ export * from './outbox-events';
 export * from '../../../modules/identity/infrastructure/persistence/identities.schema';
 export * from '../../../modules/identity/infrastructure/persistence/email-verification-tokens.schema';
 export * from '../../../modules/identity/infrastructure/persistence/sessions.schema';
+export * from '../../../modules/identity/infrastructure/persistence/password-reset-tokens.schema';

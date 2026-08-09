@@ -79,6 +79,27 @@
   | identityId | UUID | dona da sessão |
   | loggedOutAt | ISO 8601 UTC | momento do logout |
 
+### Identity.PasswordRecoveryRequested (v1.0)
+
+- **Descrição**: pedido de recuperação de senha para conta existente (IDN-007). Nunca publicado para e-mails desconhecidos.
+- **Produtor**: identity-service
+- **Consumidores**: auditoria/analytics; sinal antifraude (futuro).
+- **Payload**: `{ identityId: UUID, requestedAt: ISO 8601 UTC }`
+
+### Identity.PasswordReset (v1.0)
+
+- **Descrição**: senha redefinida via token de recuperação (IDN-008). Todas as sessões foram revogadas na mesma transação.
+- **Produtor**: identity-service
+- **Consumidores**: auditoria/analytics.
+- **Payload**: `{ identityId: UUID, resetAt: ISO 8601 UTC }`
+
+### Identity.PasswordChanged (v1.0)
+
+- **Descrição**: senha alterada pelo usuário autenticado (IDN-009). Demais sessões revogadas; a sessão atual permanece.
+- **Produtor**: identity-service
+- **Consumidores**: auditoria/analytics.
+- **Payload**: `{ identityId: UUID, changedAt: ISO 8601 UTC }`
+
 ### Identity.EmailVerified (v1.0)
 
 - **Descrição**: e-mail confirmado pelo dono da conta (IDN-002). `causationId` aponta para o `Identity.Created` da mesma transação.

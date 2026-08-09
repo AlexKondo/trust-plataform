@@ -83,12 +83,19 @@ describe.runIf(Boolean(testDatabaseUrl))('Módulo 0 — e2e', () => {
       correlationId: uuidv7(),
     });
 
-    await relay.tick();
-
-    const [row] = await db
-      .select()
-      .from(outboxEvents)
-      .where(eq(outboxEvents.eventId, envelope.eventId));
+    // O relay processa em lotes de 50 (mais antigos primeiro) — em um banco de
+    // dev com backlog pode levar mais de um ciclo até chegar neste evento.
+    let row: typeof outboxEvents.$inferSelect | undefined;
+    for (let i = 0; i < 20; i += 1) {
+      await relay.tick();
+      [row] = await db
+        .select()
+        .from(outboxEvents)
+        .where(eq(outboxEvents.eventId, envelope.eventId));
+      if (row?.status === 'PUBLISHED') {
+        break;
+      }
+    }
     expect(row?.status).toBe('PUBLISHED');
     expect(row?.publishedAt).toBeInstanceOf(Date);
   });

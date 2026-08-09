@@ -81,4 +81,8 @@ export class AppConfigService {
   get emailVerificationTtlHours(): number {
     return this.config.get('EMAIL_VERIFICATION_TTL_HOURS', { infer: true });
   }
+
+  get passwordResetTtlMinutes(): number {
+    return this.config.get('PASSWORD_RESET_TTL_MINUTES', { infer: true });
+  }
 }

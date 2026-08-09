@@ -124,6 +124,14 @@ export class Identity {
     this.props.updatedAt = now;
   }
 
+  /** IDN-008/009: troca o hash da senha (gerado exclusivamente pelo PasswordHashService). */
+  changePassword(newPasswordHash: string, now = new Date()): void {
+    this.props.passwordHash = newPasswordHash;
+    this.props.failedLoginAttempts = 0;
+    this.props.lockedUntil = null;
+    this.props.updatedAt = now;
+  }
+
   /** BR-008: registra último login e zera o contador de falhas. */
   registerSuccessfulLogin(now = new Date()): void {
     this.props.lastLoginAt = now;

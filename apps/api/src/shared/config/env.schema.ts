@@ -30,6 +30,7 @@ export const envSchema = z.object({
   /** Base do frontend para montar links de e-mail (verify, reset). */
   APP_BASE_URL: z.string().url().default('http://localhost:3000'),
   EMAIL_VERIFICATION_TTL_HOURS: z.coerce.number().int().positive().default(24),
+  PASSWORD_RESET_TTL_MINUTES: z.coerce.number().int().positive().default(30),
 });
 
 export type Env = z.infer<typeof envSchema>;

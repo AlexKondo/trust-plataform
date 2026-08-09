@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, gt, isNull, lt } from 'drizzle-orm';
+import { and, eq, gt, isNull, lt, ne } from 'drizzle-orm';
 import { DRIZZLE, Database, DatabaseExecutor } from '../../../../shared/database/database.module';
 import { Session } from '../../domain/entities/session';
 import { SessionRepository } from '../../domain/repositories/session.repository';
@@ -73,6 +73,32 @@ export class DrizzleSessionRepository extends SessionRepository {
         ),
       );
     return rows.map((row) => this.toEntity(row));
+  }
+
+  async revokeAllByIdentity(identityId: string, executor?: DatabaseExecutor): Promise<void> {
+    const target = executor ?? this.db;
+    await target
+      .update(sessions)
+      .set({ revokedAt: new Date() })
+      .where(and(eq(sessions.identityId, identityId), isNull(sessions.revokedAt)));
+  }
+
+  async revokeAllByIdentityExcept(
+    identityId: string,
+    exceptSessionId: string,
+    executor?: DatabaseExecutor,
+  ): Promise<void> {
+    const target = executor ?? this.db;
+    await target
+      .update(sessions)
+      .set({ revokedAt: new Date() })
+      .where(
+        and(
+          eq(sessions.identityId, identityId),
+          isNull(sessions.revokedAt),
+          ne(sessions.id, exceptSessionId),
+        ),
+      );
   }
 
   async deleteExpired(olderThan: Date): Promise<number> {

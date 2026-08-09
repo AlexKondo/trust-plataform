@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { AppConfigService } from '../../../../shared/config/app-config.service';
-import { EmailService, VerificationEmailInput } from '../../domain/services/email.service';
+import {
+  EmailService,
+  PasswordResetEmailInput,
+  VerificationEmailInput,
+} from '../../domain/services/email.service';
 
 const BREVO_SEND_EMAIL_URL = 'https://api.brevo.com/v3/smtp/email';
 
@@ -20,6 +24,32 @@ export class BrevoEmailService extends EmailService {
   }
 
   async sendVerificationEmail(input: VerificationEmailInput): Promise<void> {
+    await this.send({
+      operation: 'SendVerificationEmail',
+      to: input.to,
+      toName: input.fullName,
+      subject: 'Confirme seu e-mail — Trust Platform',
+      htmlContent: this.buildVerificationHtml(input),
+    });
+  }
+
+  async sendPasswordResetEmail(input: PasswordResetEmailInput): Promise<void> {
+    await this.send({
+      operation: 'SendPasswordResetEmail',
+      to: input.to,
+      toName: input.fullName,
+      subject: 'Redefinição de senha — Trust Platform',
+      htmlContent: this.buildPasswordResetHtml(input),
+    });
+  }
+
+  private async send(input: {
+    operation: string;
+    to: string;
+    toName: string;
+    subject: string;
+    htmlContent: string;
+  }): Promise<void> {
     const response = await fetch(BREVO_SEND_EMAIL_URL, {
       method: 'POST',
       headers: {
@@ -29,31 +59,46 @@ export class BrevoEmailService extends EmailService {
       },
       body: JSON.stringify({
         sender: { name: 'Trust Platform', email: this.config.emailFrom },
-        to: [{ email: input.to, name: input.fullName }],
-        subject: 'Confirme seu e-mail — Trust Platform',
-        htmlContent: this.buildVerificationHtml(input),
+        to: [{ email: input.to, name: input.toName }],
+        subject: input.subject,
+        htmlContent: input.htmlContent,
       }),
     });
 
     if (!response.ok) {
       const body = await response.text();
-      // Nunca logar o token/URL completa — só o host e o status
+      // Nunca logar o token/URL completa — só o status e o começo da resposta
       this.logger.error(
         {
-          operation: 'SendVerificationEmail',
+          operation: input.operation,
           statusCode: response.status,
           providerResponse: body.slice(0, 300),
           result: 'FAILURE',
         },
-        'Brevo rejected the verification email.',
+        'Brevo rejected the transactional email.',
       );
       throw new Error(`Brevo send failed with status ${response.status}`);
     }
 
-    this.logger.info(
-      { operation: 'SendVerificationEmail', result: 'SUCCESS' },
-      'Verification email sent via Brevo.',
-    );
+    this.logger.info({ operation: input.operation, result: 'SUCCESS' }, 'Email sent via Brevo.');
+  }
+
+  private buildPasswordResetHtml(input: PasswordResetEmailInput): string {
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+        <h2>Redefinição de senha</h2>
+        <p>Olá, ${escapeHtml(input.fullName)}. Recebemos um pedido para redefinir sua senha.
+           O link abaixo vale por 30 minutos.</p>
+        <p style="margin: 24px 0;">
+          <a href="${input.resetUrl}"
+             style="background: #111; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
+            Redefinir senha
+          </a>
+        </p>
+        <p style="color: #666; font-size: 13px;">
+          Se você não pediu a redefinição, ignore este e-mail — sua senha continua a mesma.
+        </p>
+      </div>`;
   }
 
   private buildVerificationHtml(input: VerificationEmailInput): string {

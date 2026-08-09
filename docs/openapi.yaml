@@ -285,6 +285,91 @@ paths:
         '403':
           description: Identity não está mais ativa (IDENTITY_NOT_ACTIVE)
 
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: IDN-007 — Solicitar recuperação de senha (público; anti-enumeração)
+      operationId: forgotPassword
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '202':
+          description: Resposta SEMPRE idêntica, exista ou não a conta. Token de reset vale 30 min; só o mais recente é válido.
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  message: If an account exists for this email, password recovery instructions have been sent.
+
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: IDN-008 — Redefinir senha com token de recuperação (público)
+      description: Ao concluir, TODAS as sessões e refresh tokens são revogados — novo login obrigatório.
+      operationId: resetPassword
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, newPassword]
+              properties:
+                token:
+                  type: string
+                newPassword:
+                  type: string
+                  minLength: 12
+                  description: Política DOC-002 (12+ chars, maiúscula, minúscula, número, especial).
+      responses:
+        '204':
+          description: Senha redefinida; sessões revogadas
+        '400':
+          description: Senha fora da política (VALIDATION_ERROR)
+        '401':
+          description: Token inválido/já usado (INVALID_RESET_TOKEN) ou expirado (EXPIRED_RESET_TOKEN)
+
+  /auth/change-password:
+    post:
+      tags: [Auth]
+      summary: IDN-009 — Alterar senha (autenticado)
+      description: Revoga todas as demais sessões; a sessão usada na chamada permanece ativa (INCONSISTENCIAS #22).
+      operationId: changePassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword:
+                  type: string
+                newPassword:
+                  type: string
+                  minLength: 12
+      responses:
+        '204':
+          description: Senha alterada; demais sessões revogadas
+        '400':
+          description: Senha fora da política (VALIDATION_ERROR)
+        '401':
+          description: Sem token (INVALID_TOKEN) ou senha atual incorreta (CURRENT_PASSWORD_INVALID)
+        '422':
+          description: Nova senha igual à atual (SAME_PASSWORD)
+
 components:
   securitySchemes:
     bearerAuth:

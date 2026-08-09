@@ -1,6 +1,6 @@
 import { z } from 'zod';
+import { passwordPolicySchema } from './password-policy';
 
-const PASSWORD_MIN_LENGTH = 12; // DOC-002 (vence specs antigas que dizem 8)
 const FULL_NAME_MIN_LENGTH = 3; // INCONSISTENCIAS #2
 
 /**
@@ -20,14 +20,7 @@ export const createIdentityRequestSchema = z
       .toLowerCase()
       .email('email must be a valid email address')
       .max(255),
-    password: z
-      .string({ required_error: 'password is required' })
-      .min(PASSWORD_MIN_LENGTH, `password must have at least ${PASSWORD_MIN_LENGTH} characters`)
-      .max(128)
-      .regex(/[A-Z]/, 'password must contain at least one uppercase letter')
-      .regex(/[a-z]/, 'password must contain at least one lowercase letter')
-      .regex(/[0-9]/, 'password must contain at least one number')
-      .regex(/[^A-Za-z0-9]/, 'password must contain at least one special character'),
+    password: passwordPolicySchema,
     confirmPassword: z.string({ required_error: 'confirmPassword is required' }),
     acceptTerms: z.boolean({ required_error: 'acceptTerms is required' }),
   })

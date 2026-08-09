@@ -36,6 +36,13 @@
       "when": 1786239571805,
       "tag": "0004_lowly_grim_reaper",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786240917365,
+      "tag": "0005_spooky_mindworm",
+      "breakpoints": true
     }
   ]
 }
