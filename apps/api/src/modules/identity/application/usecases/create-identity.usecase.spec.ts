@@ -41,10 +41,15 @@ function makeUseCase(overrides: { emailExists?: boolean } = {}) {
   } as unknown as Database;
   const logger = { setContext: vi.fn(), info: vi.fn(), error: vi.fn() } as unknown as PinoLogger;
 
+  const passwordBreachService = {
+    isBreached: vi.fn().mockResolvedValue(false),
+  } as unknown as import('../../domain/services/password-breach.service').PasswordBreachService;
+
   return {
     useCase: new CreateIdentityUseCase(
       repository,
       passwordHashService,
+      passwordBreachService,
       auditLogService,
       generateEmailVerification,
       db,

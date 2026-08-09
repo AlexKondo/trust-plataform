@@ -16,6 +16,7 @@ import { IdentityRepository } from './domain/repositories/identity.repository';
 import { PasswordResetTokenRepository } from './domain/repositories/password-reset-token.repository';
 import { SessionRepository } from './domain/repositories/session.repository';
 import { EmailService } from './domain/services/email.service';
+import { PasswordBreachService } from './domain/services/password-breach.service';
 import { PasswordHashService } from './domain/services/password-hash.service';
 import { TokenGeneratorService } from './domain/services/token-generator.service';
 import { AuthController } from './infrastructure/api/auth.controller';
@@ -28,6 +29,8 @@ import { DrizzlePasswordResetTokenRepository } from './infrastructure/persistenc
 import { DrizzleSessionRepository } from './infrastructure/persistence/drizzle-session.repository';
 import { Argon2PasswordHashService } from './infrastructure/security/argon2-password-hash.service';
 import { CryptoTokenGeneratorService } from './infrastructure/security/crypto-token-generator.service';
+import { HibpPasswordBreachService } from './infrastructure/security/hibp-password-breach.service';
+import { NoopPasswordBreachService } from './infrastructure/security/noop-password-breach.service';
 
 const BREVO_REST_KEY_PREFIX = 'xkeysib-';
 
@@ -53,6 +56,14 @@ const BREVO_REST_KEY_PREFIX = 'xkeysib-';
     },
     { provide: PasswordHashService, useClass: Argon2PasswordHashService },
     { provide: TokenGeneratorService, useClass: CryptoTokenGeneratorService },
+    {
+      provide: PasswordBreachService,
+      inject: [AppConfigService, PinoLogger],
+      useFactory: (config: AppConfigService, logger: PinoLogger) =>
+        config.passwordBreachCheckEnabled
+          ? new HibpPasswordBreachService(logger)
+          : new NoopPasswordBreachService(),
+    },
     {
       // Brevo REST exige chave xkeysib-; sem ela, loga o link em vez de enviar
       provide: EmailService,

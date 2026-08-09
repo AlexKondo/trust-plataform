@@ -4,10 +4,12 @@ import { AuditLogService } from '../../../../shared/audit/audit-log.service';
 import { DRIZZLE, Database } from '../../../../shared/database/database.module';
 import { OutboxService } from '../../../../shared/events/outbox.service';
 import { AuthenticatedIdentity } from '../../../../shared/security/authenticated-identity';
+import { BreachedPasswordException } from '../../domain/exceptions/breached-password.exception';
 import {
   CurrentPasswordInvalidException,
   SamePasswordException,
 } from '../../domain/exceptions/password.exceptions';
+import { PasswordBreachService } from '../../domain/services/password-breach.service';
 import { IdentityNotFoundException } from '../../domain/exceptions/verification.exceptions';
 import { IdentityRepository } from '../../domain/repositories/identity.repository';
 import { SessionRepository } from '../../domain/repositories/session.repository';
@@ -27,6 +29,7 @@ export class ChangePasswordUseCase {
     private readonly identityRepository: IdentityRepository,
     private readonly sessionRepository: SessionRepository,
     private readonly passwordHashService: PasswordHashService,
+    private readonly passwordBreachService: PasswordBreachService,
     private readonly outboxService: OutboxService,
     private readonly auditLogService: AuditLogService,
     @Inject(DRIZZLE) private readonly db: Database,
@@ -70,6 +73,10 @@ export class ChangePasswordUseCase {
     // BR-005: nova senha não pode ser igual à atual
     if (await this.passwordHashService.verify(request.newPassword, identity.passwordHash)) {
       throw new SamePasswordException();
+    }
+
+    if (await this.passwordBreachService.isBreached(request.newPassword)) {
+      throw new BreachedPasswordException();
     }
 
     const changedAt = new Date();

@@ -85,4 +85,8 @@ export class AppConfigService {
   get passwordResetTtlMinutes(): number {
     return this.config.get('PASSWORD_RESET_TTL_MINUTES', { infer: true });
   }
+
+  get passwordBreachCheckEnabled(): boolean {
+    return this.config.get('PASSWORD_BREACH_CHECK_ENABLED', { infer: true });
+  }
 }

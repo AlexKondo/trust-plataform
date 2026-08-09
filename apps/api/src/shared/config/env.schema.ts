@@ -31,6 +31,11 @@ export const envSchema = z.object({
   APP_BASE_URL: z.string().url().default('http://localhost:3000'),
   EMAIL_VERIFICATION_TTL_HOURS: z.coerce.number().int().positive().default(24),
   PASSWORD_RESET_TTL_MINUTES: z.coerce.number().int().positive().default(30),
+  /** Checagem de senha vazada via HIBP (k-anonymity); desligar em testes/offline. */
+  PASSWORD_BREACH_CHECK_ENABLED: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((value) => value === 'true'),
 });
 
 export type Env = z.infer<typeof envSchema>;

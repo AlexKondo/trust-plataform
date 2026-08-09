@@ -22,4 +22,6 @@ if (process.env.TEST_DATABASE_URL) {
   process.env.BREVO_API_KEY = '';
   process.env.LOGIN_MAX_FAILED_ATTEMPTS = '3';
   process.env.LOGIN_LOCKOUT_MINUTES = '15';
+  // Testes nunca chamam a API do HIBP
+  process.env.PASSWORD_BREACH_CHECK_ENABLED = 'false';
 }

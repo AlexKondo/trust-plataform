@@ -3,10 +3,12 @@ import { PinoLogger } from 'nestjs-pino';
 import { AuditLogService } from '../../../../shared/audit/audit-log.service';
 import { DRIZZLE, Database } from '../../../../shared/database/database.module';
 import { OutboxService } from '../../../../shared/events/outbox.service';
+import { BreachedPasswordException } from '../../domain/exceptions/breached-password.exception';
 import {
   ExpiredResetTokenException,
   InvalidResetTokenException,
 } from '../../domain/exceptions/password.exceptions';
+import { PasswordBreachService } from '../../domain/services/password-breach.service';
 import { IdentityRepository } from '../../domain/repositories/identity.repository';
 import { PasswordResetTokenRepository } from '../../domain/repositories/password-reset-token.repository';
 import { SessionRepository } from '../../domain/repositories/session.repository';
@@ -28,6 +30,7 @@ export class ResetPasswordUseCase {
     private readonly tokenRepository: PasswordResetTokenRepository,
     private readonly sessionRepository: SessionRepository,
     private readonly passwordHashService: PasswordHashService,
+    private readonly passwordBreachService: PasswordBreachService,
     private readonly tokenGenerator: TokenGeneratorService,
     private readonly outboxService: OutboxService,
     private readonly auditLogService: AuditLogService,
@@ -53,6 +56,10 @@ export class ResetPasswordUseCase {
     const identity = await this.identityRepository.findById(token.identityId);
     if (!identity) {
       throw new InvalidResetTokenException();
+    }
+
+    if (await this.passwordBreachService.isBreached(request.newPassword)) {
+      throw new BreachedPasswordException();
     }
 
     const resetAt = new Date();

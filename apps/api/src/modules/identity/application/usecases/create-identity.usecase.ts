@@ -3,8 +3,10 @@ import { PinoLogger } from 'nestjs-pino';
 import { AuditLogService } from '../../../../shared/audit/audit-log.service';
 import { DRIZZLE, Database } from '../../../../shared/database/database.module';
 import { Identity } from '../../domain/entities/identity';
+import { BreachedPasswordException } from '../../domain/exceptions/breached-password.exception';
 import { EmailAlreadyExistsException } from '../../domain/exceptions/email-already-exists.exception';
 import { IdentityRepository } from '../../domain/repositories/identity.repository';
+import { PasswordBreachService } from '../../domain/services/password-breach.service';
 import { PasswordHashService } from '../../domain/services/password-hash.service';
 import { CreateIdentityRequest } from '../dto/create-identity.request';
 import { CreateIdentityResponse } from '../dto/create-identity.response';
@@ -29,6 +31,7 @@ export class CreateIdentityUseCase {
   constructor(
     private readonly identityRepository: IdentityRepository,
     private readonly passwordHashService: PasswordHashService,
+    private readonly passwordBreachService: PasswordBreachService,
     private readonly auditLogService: AuditLogService,
     private readonly generateEmailVerification: GenerateEmailVerificationUseCase,
     @Inject(DRIZZLE) private readonly db: Database,
@@ -45,6 +48,10 @@ export class CreateIdentityUseCase {
 
     if (await this.identityRepository.existsByEmail(request.email)) {
       throw new EmailAlreadyExistsException();
+    }
+
+    if (await this.passwordBreachService.isBreached(request.password)) {
+      throw new BreachedPasswordException();
     }
 
     const passwordHash = await this.passwordHashService.hash(request.password);

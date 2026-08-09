@@ -17,6 +17,7 @@ import { IdentityRepository } from '../../domain/repositories/identity.repositor
 import { PasswordResetTokenRepository } from '../../domain/repositories/password-reset-token.repository';
 import { SessionRepository } from '../../domain/repositories/session.repository';
 import { EmailService } from '../../domain/services/email.service';
+import { PasswordBreachService } from '../../domain/services/password-breach.service';
 import { PasswordHashService } from '../../domain/services/password-hash.service';
 import { CryptoTokenGeneratorService } from '../../infrastructure/security/crypto-token-generator.service';
 import { ChangePasswordUseCase } from './change-password.usecase';
@@ -48,6 +49,8 @@ const hashMock = () =>
       Promise.resolve(password === OLD_PASSWORD && hash === OLD_HASH),
     ),
   }) as unknown as PasswordHashService;
+const breachMock = () =>
+  ({ isBreached: vi.fn().mockResolvedValue(false) }) as unknown as PasswordBreachService;
 
 function makeIdentity(): Identity {
   const identity = Identity.createNew({
@@ -148,6 +151,7 @@ describe('ResetPasswordUseCase (IDN-008)', () => {
       tokenRepository,
       sessionRepository,
       passwordHashService,
+      breachMock(),
       tokenGenerator,
       outboxService,
       auditMock(),
@@ -228,6 +232,7 @@ describe('ChangePasswordUseCase (IDN-009)', () => {
       identityRepository,
       sessionRepository,
       hashMock(),
+      breachMock(),
       outboxService,
       auditMock(),
       dbMock(),
