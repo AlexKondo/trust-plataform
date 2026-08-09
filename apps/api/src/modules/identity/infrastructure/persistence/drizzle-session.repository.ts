@@ -52,6 +52,15 @@ export class DrizzleSessionRepository extends SessionRepository {
     return row ? this.toEntity(row) : null;
   }
 
+  async findByAccessTokenId(accessTokenId: string): Promise<Session | null> {
+    const [row] = await this.db
+      .select()
+      .from(sessions)
+      .where(eq(sessions.accessTokenId, accessTokenId))
+      .limit(1);
+    return row ? this.toEntity(row) : null;
+  }
+
   async findActiveByIdentity(identityId: string): Promise<Session[]> {
     const rows = await this.db
       .select()

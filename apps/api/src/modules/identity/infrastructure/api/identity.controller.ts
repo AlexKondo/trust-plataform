@@ -3,14 +3,18 @@ import { FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { RequestContext } from '../../../../shared/logging/correlation-id.middleware';
 import { ZodValidationPipe } from '../../../../shared/api/zod-validation.pipe';
+import { AuthenticatedIdentity } from '../../../../shared/security/authenticated-identity';
+import { CurrentIdentity } from '../../../../shared/security/current-identity.decorator';
 import { Public } from '../../../../shared/security/public.decorator';
 import {
   CreateIdentityRequest,
   createIdentityRequestSchema,
 } from '../../application/dto/create-identity.request';
 import { CreateIdentityResponse } from '../../application/dto/create-identity.response';
+import { GetCurrentIdentityResponse } from '../../application/dto/get-current-identity.response';
 import { CreateIdentityUseCase, RequestMetadata } from '../../application/usecases/create-identity.usecase';
 import { GenerateEmailVerificationUseCase } from '../../application/usecases/generate-email-verification.usecase';
+import { GetCurrentIdentityUseCase } from '../../application/usecases/get-current-identity.usecase';
 import {
   VerifyEmailResponse,
   VerifyEmailUseCase,
@@ -31,7 +35,16 @@ export class IdentityController {
     private readonly createIdentityUseCase: CreateIdentityUseCase,
     private readonly verifyEmailUseCase: VerifyEmailUseCase,
     private readonly generateEmailVerificationUseCase: GenerateEmailVerificationUseCase,
+    private readonly getCurrentIdentityUseCase: GetCurrentIdentityUseCase,
   ) {}
+
+  /** IDN-005 — dados da Identity autenticada (rota protegida pelo guard global). */
+  @Get('me')
+  async getCurrentIdentity(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+  ): Promise<GetCurrentIdentityResponse> {
+    return this.getCurrentIdentityUseCase.execute(identity.identityId);
+  }
 
   /** IDN-001 — cadastro público; o envelope {success, data} é aplicado pelo interceptor. */
   @Public()

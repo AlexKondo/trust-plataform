@@ -67,6 +67,18 @@
   | identityId | UUID | dona da sessão |
   | refreshedAt | ISO 8601 UTC | momento da renovação |
 
+### Session.LoggedOut (v1.0)
+
+- **Descrição**: sessão encerrada pelo usuário (IDN-006). Afeta só a sessão atual.
+- **Produtor**: identity-service
+- **Consumidores**: auditoria/analytics (nenhum consumidor de negócio no MVP).
+- **Payload**:
+  | campo | tipo | descrição |
+  |---|---|---|
+  | sessionId | UUID | sessão revogada |
+  | identityId | UUID | dona da sessão |
+  | loggedOutAt | ISO 8601 UTC | momento do logout |
+
 ### Identity.EmailVerified (v1.0)
 
 - **Descrição**: e-mail confirmado pelo dono da conta (IDN-002). `causationId` aponta para o `Identity.Created` da mesma transação.

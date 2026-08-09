@@ -103,6 +103,52 @@ paths:
                   code: EMAIL_ALREADY_EXISTS
                   message: An identity with this email already exists.
 
+  /identities/me:
+    get:
+      tags: [Identity]
+      summary: IDN-005 — Dados da Identity autenticada
+      description: >
+        Rota da spec era `/me`; padronizada como `/identities/me` (mesmo padrão de
+        `/trust-passports/me` do TPS-002). Retorna apenas dados públicos.
+      operationId: getCurrentIdentity
+      responses:
+        '200':
+          description: Dados da Identity autenticada
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  identityId: '019fe415-6318-7bfb-a184-3f47c3f0b7e1'
+                  fullName: John Doe
+                  email: john@email.com
+                  status: ACTIVE
+                  createdAt: '2026-08-08T10:00:00.000Z'
+                  lastLoginAt: '2026-08-08T20:30:00.000Z'
+        '401':
+          description: Sem token ou token inválido/expirado (INVALID_TOKEN)
+        '403':
+          description: Identity não está ativa (IDENTITY_NOT_ACTIVE)
+        '404':
+          description: Identity não encontrada (IDENTITY_NOT_FOUND)
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: IDN-006 — Encerrar a sessão atual
+      description: >
+        Revoga apenas a sessão do access token usado na chamada; outras sessões
+        do usuário permanecem ativas. O refresh token da sessão morre imediatamente;
+        o access token permanece válido até expirar (≤15 min — P7, sem blocklist no MVP).
+      operationId: logout
+      responses:
+        '204':
+          description: Sessão revogada; sem corpo
+        '401':
+          description: Sem token válido (INVALID_TOKEN) ou sessão já revogada (SESSION_ALREADY_REVOKED)
+        '404':
+          description: Sessão não encontrada (SESSION_NOT_FOUND)
+
   /identities/verify-email:
     get:
       tags: [Identity]
