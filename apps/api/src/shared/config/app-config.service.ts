@@ -15,7 +15,7 @@ export class AppConfigService {
   }
 
   get apiPort(): number {
-    return this.config.get('API_PORT', { infer: true });
+    return this.config.get('PORT', { infer: true }) ?? this.config.get('API_PORT', { infer: true });
   }
 
   get databaseUrl(): string {

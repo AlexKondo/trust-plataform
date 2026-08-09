@@ -1,0 +1,28 @@
+# Blueprint do Render para a API da Trust Platform.
+# No Render: New + → Blueprint → conectar este repositório → ele lê este arquivo.
+# As variáveis marcadas sync:false são preenchidas no painel (valores do seu .env).
+services:
+  - type: web
+    name: trust-api
+    runtime: node
+    plan: free
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @trust/api build
+    startCommand: node apps/api/dist/shared/database/migrate.js && node apps/api/dist/main.js
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_DATABASE_URL
+        sync: false
+      - key: JWT_PRIVATE_KEY
+        sync: false
+      - key: JWT_PUBLIC_KEY
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: APP_BASE_URL
+        sync: false

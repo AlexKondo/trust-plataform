@@ -3,6 +3,8 @@ import { z } from 'zod';
 export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   API_PORT: z.coerce.number().int().positive().default(3001),
+  /** Porta injetada por plataformas de hospedagem (Render/Railway); vence a API_PORT. */
+  PORT: z.coerce.number().int().positive().optional(),
 
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
   DIRECT_DATABASE_URL: z.string().min(1).optional(),
