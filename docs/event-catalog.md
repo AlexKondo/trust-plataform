@@ -29,6 +29,38 @@
 
 ## Eventos ativos
 
+### MarketplaceListing.Created (v1.0) · MarketplaceListing.Updated (v1.0) · MarketplaceListing.Published (v1.0)
+
+- **Descrição**: ciclo de vida do anúncio (MRK-001/002/003). `Created` sai com `status: DRAFT` (o anúncio ainda não é visível); `Published` é o marco que o torna pesquisável.
+- **Produtor**: marketplace-service
+- **Consumidores**: nenhum no MVP (auditoria/analytics). Pontuação de confiança por atividade no Marketplace só entra com pedidos/reviews (Módulos 8–9, INCONSISTENCIAS #13).
+- **Payloads**: `Created {listingId, ownerId, status: "DRAFT", createdAt}`; `Updated {listingId, ownerId, updatedFields: string[], updatedAt}`; `Published {listingId, ownerId, category, status: "PUBLISHED", publishedAt}`
+- **Exemplo**:
+  ```json
+  { "eventId": "019fe8f0-…", "eventName": "MarketplaceListing.Published", "eventVersion": "1.0", "occurredAt": "2026-08-09T18:00:00Z", "producer": "marketplace-service", "correlationId": "019fe8f0-…", "payload": { "listingId": "019fe8f0-…", "ownerId": "019fe41e-…", "category": "HOME_REPAIRS", "status": "PUBLISHED", "publishedAt": "2026-08-09T18:00:00Z" } }
+  ```
+
+### MarketplaceListing.Viewed (v1.0)
+
+- **Descrição**: visualização do detalhe de um anúncio publicado (MRK-005 BR-004). Publicado também para visitante anônimo (`viewerId: null`) e nunca para o próprio dono.
+- **Produtor**: marketplace-service
+- **Consumidores**: nenhum no MVP (analytics de vitrine).
+- **Payload**: `{ listingId: UUID, viewerId: UUID | null, viewedAt: ISO 8601 }`
+
+### MarketplaceConversation.Created (v1.0) · MarketplaceConversation.Closed (v1.0) · MarketplaceConversation.Read (v1.0)
+
+- **Descrição**: ciclo da conversa de negociação (MRK-006/007/008). `Created` só sai quando uma conversa nova nasce — reaproveitar uma conversa ativa (BR-005 do MRK-006, INCONSISTENCIAS #9) publica apenas `MarketplaceMessage.Sent`. `Read` só sai quando alguma mensagem realmente mudou de estado.
+- **Produtor**: marketplace-service
+- **Consumidores**: nenhum no MVP (notificações são pós-MVP).
+- **Payloads**: `Created {conversationId, listingId, buyerId, sellerId, startedAt}`; `Closed {conversationId, listingId, closedBy, closedAt}`; `Read {conversationId, readerId, messagesRead, readAt}`
+
+### MarketplaceMessage.Sent (v1.0)
+
+- **Descrição**: mensagem registrada na conversa (MRK-006/007). Mensagens são imutáveis — não existe evento de edição ou exclusão.
+- **Produtor**: marketplace-service
+- **Consumidores**: nenhum no MVP (notificação ao destinatário é pós-MVP).
+- **Payload**: `{ conversationId: UUID, messageId: UUID, senderId: UUID, sentAt: ISO 8601 }`
+
 ### TrustBadge.Awarded (v1.0) · TrustBadge.Revoked (v1.0)
 
 - **Descrição**: badge concedido/revogado pelo motor (TRS-013). PERMANENT nunca é revogado; DYNAMIC reflete o estado atual. SÓ o TRS publica `TrustBadge.*`.

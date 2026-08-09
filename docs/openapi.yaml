@@ -17,6 +17,7 @@ tags:
   - name: Trust Passport
   - name: Verification
   - name: Trust Score
+  - name: Marketplace
 
 paths:
   /health:
@@ -686,7 +687,7 @@ paths:
       tags: [Trust Score]
       summary: TRS-010 — Listar benefícios (ADMIN)
       operationId: listTrustBenefits
-      responses: { '200': { description: Benefícios com condições de elegibilidade sobre {score, level} } }
+      responses: { '200': { description: 'Benefícios com condições de elegibilidade sobre {score, level}' } }
     post:
       tags: [Trust Score]
       summary: TRS-010 — Criar benefício (ADMIN)
@@ -814,6 +815,245 @@ paths:
       operationId: updateBadge
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: Atualizado } }
+
+  # ── Marketplace (Módulo 6 — MRK-001..008) ─────────────────────────────────
+  /marketplace/listings:
+    get:
+      tags: [Marketplace]
+      summary: MRK-004 — Buscar anúncios publicados (sem auth)
+      description: >
+        Só retorna anúncios PUBLISHED. Filtros combináveis; ordenação por
+        relevance (padrão) | recent | price_asc | price_desc | trust_score.
+        `minimumTrustLevel` filtra pelo nível do anunciante (Trust Layer).
+      operationId: searchMarketplaceListings
+      security: []
+      parameters:
+        - { name: q, in: query, schema: { type: string, minLength: 2 } }
+        - { name: category, in: query, schema: { type: string }, description: 'Código da categoria (ex.: ELECTRICAL)' }
+        - { name: listingType, in: query, schema: { type: string, enum: [PRODUCT, SERVICE] } }
+        - { name: minPrice, in: query, schema: { type: number } }
+        - { name: maxPrice, in: query, schema: { type: number } }
+        - { name: currency, in: query, schema: { type: string, minLength: 3, maxLength: 3 } }
+        - { name: location, in: query, schema: { type: string } }
+        - { name: minimumTrustLevel, in: query, schema: { type: string }, description: 'Ex.: SILVER — inclui os níveis acima' }
+        - { name: sort, in: query, schema: { type: string, enum: [relevance, recent, price_asc, price_desc, trust_score] } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: size, in: query, schema: { type: integer, default: 20, maximum: 50 } }
+      responses:
+        '200':
+          description: Resumo dos anúncios + bloco pagination
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  - listingId: 019fe8f0-0000-7000-8000-000000000001
+                    title: Montagem de móveis e pequenos reparos
+                    excerpt: Atendo toda a região central, com garantia de 90 dias…
+                    listingType: SERVICE
+                    category: HOME_REPAIRS
+                    categoryName: Reparos e Manutenção
+                    price: 180
+                    currency: BRL
+                    location: São Paulo/SP
+                    imageUrl: https://cdn.trustplatform.test/foto-1.jpg
+                    publishedAt: '2026-08-09T18:00:00.000Z'
+                    viewCount: 12
+                    seller: { trustScore: 25, trustLevel: BRONZE }
+                pagination: { page: 1, pageSize: 20, totalItems: 1, totalPages: 1 }
+        '400': { description: Parâmetros inválidos (VALIDATION_ERROR) }
+    post:
+      tags: [Marketplace]
+      summary: MRK-001 — Criar anúncio (nasce em DRAFT)
+      description: >
+        Só `title` é obrigatório: o rascunho pode nascer incompleto (BR-004) e a
+        obrigatoriedade dos demais campos é cobrada na publicação (MRK-003
+        BR-003). Ver INCONSISTENCIAS #29.
+      operationId: createMarketplaceListing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              title: Montagem de móveis e pequenos reparos
+              description: Atendo toda a região central, com garantia de 90 dias no serviço.
+              listingType: SERVICE
+              category: HOME_REPAIRS
+              price: 180
+              currency: BRL
+              location: São Paulo/SP
+              images: ['https://cdn.trustplatform.test/foto-1.jpg']
+      responses:
+        '201': { description: 'Anúncio criado em DRAFT; `publishing.missingFields` lista o que falta' }
+        '401': { description: Sem token (INVALID_TOKEN) }
+        '422': { description: Categoria inexistente/inativa (MARKETPLACE_CATEGORY_NOT_FOUND) }
+
+  /marketplace/listings/categories:
+    get:
+      tags: [Marketplace]
+      summary: Categorias ativas e seus requisitos de reputação (sem auth)
+      operationId: listMarketplaceCategories
+      security: []
+      responses:
+        '200': { description: '[{code, name, description, minimumTrustLevel, minimumScore}]' }
+
+  /marketplace/listings/mine:
+    get:
+      tags: [Marketplace]
+      summary: Meus anúncios (inclui rascunhos e pendências de publicação)
+      operationId: listMyMarketplaceListings
+      parameters:
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: size, in: query, schema: { type: integer, default: 20, maximum: 50 } }
+      responses: { '200': { description: Resumo + status + missingFields, paginado } }
+
+  /marketplace/listings/{listingId}:
+    get:
+      tags: [Marketplace]
+      summary: MRK-005 — Detalhe do anúncio (sem auth)
+      description: >
+        Público vê só PUBLISHED e o resumo do anunciante conforme as Visibility
+        Policies (TRS-016). Com Bearer token do dono, devolve o próprio anúncio
+        em qualquer status e não conta visualização.
+      operationId: getMarketplaceListing
+      security: []
+      parameters: [{ name: listingId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200':
+          description: Anúncio completo (+ seller na visão pública)
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  listingId: 019fe8f0-0000-7000-8000-000000000001
+                  title: Montagem de móveis e pequenos reparos
+                  status: PUBLISHED
+                  price: 180
+                  currency: BRL
+                  images: ['https://cdn.trustplatform.test/foto-1.jpg']
+                  viewCount: 13
+                  seller:
+                    displayName: João F.
+                    trustLevel: BRONZE
+                    trustScore: 25
+                    badges: [{ code: TRUSTED_MEMBER, name: Membro Confiável }]
+                    verifications: { emailVerified: true, phoneVerified: false, documentVerified: false, addressVerified: false }
+                    memberSince: '2026-08-09T12:00:00.000Z'
+        '404': { description: Inexistente ou não publicado (MARKETPLACE_LISTING_NOT_FOUND) }
+    put:
+      tags: [Marketplace]
+      summary: MRK-002 — Atualizar anúncio (só o dono; não altera status)
+      operationId: updateMarketplaceListing
+      parameters: [{ name: listingId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example: { price: 200, location: São Paulo/SP }
+      responses:
+        '200': { description: Atualizado (publica MarketplaceListing.Updated com updatedFields) }
+        '403': { description: Não é o dono (MARKETPLACE_LISTING_FORBIDDEN) }
+        '404': { description: Não encontrado }
+        '409': { description: Status não permite mais edição (MARKETPLACE_LISTING_NOT_EDITABLE) }
+
+  /marketplace/listings/{listingId}/publish:
+    post:
+      tags: [Marketplace]
+      summary: MRK-003 — Publicar anúncio (exige conta ativa + reputação da categoria)
+      operationId: publishMarketplaceListing
+      parameters: [{ name: listingId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: 'PUBLISHED + publishedAt; publica MarketplaceListing.Published' }
+        '403': { description: 'Não é o dono, conta inativa ou nível insuficiente (MARKETPLACE_PUBLICATION_NOT_ALLOWED)' }
+        '404': { description: Não encontrado }
+        '409': { description: Já publicado (MARKETPLACE_LISTING_ALREADY_PUBLISHED) }
+        '422': { description: 'Campos obrigatórios ausentes (MARKETPLACE_LISTING_INCOMPLETE)' }
+
+  /marketplace/listings/{listingId}/contact:
+    post:
+      tags: [Marketplace]
+      summary: MRK-006 — Entrar em contato com o anunciante
+      description: >
+        201 quando abre a conversa; **200 quando reutiliza** uma conversa ativa
+        entre as mesmas partes para o mesmo anúncio (BR-005 + INCONSISTENCIAS
+        #9 — nunca 409, nunca duplicata).
+      operationId: contactMarketplaceListingOwner
+      parameters: [{ name: listingId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example: { message: 'Olá! Você atende no sábado de manhã?' }
+      responses:
+        '201': { description: '{conversation, message, created: true}' }
+        '200': { description: '{conversation, message, created: false} — conversa ativa reaproveitada' }
+        '404': { description: 'Anúncio inexistente ou indisponível (MARKETPLACE_LISTING_UNAVAILABLE)' }
+        '422': { description: 'Contato com o próprio anúncio (CANNOT_CONTACT_OWN_LISTING)' }
+
+  /marketplace/conversations:
+    get:
+      tags: [Marketplace]
+      summary: MRK-007 — Minhas conversas (como comprador ou vendedor)
+      operationId: listMarketplaceConversations
+      parameters:
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: size, in: query, schema: { type: integer, default: 20, maximum: 50 } }
+      responses:
+        '200': { description: '[{conversationId, listingId, listingTitle, counterpartName, status, lastMessageAt, lastMessagePreview, unreadCount}] + pagination' }
+
+  /marketplace/conversations/{conversationId}:
+    get:
+      tags: [Marketplace]
+      summary: MRK-007 — Conversa + histórico de mensagens (só participantes)
+      operationId: getMarketplaceConversation
+      parameters:
+        - { name: conversationId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: size, in: query, schema: { type: integer, default: 50, maximum: 100 } }
+      responses:
+        '200': { description: '{conversation, messages[], pagination}' }
+        '403': { description: Não é participante (MARKETPLACE_CONVERSATION_FORBIDDEN) }
+        '404': { description: Não encontrada (MARKETPLACE_CONVERSATION_NOT_FOUND) }
+
+  /marketplace/conversations/{conversationId}/messages:
+    post:
+      tags: [Marketplace]
+      summary: MRK-007 — Enviar mensagem (só participantes, só conversa OPEN)
+      operationId: sendMarketplaceMessage
+      parameters: [{ name: conversationId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example: { message: 'Bom dia! Atendo sim, sábado às 8h.' }
+      responses:
+        '201': { description: 'Mensagem registrada (imutável); publica MarketplaceMessage.Sent' }
+        '403': { description: Não é participante }
+        '409': { description: Conversa encerrada (MARKETPLACE_CONVERSATION_CLOSED) }
+
+  /marketplace/conversations/{conversationId}/read:
+    patch:
+      tags: [Marketplace]
+      summary: MRK-007 — Marcar como lidas as mensagens recebidas
+      operationId: markMarketplaceMessagesAsRead
+      parameters: [{ name: conversationId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: '{messagesRead}; publica MarketplaceConversation.Read quando houver mudança' } }
+
+  /marketplace/conversations/{conversationId}/close:
+    post:
+      tags: [Marketplace]
+      summary: MRK-008 — Encerrar conversa (histórico preservado)
+      operationId: closeMarketplaceConversation
+      parameters: [{ name: conversationId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        content:
+          application/json:
+            example: { reason: 'Negociação concluída.' }
+      responses:
+        '200': { description: 'CLOSED + closedAt/closedBy; publica MarketplaceConversation.Closed' }
+        '403': { description: Não é participante }
+        '409': { description: Já encerrada (MARKETPLACE_CONVERSATION_ALREADY_CLOSED) }
 
 components:
   securitySchemes:

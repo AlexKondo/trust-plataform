@@ -29,6 +29,8 @@ import { TrustScoreRepository } from './infrastructure/persistence/drizzle-trust
     VerificationRejectedScoringConsumer,
     AwardBadgesConsumer,
   ],
-  exports: [TrustScoreRepository],
+  // TrustProfileService é exportado para o Marketplace montar o resumo público
+  // do anunciante respeitando as Visibility Policies (MRK-005 BR-003/005).
+  exports: [TrustScoreRepository, TrustProfileService],
 })
 export class TrustScoreModule {}

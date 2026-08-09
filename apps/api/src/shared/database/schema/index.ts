@@ -11,3 +11,4 @@ export * from '../../../modules/trust-passport/infrastructure/persistence/trust-
 export * from '../../../modules/verification/infrastructure/persistence/verifications.schema';
 export * from '../../../modules/trust-score/infrastructure/persistence/trust-score.schema';
 export * from '../../../modules/trust-score/infrastructure/persistence/trust-reputation.schema';
+export * from '../../../modules/marketplace/infrastructure/persistence/marketplace.schema';

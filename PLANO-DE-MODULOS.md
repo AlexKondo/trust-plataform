@@ -58,10 +58,11 @@ Ordem funcional corrigida:
 3. TRS-015 Get Trust Profile consolidado (`PUBLIC_VIEW`/`PRIVATE_VIEW`) — renomear artefatos para não colidir com TRS-005 (ver INCONSISTENCIAS #3)
 4. TRS-017 Share (links revogáveis) + TRS-019 Revoke (é extensão do 017, não reimplementar) + TRS-018 Verification Link + TRS-020 Access History (a tabela `trust_profile_access_logs` precisa nascer com o TRS-017)
 
-### Módulo 6 — MRK Listings + Conversations (Sprint 7) — MRK-001..008
+### Módulo 6 — MRK Listings + Conversations (Sprint 7) — MRK-001..008 ✅ CONCLUÍDO (2026-08-09)
 - Listings: Create (DRAFT) → Update → Publish (exige Identity ativa + reputação mínima por categoria) → Search → Get
 - Conversations: Contact Owner (reutiliza conversa ativa — ver INCONSISTENCIAS #9) → Manage (mensagens imutáveis) → Close
-- Tabelas: `marketplace_listings`, `marketplace_conversations`, `marketplace_messages`
+- Tabelas: `marketplace_listings`, `marketplace_conversations`, `marketplace_messages` + `marketplace_categories` e `marketplace_listing_images` (lacunas das specs — INCONSISTENCIAS #30/#31)
+- Primeiro módulo que **consome** a Trust Layer: nível mínimo por categoria como porteiro da publicação, reputação do anunciante na busca (filtro + ordenação) e no detalhe (respeitando as Visibility Policies do TRS-016)
 
 ### Módulo 7 — MRK Offers (Sprints 8–9) — MRK-009..014
 Create → Update → Withdraw → Counter (`parentOfferId`, sem limite de rodadas) → **Accept** (pivô: encerra concorrentes como `CLOSED`, listing → `RESERVED`, cria Order na mesma transação) → Reject.

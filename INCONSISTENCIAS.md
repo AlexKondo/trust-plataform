@@ -35,6 +35,9 @@
 | 26 | `UNIQUE(order_id)` em `scheduling` vs "histórico de reagendamentos" (MRK-019 BR-006) | MVP sem reagendamento ⇒ manter `UNIQUE(order_id)`. Se reagendamento entrar, trocar por `UNIQUE(order_id) WHERE status = 'ACTIVE'`. |
 | 27 | Founder Book: Trust Engine com 5 pilares vs 8 componentes vs 10 capacidades; "Trust Points" só na V2 | Para o MVP vale o que as specs implementam: **Score, Level, Badges, Benefits, Passport, Shares**. Trust Points/Capital/Coin/Shield ficam pós-MVP (não há spec). |
 | 28 | Domínio "Compliance" citado (TP-004) mas ausente da lista de domínios | Antifraude/compliance = responsabilidade futura do módulo **Administration**. Nenhuma feature MVP depende disso. |
+| 29 | MRK-001: BR-002 exige título/descrição/categoria/tipo/preço/moeda, mas BR-004 permite salvar rascunho incompleto | **BR-002 define o anúncio COMPLETO**, cobrado na publicação (MRK-003 BR-003). A criação exige só o `title`; as colunas de conteúdo são NULLABLE e a API devolve `publishing.missingFields` com o que falta. |
+| 30 | MRK-001/003/004 usam `category_id UUID`, mas nenhuma spec cria a tabela de categorias — e MRK-003 BR-005 exige "requisitos mínimos de reputação para a categoria" | Criar **`marketplace_categories`** (código, nome, `minimum_trust_level`, `minimum_score`) com seed de 12 categorias. A API recebe/devolve o **código** (`ELECTRICAL`), não o UUID. É o único ponto do MVP em que reputação vira permissão de negócio. |
+| 31 | MRK-004 filtra por localização e MRK-005 exibe imagens, mas nenhum campo/tabela existe nas specs de banco | Adicionar `location VARCHAR(160)` em `marketplace_listings` (texto livre "Cidade/UF") e criar **`marketplace_listing_images`** (URL + posição). MVP aceita **URLs já hospedadas**; upload binário para o Supabase Storage fica para a feature de mídia. |
 
 ## Decisões de stack e infraestrutura (DECIDIDO em 2026-08-08)
 
