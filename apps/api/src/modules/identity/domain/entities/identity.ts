@@ -81,4 +81,14 @@ export class Identity {
   get deletedAt(): Date | null {
     return this.props.deletedAt;
   }
+
+  get isActive(): boolean {
+    return this.props.status === IDENTITY_STATUS.ACTIVE;
+  }
+
+  /** IDN-002 BR-005: e-mail confirmado → conta ativada. */
+  activate(now = new Date()): void {
+    this.props.status = IDENTITY_STATUS.ACTIVE;
+    this.props.updatedAt = now;
+  }
 }

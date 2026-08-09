@@ -9,6 +9,7 @@ import { PasswordHashService } from '../../domain/services/password-hash.service
 import { CreateIdentityRequest } from '../dto/create-identity.request';
 import { CreateIdentityResponse } from '../dto/create-identity.response';
 import { IdentityMapper } from '../mapper/identity.mapper';
+import { GenerateEmailVerificationUseCase } from './generate-email-verification.usecase';
 
 export interface RequestMetadata {
   correlationId?: string;
@@ -29,6 +30,7 @@ export class CreateIdentityUseCase {
     private readonly identityRepository: IdentityRepository,
     private readonly passwordHashService: PasswordHashService,
     private readonly auditLogService: AuditLogService,
+    private readonly generateEmailVerification: GenerateEmailVerificationUseCase,
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly logger: PinoLogger,
   ) {
@@ -69,6 +71,17 @@ export class CreateIdentityUseCase {
         tx,
       );
     });
+
+    // IDN-002 BR-001: toda nova Identity recebe token + e-mail de verificação.
+    // Falha aqui não desfaz o cadastro — o usuário pode pedir reenvio.
+    try {
+      await this.generateEmailVerification.issueAndSend(identity, metadata);
+    } catch (error) {
+      this.logger.error(
+        { err: error, operation: 'CreateIdentity', identityId: identity.id },
+        'Failed to issue verification email after registration.',
+      );
+    }
 
     this.logger.info(
       {

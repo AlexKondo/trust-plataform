@@ -8,6 +8,7 @@ import { IdentityRepository } from '../../domain/repositories/identity.repositor
 import { PasswordHashService } from '../../domain/services/password-hash.service';
 import { CreateIdentityRequest } from '../dto/create-identity.request';
 import { CreateIdentityUseCase } from './create-identity.usecase';
+import { GenerateEmailVerificationUseCase } from './generate-email-verification.usecase';
 
 const request: CreateIdentityRequest = {
   fullName: 'John Doe',
@@ -31,6 +32,9 @@ function makeUseCase(overrides: { emailExists?: boolean } = {}) {
   } as unknown as PasswordHashService;
 
   const auditLogService = { record: vi.fn().mockResolvedValue(undefined) } as unknown as AuditLogService;
+  const generateEmailVerification = {
+    issueAndSend: vi.fn().mockResolvedValue(undefined),
+  } as unknown as GenerateEmailVerificationUseCase;
   const fakeTx = Symbol('tx');
   const db = {
     transaction: vi.fn(async (fn: (tx: unknown) => Promise<void>) => fn(fakeTx)),
@@ -38,10 +42,18 @@ function makeUseCase(overrides: { emailExists?: boolean } = {}) {
   const logger = { setContext: vi.fn(), info: vi.fn(), error: vi.fn() } as unknown as PinoLogger;
 
   return {
-    useCase: new CreateIdentityUseCase(repository, passwordHashService, auditLogService, db, logger),
+    useCase: new CreateIdentityUseCase(
+      repository,
+      passwordHashService,
+      auditLogService,
+      generateEmailVerification,
+      db,
+      logger,
+    ),
     repository,
     passwordHashService,
     auditLogService,
+    generateEmailVerification,
     fakeTx,
   };
 }
@@ -62,6 +74,14 @@ describe('CreateIdentityUseCase (IDN-001)', () => {
     const savedIdentity = vi.mocked(repository.save).mock.calls[0]?.[0];
     expect(savedIdentity?.passwordHash).toBe('$argon2id$fake-hash');
     expect(JSON.stringify(savedIdentity)).not.toContain(request.password);
+  });
+
+  it('dispara token + e-mail de verificação após criar (IDN-002 BR-001), sem falhar o cadastro se o envio quebrar', async () => {
+    const { useCase, generateEmailVerification } = makeUseCase();
+    vi.mocked(generateEmailVerification.issueAndSend).mockRejectedValueOnce(new Error('smtp down'));
+    const response = await useCase.execute(request);
+    expect(generateEmailVerification.issueAndSend).toHaveBeenCalledOnce();
+    expect(response.status).toBe(IDENTITY_STATUS.PENDING_EMAIL_VERIFICATION);
   });
 
   it('rejeita e-mail duplicado sem criar Identity (BR-001/006)', async () => {

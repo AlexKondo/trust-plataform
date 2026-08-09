@@ -53,4 +53,20 @@ export class AppConfigService {
   get outboxMaxAttempts(): number {
     return this.config.get('OUTBOX_MAX_ATTEMPTS', { infer: true });
   }
+
+  get brevoApiKey(): string | undefined {
+    return this.config.get('BREVO_API_KEY', { infer: true });
+  }
+
+  get emailFrom(): string {
+    return this.config.get('EMAIL_FROM', { infer: true });
+  }
+
+  get appBaseUrl(): string {
+    return this.config.get('APP_BASE_URL', { infer: true });
+  }
+
+  get emailVerificationTtlHours(): number {
+    return this.config.get('EMAIL_VERIFICATION_TTL_HOURS', { infer: true });
+  }
 }

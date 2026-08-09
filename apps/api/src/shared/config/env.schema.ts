@@ -20,8 +20,11 @@ export const envSchema = z.object({
   OUTBOX_BATCH_SIZE: z.coerce.number().int().min(1).default(50),
   OUTBOX_MAX_ATTEMPTS: z.coerce.number().int().min(1).default(10),
 
-  EMAIL_PROVIDER_API_KEY: z.string().optional(),
-  EMAIL_FROM: z.string().optional(),
+  BREVO_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().email().default('no-reply@trustplatform.com'),
+  /** Base do frontend para montar links de e-mail (verify, reset). */
+  APP_BASE_URL: z.string().url().default('http://localhost:3000'),
+  EMAIL_VERIFICATION_TTL_HOURS: z.coerce.number().int().positive().default(24),
 });
 
 export type Env = z.infer<typeof envSchema>;

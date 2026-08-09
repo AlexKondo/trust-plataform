@@ -102,6 +102,70 @@ paths:
                   code: EMAIL_ALREADY_EXISTS
                   message: An identity with this email already exists.
 
+  /identities/verify-email:
+    get:
+      tags: [Identity]
+      summary: IDN-002 — Confirmar e-mail via token do link (público)
+      operationId: verifyEmail
+      security: []
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 20
+            maxLength: 255
+          description: Token recebido no e-mail de verificação (validade de 24 h).
+      responses:
+        '200':
+          description: E-mail confirmado; conta ativada
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  status: ACTIVE
+        '400':
+          description: Token inválido ou expirado (INVALID_VERIFICATION_TOKEN / EXPIRED_VERIFICATION_TOKEN)
+          content:
+            application/json:
+              example:
+                success: false
+                error:
+                  code: INVALID_VERIFICATION_TOKEN
+                  message: Invalid verification token.
+        '404':
+          description: Identity não encontrada (IDENTITY_NOT_FOUND)
+        '409':
+          description: E-mail já verificado (EMAIL_ALREADY_VERIFIED)
+
+  /identities/{identityId}/verify-email:
+    post:
+      tags: [Identity]
+      summary: IDN-002 — Reenviar e-mail de verificação (público)
+      operationId: resendEmailVerification
+      security: []
+      parameters:
+        - name: identityId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '202':
+          description: Novo token gerado e e-mail solicitado; tokens anteriores invalidados
+          content:
+            application/json:
+              example:
+                success: true
+                data: null
+        '404':
+          description: Identity não encontrada (IDENTITY_NOT_FOUND)
+        '409':
+          description: E-mail já verificado (EMAIL_ALREADY_VERIFIED)
+
 components:
   securitySchemes:
     bearerAuth:
