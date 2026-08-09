@@ -20,6 +20,30 @@ All on-screen text in Brazilian Portuguese. Desktop web, responsive-friendly. Ac
 
 ---
 
+## Tela 0 — Landing Page (`/` — página pública)
+
+> Dica: para esta tela, no Stitch, peça uma página **completa com rolagem** (não é um card centralizado).
+> O bloco de estilo vale, exceto o layout de card — a landing usa seções de largura total.
+
+```
+Public marketing landing page for "Trust Platform" — the digital trust layer for the local services economy.
+Full-width scrolling page, NOT a centered card. Clean, professional, trustworthy; lots of white space.
+
+Sticky top navbar: shield-check logo + "Trust Platform" wordmark on the left; links "Como funciona", "Para profissionais", "Para clientes"; on the right a ghost button "Entrar" and a primary deep-blue button "Criar conta".
+
+Hero section: headline "Confiança que abre portas." with subheadline "A Trust Platform transforma sua reputação em um ativo real: um passaporte digital de confiança para contratar e ser contratado com segurança." Primary CTA "Criar conta gratuita" + secondary link "Ver como funciona". On the right side of the hero, a mockup of a Trust Passport card component: avatar, name "Maria Silva", tag "Verificada", a circular Trust Score indicator showing "742 — GOLD", and 3 small verification badges (identity, phone, address).
+
+Section "Como funciona" with 3 steps in cards, each with an icon: 1. "Crie sua identidade" — "Cadastre-se e confirme seus dados."; 2. "Verifique e evolua" — "Envie verificações e construa seu Trust Score."; 3. "Contrate e trabalhe com confiança" — "Use sua reputação no marketplace de serviços."
+
+Section with two audience cards side by side: "Para profissionais" — "Sua reputação vira credencial: conquiste clientes com um perfil verificado." and "Para clientes" — "Contrate com tranquilidade: veja score, verificações e histórico real."
+
+Trust indicators strip: 4 small items with icons: "Verificações auditáveis", "Score explicável", "Dados protegidos", "Você controla o que compartilha".
+
+Final CTA section on a light gray background: "Comece a construir sua confiança hoje." with primary button "Criar conta gratuita".
+
+Footer: logo, short description, columns with links "Produto", "Empresa", "Legal" (Termos de Uso, Política de Privacidade), and copyright "© 2026 Trust Platform".
+```
+
 ## Tela 1 — Cadastro (`/register`)
 
 ```
