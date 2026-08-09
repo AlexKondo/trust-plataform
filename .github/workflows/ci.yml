@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: trust
+          POSTGRES_PASSWORD: trust
+          POSTGRES_DB: trust_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U trust"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Enable pnpm via corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test (unit + e2e contra Postgres 16)
+        run: pnpm test
+        env:
+          TEST_DATABASE_URL: postgresql://trust:trust@localhost:5432/trust_test
+
+      - name: Build
+        run: pnpm build

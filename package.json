@@ -1,0 +1,27 @@
+{
+  "name": "trust-platform",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Trust Platform — infraestrutura digital de confiança para a economia de serviços locais",
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@11.20.0",
+  "scripts": {
+    "dev": "pnpm --filter @trust/api dev",
+    "build": "pnpm -r build",
+    "lint": "eslint .",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "db:generate": "pnpm --filter @trust/api db:generate",
+    "db:migrate": "pnpm --filter @trust/api db:migrate"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.32.0",
+    "eslint": "^9.32.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.39.0"
+  }
+}

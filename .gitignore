@@ -1,0 +1,30 @@
+# Ambiente — NUNCA commitar segredos
+.env
+.env.local
+.env.*.local
+.env.examples
+
+# Dependências e builds
+node_modules/
+dist/
+build/
+.next/
+coverage/
+
+# Supabase CLI (stack local)
+supabase/.temp/
+supabase/.branches/
+
+# IDE / SO
+.vscode/*
+!.vscode/extensions.json
+.idea/
+Thumbs.db
+.DS_Store
+
+# Logs
+*.log
+
+#Arquivos do projeto
+*.docx
+*.xlsx

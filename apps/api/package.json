@@ -1,0 +1,49 @@
+{
+  "name": "@trust/api",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Trust Platform API — monolito modular (IDN, TPS, VRF, TRS, MRK)",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "nest start --watch",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/main.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/shared/database/migrate.ts"
+  },
+  "dependencies": {
+    "@fastify/helmet": "^13.0.2",
+    "@nestjs/common": "^11.1.6",
+    "@nestjs/config": "^4.0.2",
+    "@nestjs/core": "^11.1.6",
+    "@nestjs/jwt": "^11.0.0",
+    "@nestjs/platform-fastify": "^11.1.6",
+    "drizzle-orm": "^0.44.4",
+    "fastify": "5.10.0",
+    "nestjs-pino": "^4.4.0",
+    "pg-boss": "^10.3.2",
+    "pino": "^9.7.0",
+    "pino-http": "^10.5.0",
+    "postgres": "^3.4.7",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "uuid": "^11.1.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.24",
+    "@nestjs/testing": "^11.1.6",
+    "@swc/core": "^1.13.3",
+    "@types/node": "^22.17.0",
+    "dotenv": "^17.2.1",
+    "drizzle-kit": "^0.31.4",
+    "pino-pretty": "^13.1.1",
+    "tsx": "^4.20.3",
+    "typescript": "^5.9.2",
+    "unplugin-swc": "^1.5.5",
+    "vitest": "^3.2.4"
+  }
+}
