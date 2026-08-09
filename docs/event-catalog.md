@@ -29,11 +29,25 @@
 
 ## Eventos ativos
 
+### TrustPassport.Created (v1.0)
+
+- **Descrição**: Trust Passport criado para uma Identity ativada (TPS-001). `causationId` aponta para o `Identity.Created` que o originou.
+- **Produtor**: trust-passport-service
+- **Consumidores**: TRS (TRS-001 — cria o Trust Score; ainda não implementado).
+- **Payload**: `{ trustPassportId: UUID, identityId: UUID, status: "ACTIVE", createdAt: ISO 8601 }`
+
+### TrustPassport.Updated (v1.0)
+
+- **Descrição**: atributos EDITABLE alterados pelo dono (TPS-003). Atributo verificável alterado tem a verificação revogada.
+- **Produtor**: trust-passport-service
+- **Consumidores**: nenhum no MVP (auditoria/analytics).
+- **Payload**: `{ trustPassportId: UUID, identityId: UUID, updatedFields: string[], updatedAt: ISO 8601 }`
+
 ### Identity.Created (v1.0)
 
 - **Descrição**: identidade **ativada e válida** para os demais módulos — publicado na verificação de e-mail (IDN-002), não no cadastro (decisão INCONSISTENCIAS #11).
 - **Produtor**: identity-service
-- **Consumidores**: TPS (TPS-001 — cria o Trust Passport automaticamente; ainda não implementado).
+- **Consumidores**: ✅ `tps.create-trust-passport` (TPS-001) — cria o Trust Passport automaticamente.
 - **Payload**:
   | campo | tipo | descrição |
   |---|---|---|

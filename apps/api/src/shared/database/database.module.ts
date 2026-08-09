@@ -30,7 +30,7 @@ class DatabaseShutdown implements OnApplicationShutdown {
         postgres(config.databaseUrl, {
           // Supabase session pooler: sem prepared statements para evitar conflitos de pool
           prepare: false,
-          max: 10,
+          max: config.dbPoolMax,
           idle_timeout: 30,
           connect_timeout: 10,
         }),

@@ -12,6 +12,7 @@ import { ResponseEnvelopeInterceptor } from './shared/api/response-envelope.inte
 import { GlobalExceptionFilter } from './shared/api/global-exception.filter';
 import { HealthModule } from './modules/health/health.module';
 import { IdentityModule } from './modules/identity/identity.module';
+import { TrustPassportModule } from './modules/trust-passport/trust-passport.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { IdentityModule } from './modules/identity/identity.module';
     AuditModule,
     HealthModule,
     IdentityModule,
+    TrustPassportModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

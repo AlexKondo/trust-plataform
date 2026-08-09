@@ -22,6 +22,10 @@ export class AppConfigService {
     return this.config.get('DATABASE_URL', { infer: true });
   }
 
+  get dbPoolMax(): number {
+    return this.config.get('DB_POOL_MAX', { infer: true });
+  }
+
   get jwtPrivateKeyPem(): string {
     return Buffer.from(this.config.get('JWT_PRIVATE_KEY', { infer: true }), 'base64').toString(
       'utf8',

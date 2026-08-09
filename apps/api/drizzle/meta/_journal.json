@@ -43,6 +43,13 @@
       "when": 1786240917365,
       "tag": "0005_spooky_mindworm",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786290277031,
+      "tag": "0006_foamy_secret_warriors",
+      "breakpoints": true
     }
   ]
 }

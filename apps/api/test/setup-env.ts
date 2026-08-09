@@ -24,4 +24,6 @@ if (process.env.TEST_DATABASE_URL) {
   process.env.LOGIN_LOCKOUT_MINUTES = '15';
   // Testes nunca chamam a API do HIBP
   process.env.PASSWORD_BREACH_CHECK_ENABLED = 'false';
+  // Pooler do Supabase free limita 15 clients — cada suíte e2e usa pool pequeno
+  process.env.DB_POOL_MAX = '4';
 }

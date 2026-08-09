@@ -14,6 +14,7 @@ tags:
   - name: Platform
   - name: Identity
   - name: Auth
+  - name: Trust Passport
 
 paths:
   /health:
@@ -369,6 +370,99 @@ paths:
           description: Sem token (INVALID_TOKEN) ou senha atual incorreta (CURRENT_PASSWORD_INVALID)
         '422':
           description: Nova senha igual à atual (SAME_PASSWORD)
+
+  /trust-passports:
+    post:
+      tags: [Trust Passport]
+      summary: TPS-001 — Criar o próprio Trust Passport (fallback manual)
+      description: >
+        Caminho normal é automático (consumer de Identity.Created). Este endpoint é o
+        fallback explícito; a Identity vem do token (anti-IDOR).
+      operationId: createTrustPassport
+      responses:
+        '201':
+          description: Passport criado (status ACTIVE, emailVerified true, completude 25)
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  trustPassportId: '019fe736-…'
+                  status: ACTIVE
+        '401':
+          description: Sem token (INVALID_TOKEN)
+        '409':
+          description: Já existe Passport para esta Identity (TRUST_PASSPORT_ALREADY_EXISTS)
+
+  /trust-passports/me:
+    get:
+      tags: [Trust Passport]
+      summary: TPS-002 — Consultar o próprio Trust Passport
+      operationId: getMyTrustPassport
+      responses:
+        '200':
+          description: Estado atual do Passport
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  trustPassportId: '019fe736-…'
+                  status: ACTIVE
+                  profileCompletion: 25
+                  emailVerified: true
+                  phoneVerified: false
+                  documentVerified: false
+                  addressVerified: false
+                  phone: null
+                  address: null
+                  createdAt: '2026-08-09T12:00:00.000Z'
+                  updatedAt: '2026-08-09T12:00:00.000Z'
+        '401':
+          description: Sem token (INVALID_TOKEN)
+        '404':
+          description: Passport ainda não criado (TRUST_PASSPORT_NOT_FOUND)
+    put:
+      tags: [Trust Passport]
+      summary: TPS-003 — Atualizar atributos EDITABLE (phone/address)
+      description: >
+        Alterar um atributo verificável revoga sua verificação e recalcula a completude.
+        Campos imutáveis não são aceitos pelo schema. Publica TrustPassport.Updated.
+      operationId: updateMyTrustPassport
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phone:
+                  type: string
+                  example: '+55 11 99999-9999'
+                address:
+                  type: object
+                  required: [country, state, city]
+                  properties:
+                    country: { type: string, minLength: 2, maxLength: 2, example: BR }
+                    state: { type: string, example: SP }
+                    city: { type: string, example: Valinhos }
+      responses:
+        '200':
+          description: Passport atualizado
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  trustPassportId: '019fe736-…'
+                  profileCompletion: 25
+                  updatedAt: '2026-08-09T12:05:00.000Z'
+        '400':
+          description: Payload inválido (VALIDATION_ERROR)
+        '401':
+          description: Sem token (INVALID_TOKEN)
+        '404':
+          description: Passport não encontrado (TRUST_PASSPORT_NOT_FOUND)
 
 components:
   securitySchemes:

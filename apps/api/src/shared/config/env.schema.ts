@@ -8,6 +8,8 @@ export const envSchema = z.object({
 
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
   DIRECT_DATABASE_URL: z.string().min(1).optional(),
+  /** Tamanho do pool do postgres.js (pooler do Supabase free limita 15 clients no total). */
+  DB_POOL_MAX: z.coerce.number().int().min(1).default(8),
 
   SUPABASE_URL: z.string().url().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),

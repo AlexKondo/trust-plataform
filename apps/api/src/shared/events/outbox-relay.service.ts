@@ -4,12 +4,14 @@ import {
   OnApplicationBootstrap,
   OnApplicationShutdown,
 } from '@nestjs/common';
+import { DiscoveryService } from '@nestjs/core';
 import { asc, eq, sql } from 'drizzle-orm';
 import { PinoLogger } from 'nestjs-pino';
 import PgBoss from 'pg-boss';
 import { AppConfigService } from '../config/app-config.service';
 import { DRIZZLE, Database } from '../database/database.module';
-import { OUTBOX_STATUS, OutboxEventRow, outboxEvents } from '../database/schema';
+import { OUTBOX_STATUS, OutboxEventRow, outboxEvents, processedEvents } from '../database/schema';
+import { EventConsumer } from './event-consumer';
 import { EventEnvelope } from './event-envelope';
 
 /**
@@ -28,6 +30,7 @@ export class OutboxRelayService implements OnApplicationBootstrap, OnApplication
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly config: AppConfigService,
+    private readonly discovery: DiscoveryService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(OutboxRelayService.name);
@@ -37,17 +40,88 @@ export class OutboxRelayService implements OnApplicationBootstrap, OnApplication
     this.boss = new PgBoss({
       connectionString: this.config.databaseUrl,
       schema: 'pgboss',
-      max: 3,
+      max: Math.min(2, this.config.dbPoolMax),
     });
     this.boss.on('error', (error) =>
       this.logger.error({ err: error }, 'pg-boss reported an error.'),
     );
     await this.boss.start();
+    await this.registerConsumers();
     this.timer = setInterval(() => void this.tick(), this.config.outboxPollIntervalMs);
     this.logger.info(
       { operation: 'OutboxRelayStart', pollIntervalMs: this.config.outboxPollIntervalMs },
       'Outbox relay started.',
     );
+  }
+
+  /**
+   * Descobre todos os providers que estendem EventConsumer e os registra no
+   * pg-boss. Cada consumo roda em transação com dedupe por (consumer, eventId).
+   */
+  private async registerConsumers(): Promise<void> {
+    const consumers = this.discovery
+      .getProviders()
+      .map((wrapper) => wrapper.instance as unknown)
+      .filter((instance): instance is EventConsumer => instance instanceof EventConsumer);
+
+    for (const consumer of consumers) {
+      await this.ensureQueue(consumer.eventName);
+      await this.boss!.work(consumer.eventName, async (jobs: PgBoss.Job<EventEnvelope>[]) => {
+        for (const job of jobs) {
+          await this.consume(consumer, job.data);
+        }
+      });
+      this.logger.info(
+        {
+          operation: 'ConsumerRegistered',
+          eventName: consumer.eventName,
+          consumerName: consumer.consumerName,
+        },
+        'Event consumer registered.',
+      );
+    }
+  }
+
+  private async consume(consumer: EventConsumer, envelope: EventEnvelope): Promise<void> {
+    try {
+      await this.db.transaction(async (tx) => {
+        const inserted = await tx
+          .insert(processedEvents)
+          .values({ consumerName: consumer.consumerName, eventId: envelope.eventId })
+          .onConflictDoNothing()
+          .returning({ eventId: processedEvents.eventId });
+        if (inserted.length === 0) {
+          // já processado (at-least-once) — idempotência garantida
+          return;
+        }
+        await consumer.handle(envelope, tx);
+      });
+      this.logger.info(
+        {
+          operation: 'EventConsumed',
+          eventName: envelope.eventName,
+          eventId: envelope.eventId,
+          consumerName: consumer.consumerName,
+          correlationId: envelope.correlationId,
+          result: 'SUCCESS',
+        },
+        'Event consumed.',
+      );
+    } catch (error) {
+      this.logger.error(
+        {
+          err: error,
+          operation: 'EventConsumed',
+          eventName: envelope.eventName,
+          eventId: envelope.eventId,
+          consumerName: consumer.consumerName,
+          correlationId: envelope.correlationId,
+          result: 'FAILURE',
+        },
+        'Event consumer failed; pg-boss will retry.',
+      );
+      throw error;
+    }
   }
 
   async onApplicationShutdown(): Promise<void> {
@@ -145,7 +219,13 @@ export class OutboxRelayService implements OnApplicationBootstrap, OnApplication
     if (this.ensuredQueues.has(name)) {
       return;
     }
-    await this.boss!.createQueue(name);
+    // Retry com backoff para falhas de consumer (ex.: dependência ainda não criada)
+    await this.boss!.createQueue(name, {
+      name,
+      retryLimit: 10,
+      retryDelay: 15,
+      retryBackoff: true,
+    });
     this.ensuredQueues.add(name);
   }
 
