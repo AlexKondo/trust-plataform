@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { AppConfigService } from '../../shared/config/app-config.service';
 import { AuthenticateIdentityUseCase } from './application/usecases/authenticate-identity.usecase';
+import { RefreshSessionUseCase } from './application/usecases/refresh-session.usecase';
 import { CreateIdentityUseCase } from './application/usecases/create-identity.usecase';
 import { GenerateEmailVerificationUseCase } from './application/usecases/generate-email-verification.usecase';
 import { VerifyEmailUseCase } from './application/usecases/verify-email.usecase';
@@ -30,6 +31,7 @@ const BREVO_REST_KEY_PREFIX = 'xkeysib-';
     GenerateEmailVerificationUseCase,
     VerifyEmailUseCase,
     AuthenticateIdentityUseCase,
+    RefreshSessionUseCase,
     { provide: IdentityRepository, useClass: DrizzleIdentityRepository },
     { provide: SessionRepository, useClass: DrizzleSessionRepository },
     {

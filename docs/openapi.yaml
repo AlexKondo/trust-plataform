@@ -206,6 +206,39 @@ paths:
         '429':
           description: Conta temporariamente bloqueada por tentativas falhas (ACCOUNT_LOCKED) ou rate limit por IP (RATE_LIMIT_EXCEEDED)
 
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: IDN-004 — Renovar sessão com rotação do refresh token (público)
+      operationId: refreshSession
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken:
+                  type: string
+                  description: Refresh token recebido no login ou no refresh anterior. Uso único — cada renovação devolve um novo.
+      responses:
+        '200':
+          description: Novos tokens; o refresh token anterior deixa de valer imediatamente
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  accessToken: 'eyJhbGciOiJFUzI1NiIs…'
+                  refreshToken: 'nZhNpAkFVk_ck58xHC56…'
+                  expiresIn: 900
+        '401':
+          description: Token desconhecido/já usado (INVALID_REFRESH_TOKEN), expirado (EXPIRED_REFRESH_TOKEN) ou sessão revogada (SESSION_REVOKED)
+        '403':
+          description: Identity não está mais ativa (IDENTITY_NOT_ACTIVE)
+
 components:
   securitySchemes:
     bearerAuth:

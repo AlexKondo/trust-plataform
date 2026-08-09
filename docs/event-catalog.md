@@ -55,6 +55,18 @@
   | sessionId | UUID | sessão criada |
   | authenticatedAt | ISO 8601 UTC | momento do login |
 
+### Session.Refreshed (v1.0)
+
+- **Descrição**: sessão renovada com rotação do refresh token (IDN-004).
+- **Produtor**: identity-service
+- **Consumidores**: auditoria/analytics (nenhum consumidor de negócio no MVP).
+- **Payload**:
+  | campo | tipo | descrição |
+  |---|---|---|
+  | sessionId | UUID | sessão renovada |
+  | identityId | UUID | dona da sessão |
+  | refreshedAt | ISO 8601 UTC | momento da renovação |
+
 ### Identity.EmailVerified (v1.0)
 
 - **Descrição**: e-mail confirmado pelo dono da conta (IDN-002). `causationId` aponta para o `Identity.Created` da mesma transação.
