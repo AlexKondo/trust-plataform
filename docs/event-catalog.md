@@ -29,6 +29,13 @@
 
 ## Eventos ativos
 
+### TrustScore.Created (v1.0) · TrustScore.Calculated (v1.0) · TrustLevel.Changed (v1.0)
+
+- **Descrição**: ciclo do Trust Engine (TRS-001/003/004). SÓ o TRS publica eventos `TrustScore.*`/`TrustLevel.*` (regra de ouro TP-001).
+- **Produtor**: trust-engine
+- **Consumidores**: TrustPassport.Created → ✅ `trs.create-trust-score` (cria score 0/UNVERIFIED) e pontua; Verification.Approved/Rejected → ✅ `trs.score-verification-approved/-rejected` (registram Trust Events e recalculam).
+- **Payloads**: `Created {trustPassportId, identityId, score: 0, createdAt}`; `Calculated {trustPassportId, identityId, score, level, calculatedAt}`; `Changed {trustPassportId, identityId, previousLevel, newLevel, score, changedAt}`
+
 ### Verification.Created (v1.0) · Verification.EvidenceSubmitted (v1.0) · Verification.ReviewStarted (v1.0)
 
 - **Descrição**: ciclo de vida da verificação (VRF-001/002/003). `EvidenceSubmitted` é publicado quando TODAS as evidências obrigatórias foram enviadas (status → PENDING_REVIEW).

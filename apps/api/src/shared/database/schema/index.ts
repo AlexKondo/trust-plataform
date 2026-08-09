@@ -9,3 +9,4 @@ export * from '../../../modules/identity/infrastructure/persistence/sessions.sch
 export * from '../../../modules/identity/infrastructure/persistence/password-reset-tokens.schema';
 export * from '../../../modules/trust-passport/infrastructure/persistence/trust-passports.schema';
 export * from '../../../modules/verification/infrastructure/persistence/verifications.schema';
+export * from '../../../modules/trust-score/infrastructure/persistence/trust-score.schema';

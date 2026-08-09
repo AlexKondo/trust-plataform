@@ -57,6 +57,20 @@
       "when": 1786291327778,
       "tag": "0007_known_zarda",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786292358431,
+      "tag": "0008_glamorous_sersi",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786292370134,
+      "tag": "0009_trust_rules_seed",
+      "breakpoints": true
     }
   ]
 }

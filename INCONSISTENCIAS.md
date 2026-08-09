@@ -50,6 +50,6 @@
 
 | # | Decisão | Contexto | Recomendação |
 |---|---|---|---|
-| P4 | **Escala do Trust Score e níveis iniciais** | Nunca definida (exemplos: 742, GOLD, Diamond). TP-005 diz que a fórmula é IP da empresa. Sem seed, TRS-004 não classifica ninguém. | Definir escala 0–1000 e seed inicial de níveis (ex.: UNVERIFIED 0, BRONZE 1–249, SILVER 250–499, GOLD 500–749, PLATINUM 750–1000) como **dados** (trust_level_rules), ajustável sem código. |
-| P5 | **Formato da `conditionExpression`/`eligibilityExpression`** | TRS-009/010/012 exigem uma DSL de regras "evolutiva" sem definir sintaxe. | MVP: JSON estruturado simples (campo, operador, valor + AND/OR), avaliado por um interpretador próprio. Evitar DSL textual agora. |
+| P4 | **Escala do Trust Score e níveis iniciais** | Nunca definida. | **RESOLVIDO em 2026-08-09 (founder)**: escala **0–1000**; seed de níveis como dados (`trust_level_rules`): UNVERIFIED 0, BRONZE 1–249, SILVER 250–499, GOLD 500–749, PLATINUM 750–1000. |
+| P5 | **Formato da `conditionExpression`/`eligibilityExpression`** | TRS-009/010/012 exigem uma DSL de regras "evolutiva" sem definir sintaxe. | **RESOLVIDO em 2026-08-09 (founder)**: JSON estruturado (lista de `{field, op, value}` com semântica AND; ops eq/ne/gt/gte/lt/lte/in) avaliado por interpretador próprio. Regras em `trust_score_rules`, editáveis por API admin. |
 | P6b | **Provedores de e-mail/SMS/KYC** | Exigidos pelas specs mas nunca nomeados. | ~~E-mail transacional: Resend ou Postmark~~ **RESOLVIDO em 2026-08-08: Brevo** (decisão do founder) para e-mail transacional via API HTTP (`BREVO_API_KEY` no `.env`; necessário a partir do IDN-002). SMS/OTP (fase 2): Twilio. KYC: manual no MVP. |

@@ -16,6 +16,7 @@ tags:
   - name: Auth
   - name: Trust Passport
   - name: Verification
+  - name: Trust Score
 
 paths:
   /health:
@@ -585,6 +586,85 @@ paths:
         '200': { description: Detalhes com review, decisão e metadados das evidências }
         '403': { description: Não é dono nem admin (VERIFICATION_ACCESS_DENIED) }
         '404': { description: Não encontrada (VERIFICATION_NOT_FOUND) }
+
+  /trust-scores/me:
+    get:
+      tags: [Trust Score]
+      summary: TRS-005 — Meu score e nível (escala 0–1000, P4)
+      operationId: getMyTrustScore
+      responses:
+        '200':
+          content:
+            application/json:
+              example:
+                success: true
+                data: { trustPassportId: '019fe7…', score: 175, level: BRONZE, calculatedAt: '2026-08-09T13:20:00.000Z' }
+        '404': { description: Score ainda não criado (TRUST_SCORE_NOT_FOUND) }
+
+  /trust-scores/me/timeline:
+    get:
+      tags: [Trust Score]
+      summary: TRS-006 — Timeline explicável dos trust events (paginada)
+      operationId: getMyTrustTimeline
+      parameters:
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+      responses:
+        '200':
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  - { id: '019fe7…', eventName: Verification.Approved, points: 150, occurredAt: '2026-08-09T13:15:00.000Z' }
+                  - { id: '019fe7…', eventName: TrustPassport.Created, points: 25, occurredAt: '2026-08-09T13:10:00.000Z' }
+                pagination: { page: 1, pageSize: 20, totalItems: 2, totalPages: 1 }
+
+  /admin/trust-score-rules:
+    get:
+      tags: [Trust Score]
+      summary: TRS-009 — Listar regras de pontuação (ADMIN)
+      operationId: listTrustScoreRules
+      responses: { '200': { description: Regras com condições JSON (P5) }, '403': { description: ADMIN_REQUIRED } }
+    post:
+      tags: [Trust Score]
+      summary: TRS-009 — Criar regra de pontuação (ADMIN)
+      operationId: createTrustScoreRule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              eventName: MarketplaceOrder.Completed
+              description: Pedido concluído com sucesso
+              points: 20
+              conditions: [{ field: role, op: eq, value: PROVIDER }]
+              maxOccurrences: null
+              active: true
+      responses: { '201': { description: Regra criada }, '403': { description: ADMIN_REQUIRED } }
+
+  /admin/trust-score-rules/{id}:
+    patch:
+      tags: [Trust Score]
+      summary: TRS-009 — Editar regra (pontos/condições/ativa) (ADMIN)
+      operationId: updateTrustScoreRule
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: Regra atualizada }, '403': { description: ADMIN_REQUIRED } }
+
+  /admin/trust-level-rules:
+    get:
+      tags: [Trust Score]
+      summary: TRS-008 — Listar faixas de nível (ADMIN)
+      operationId: listTrustLevelRules
+      responses: { '200': { description: 'Seed P4: UNVERIFIED 0 / BRONZE 1–249 / SILVER 250–499 / GOLD 500–749 / PLATINUM 750–1000' } }
+
+  /admin/trust-level-rules/{id}:
+    patch:
+      tags: [Trust Score]
+      summary: TRS-008 — Ajustar faixa de nível (ADMIN)
+      operationId: updateTrustLevelRule
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: Faixa atualizada } }
 
 components:
   securitySchemes:

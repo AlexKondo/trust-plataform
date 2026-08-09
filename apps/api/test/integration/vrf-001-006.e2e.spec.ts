@@ -240,6 +240,45 @@ describe.runIf(Boolean(testDatabaseUrl))('VRF-001..006 — Verification e2e', ()
       expect(synced).toBe(true);
     }
 
+    // TRS: pontuação automática — Passport.Created (+25) + DOCUMENT aprovado (+150) = 175 BRONZE
+    {
+      const startedAt = Date.now();
+      let scored = false;
+      while (Date.now() - startedAt < 20000 && !scored) {
+        await relay.tick();
+        const me = await app.inject({
+          method: 'GET',
+          url: '/api/v1/trust-scores/me',
+          headers: { authorization: `Bearer ${user.accessToken}` },
+        });
+        if (me.statusCode === 200) {
+          const data = me.json<{ data: { score: number; level: string } }>().data;
+          if (data.score === 175) {
+            expect(data.level).toBe('BRONZE');
+            scored = true;
+          }
+        }
+        if (!scored) {
+          await new Promise((resolveSleep) => setTimeout(resolveSleep, 500));
+        }
+      }
+      expect(scored).toBe(true);
+
+      // timeline explicável (TRS-006)
+      const timeline = await app.inject({
+        method: 'GET',
+        url: '/api/v1/trust-scores/me/timeline',
+        headers: { authorization: `Bearer ${user.accessToken}` },
+      });
+      expect(timeline.statusCode).toBe(200);
+      const body = timeline.json<{
+        data: Array<{ eventName: string; points: number }>;
+        pagination: { totalItems: number };
+      }>();
+      expect(body.pagination.totalItems).toBe(2);
+      expect(body.data.map((e) => e.points).sort((a, b) => a - b)).toEqual([25, 150]);
+    }
+
     // VRF-006: dono consulta com review/decisão/evidências (só metadados)
     const details = await app.inject({
       method: 'GET',
