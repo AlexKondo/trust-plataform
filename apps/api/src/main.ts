@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import helmet from '@fastify/helmet';
+import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
@@ -25,6 +26,10 @@ export async function createApp(): Promise<NestFastifyApplication> {
   const config = app.get(AppConfigService);
   // CORS: apenas o frontend (APP_BASE_URL) pode chamar a API pelo navegador
   app.enableCors({ origin: config.appBaseUrl, credentials: false });
+  // Upload de evidências (VRF-002); limite de tamanho vem da configuração
+  await app.register(multipart, {
+    limits: { fileSize: config.evidenceMaxFileBytes, files: 1 },
+  });
   await app.register(rateLimit, {
     max: config.rateLimitMaxPerMinute,
     timeWindow: '1 minute',

@@ -27,6 +27,7 @@ import { DrizzleEmailVerificationTokenRepository } from './infrastructure/persis
 import { DrizzleIdentityRepository } from './infrastructure/persistence/drizzle-identity.repository';
 import { DrizzlePasswordResetTokenRepository } from './infrastructure/persistence/drizzle-password-reset-token.repository';
 import { DrizzleSessionRepository } from './infrastructure/persistence/drizzle-session.repository';
+import { AdminGuard } from './infrastructure/security/admin.guard';
 import { Argon2PasswordHashService } from './infrastructure/security/argon2-password-hash.service';
 import { CryptoTokenGeneratorService } from './infrastructure/security/crypto-token-generator.service';
 import { HibpPasswordBreachService } from './infrastructure/security/hibp-password-breach.service';
@@ -47,6 +48,7 @@ const BREVO_REST_KEY_PREFIX = 'xkeysib-';
     ForgotPasswordUseCase,
     ResetPasswordUseCase,
     ChangePasswordUseCase,
+    AdminGuard,
     { provide: IdentityRepository, useClass: DrizzleIdentityRepository },
     { provide: SessionRepository, useClass: DrizzleSessionRepository },
     { provide: PasswordResetTokenRepository, useClass: DrizzlePasswordResetTokenRepository },
@@ -74,6 +76,6 @@ const BREVO_REST_KEY_PREFIX = 'xkeysib-';
           : new LoggingEmailService(logger),
     },
   ],
-  exports: [IdentityRepository, SessionRepository, PasswordHashService],
+  exports: [IdentityRepository, SessionRepository, PasswordHashService, AdminGuard],
 })
 export class IdentityModule {}

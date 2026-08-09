@@ -13,6 +13,7 @@ import { GlobalExceptionFilter } from './shared/api/global-exception.filter';
 import { HealthModule } from './modules/health/health.module';
 import { IdentityModule } from './modules/identity/identity.module';
 import { TrustPassportModule } from './modules/trust-passport/trust-passport.module';
+import { VerificationModule } from './modules/verification/verification.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { TrustPassportModule } from './modules/trust-passport/trust-passport.mod
     HealthModule,
     IdentityModule,
     TrustPassportModule,
+    VerificationModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

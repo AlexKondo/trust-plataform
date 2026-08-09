@@ -70,6 +70,18 @@ export class AppConfigService {
     return this.config.get('RATE_LIMIT_MAX_PER_MINUTE', { infer: true });
   }
 
+  get evidenceMaxFileBytes(): number {
+    return this.config.get('EVIDENCE_MAX_FILE_MB', { infer: true }) * 1024 * 1024;
+  }
+
+  get supabaseUrl(): string | undefined {
+    return this.config.get('SUPABASE_URL', { infer: true });
+  }
+
+  get supabaseServiceRoleKey(): string | undefined {
+    return this.config.get('SUPABASE_SERVICE_ROLE_KEY', { infer: true });
+  }
+
   get brevoApiKey(): string | undefined {
     return this.config.get('BREVO_API_KEY', { infer: true });
   }

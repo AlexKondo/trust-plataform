@@ -11,6 +11,7 @@ interface IdentityProps {
   lastLoginAt: Date | null;
   failedLoginAttempts: number;
   lockedUntil: Date | null;
+  isAdmin: boolean;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -42,6 +43,7 @@ export class Identity {
       lastLoginAt: null,
       failedLoginAttempts: 0,
       lockedUntil: null,
+      isAdmin: false,
       createdAt: now,
       updatedAt: now,
       deletedAt: null,
@@ -102,6 +104,10 @@ export class Identity {
 
   get lockedUntil(): Date | null {
     return this.props.lockedUntil;
+  }
+
+  get isAdmin(): boolean {
+    return this.props.isAdmin;
   }
 
   /** IDN-002 BR-005: e-mail confirmado → conta ativada. */

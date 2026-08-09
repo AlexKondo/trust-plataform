@@ -15,6 +15,7 @@ tags:
   - name: Identity
   - name: Auth
   - name: Trust Passport
+  - name: Verification
 
 paths:
   /health:
@@ -463,6 +464,127 @@ paths:
           description: Sem token (INVALID_TOKEN)
         '404':
           description: Passport não encontrado (TRUST_PASSPORT_NOT_FOUND)
+
+  /verifications:
+    post:
+      tags: [Verification]
+      summary: VRF-001 — Iniciar verificação para o próprio Passport
+      operationId: createVerification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type]
+              properties:
+                type:
+                  type: string
+                  enum: [DOCUMENT, ADDRESS, BANK_ACCOUNT, BUSINESS, BIOMETRIC]
+                  description: PHONE/EMAIL entram na fase de OTP.
+      responses:
+        '201':
+          description: Verificação criada em WAITING_FOR_EVIDENCE
+          content:
+            application/json:
+              example:
+                success: true
+                data: { verificationId: '019fe744-…', type: DOCUMENT, status: WAITING_FOR_EVIDENCE }
+        '400': { description: Tipo inválido (VALIDATION_ERROR) }
+        '404': { description: Passport inexistente (TRUST_PASSPORT_NOT_FOUND) }
+        '409': { description: Já existe verificação ativa deste tipo (VERIFICATION_ALREADY_EXISTS) }
+
+  /verifications/{verificationId}/evidence:
+    post:
+      tags: [Verification]
+      summary: VRF-002 — Enviar evidência (multipart)
+      description: >
+        multipart/form-data com campo `type` (ex.: DOCUMENT_FRONT, DOCUMENT_BACK, PROOF_OF_ADDRESS,
+        BANK_STATEMENT, BUSINESS_REGISTRATION, SELFIE) e arquivo em `file` (jpeg/png/webp/pdf, máx. 10 MB).
+        Quando todas as evidências obrigatórias forem enviadas, o status vira PENDING_REVIEW.
+      operationId: submitVerificationEvidence
+      parameters:
+        - { name: verificationId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '201':
+          description: Evidência aceita; retorna o status atual
+        '403': { description: Não é o dono (VERIFICATION_ACCESS_DENIED) }
+        '404': { description: Verificação não encontrada }
+        '409': { description: Status não aceita evidências (INVALID_VERIFICATION_STATUS) }
+        '413': { description: Arquivo grande demais (FILE_TOO_LARGE) }
+        '415': { description: MIME não permitido (UNSUPPORTED_MEDIA_TYPE) }
+        '422': { description: Tipo de evidência não requerido (EVIDENCE_TYPE_NOT_REQUIRED) }
+
+  /verifications/{verificationId}/review:
+    post:
+      tags: [Verification]
+      summary: VRF-003 — Iniciar revisão (ADMIN)
+      operationId: reviewVerification
+      parameters:
+        - { name: verificationId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reviewType: { type: string, enum: [AUTOMATIC, MANUAL, EXTERNAL_PROVIDER], default: MANUAL }
+      responses:
+        '201': { description: Revisão iniciada (IN_REVIEW) }
+        '403': { description: Requer admin (ADMIN_REQUIRED) }
+        '409': { description: Status inválido (INVALID_VERIFICATION_STATUS) }
+
+  /verifications/{verificationId}/approve:
+    post:
+      tags: [Verification]
+      summary: VRF-004 — Aprovar (ADMIN; irreversível)
+      operationId: approveVerification
+      parameters:
+        - { name: verificationId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, properties: { comments: { type: string } } }
+      responses:
+        '200': { description: APPROVED; publica Verification.Approved + ReviewCompleted }
+        '403': { description: Requer admin (ADMIN_REQUIRED) }
+        '409': { description: Status inválido (INVALID_VERIFICATION_STATUS) }
+
+  /verifications/{verificationId}/reject:
+    post:
+      tags: [Verification]
+      summary: VRF-005 — Rejeitar com motivo do catálogo (ADMIN; irreversível)
+      operationId: rejectVerification
+      parameters:
+        - { name: verificationId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reasonCode]
+              properties:
+                reasonCode:
+                  type: string
+                  enum: [DOCUMENT_UNREADABLE, DOCUMENT_EXPIRED, DOCUMENT_INCOMPLETE, FACE_MISMATCH, ADDRESS_INVALID, PHONE_VERIFICATION_FAILED, FRAUD_SUSPECTED, INSUFFICIENT_EVIDENCE, OTHER]
+                comments: { type: string }
+      responses:
+        '200': { description: REJECTED; nova tentativa exige nova verificação }
+        '403': { description: Requer admin (ADMIN_REQUIRED) }
+        '409': { description: Status inválido (INVALID_VERIFICATION_STATUS) }
+
+  /verifications/{verificationId}:
+    get:
+      tags: [Verification]
+      summary: VRF-006 — Consultar (dono ou admin; só metadados de arquivos)
+      operationId: getVerification
+      parameters:
+        - { name: verificationId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Detalhes com review, decisão e metadados das evidências }
+        '403': { description: Não é dono nem admin (VERIFICATION_ACCESS_DENIED) }
+        '404': { description: Não encontrada (VERIFICATION_NOT_FOUND) }
 
 components:
   securitySchemes:

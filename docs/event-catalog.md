@@ -29,6 +29,20 @@
 
 ## Eventos ativos
 
+### Verification.Created (v1.0) · Verification.EvidenceSubmitted (v1.0) · Verification.ReviewStarted (v1.0)
+
+- **Descrição**: ciclo de vida da verificação (VRF-001/002/003). `EvidenceSubmitted` é publicado quando TODAS as evidências obrigatórias foram enviadas (status → PENDING_REVIEW).
+- **Produtor**: verification-service
+- **Consumidores**: nenhum no MVP (auditoria/analytics).
+- **Payloads**: `Created {verificationId, trustPassportId, identityId, type, attempt, createdAt}`; `EvidenceSubmitted {verificationId, trustPassportId, type, submittedAt}`; `ReviewStarted {verificationId, reviewId, reviewType, startedAt}`
+
+### Verification.Approved (v1.0) · Verification.Rejected (v1.0) · Verification.ReviewCompleted (v1.0)
+
+- **Descrição**: decisão irreversível da verificação (VRF-004/005). `ReviewCompleted` sempre acompanha a decisão (causationId → evento de decisão).
+- **Produtor**: verification-service
+- **Consumidores**: TPS-004 (projeção no Passport — próximo módulo) e TRS (pontuação — futuro). Rejeição também será consumida (INCONSISTENCIAS #7).
+- **Payloads**: `Approved {verificationId, trustPassportId, type, approvedAt}`; `Rejected {verificationId, trustPassportId, type, reasonCode, rejectedAt}`; `ReviewCompleted {verificationId, reviewId, decision, completedAt}`
+
 ### TrustPassport.Created (v1.0)
 
 - **Descrição**: Trust Passport criado para uma Identity ativada (TPS-001). `causationId` aponta para o `Identity.Created` que o originou.

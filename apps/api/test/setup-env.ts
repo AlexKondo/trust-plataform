@@ -26,4 +26,7 @@ if (process.env.TEST_DATABASE_URL) {
   process.env.PASSWORD_BREACH_CHECK_ENABLED = 'false';
   // Pooler do Supabase free limita 15 clients — cada suíte e2e usa pool pequeno
   process.env.DB_POOL_MAX = '4';
+  // Storage de evidências em memória nos testes ('' = ausente no env schema)
+  process.env.SUPABASE_URL = '';
+  process.env.SUPABASE_SERVICE_ROLE_KEY = '';
 }

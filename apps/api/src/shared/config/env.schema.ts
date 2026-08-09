@@ -11,8 +11,17 @@ export const envSchema = z.object({
   /** Tamanho do pool do postgres.js (pooler do Supabase free limita 15 clients no total). */
   DB_POOL_MAX: z.coerce.number().int().min(1).default(8),
 
-  SUPABASE_URL: z.string().url().optional(),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
+  // '' é tratado como ausente (testes usam '' para forçar storage em memória)
+  SUPABASE_URL: z
+    .string()
+    .optional()
+    .transform((value) => (value ? value : undefined)),
+  SUPABASE_SERVICE_ROLE_KEY: z
+    .string()
+    .optional()
+    .transform((value) => (value ? value : undefined)),
+  /** Tamanho máximo de evidência (VRF-002 BR-003). */
+  EVIDENCE_MAX_FILE_MB: z.coerce.number().int().min(1).default(10),
 
   // Chaves ES256 em PEM, codificadas em base64 (uma linha no .env)
   JWT_PRIVATE_KEY: z.string().min(1, 'JWT_PRIVATE_KEY is required (base64 PEM)'),

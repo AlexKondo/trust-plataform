@@ -50,6 +50,13 @@
       "when": 1786290277031,
       "tag": "0006_foamy_secret_warriors",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786291327778,
+      "tag": "0007_known_zarda",
+      "breakpoints": true
     }
   ]
 }
