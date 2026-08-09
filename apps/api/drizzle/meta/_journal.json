@@ -85,6 +85,20 @@
       "when": 1786293888940,
       "tag": "0011_trust_benefits_seed",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1786294665047,
+      "tag": "0012_needy_doctor_doom",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1786294666599,
+      "tag": "0013_trust_badges_seed",
+      "breakpoints": true
     }
   ]
 }

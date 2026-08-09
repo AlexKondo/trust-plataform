@@ -711,6 +711,110 @@ paths:
         '200': { description: 'Score recalculado deterministicamente; publica TrustScore.Calculated com rebuild: true' }
         '404': { description: Score não encontrado (TRUST_SCORE_NOT_FOUND) }
 
+  /trust-badges/me:
+    get:
+      tags: [Trust Score]
+      summary: TRS-014 — Meus badges concedidos
+      operationId: getMyBadges
+      responses: { '200': { description: 'Badges ativos com catálogo: [{code, name, description, badgeType, awardedAt}]' } }
+
+  /trust-profile/me:
+    get:
+      tags: [Trust Score]
+      summary: TRS-015 — Perfil de confiança consolidado (PRIVATE_VIEW, sempre completo)
+      operationId: getMyTrustProfile
+      responses:
+        '200':
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  view: PRIVATE_VIEW
+                  displayName: Maria Silva Santos
+                  level: BRONZE
+                  score: 175
+                  profileCompletion: 50
+                  verifications: { emailVerified: true, phoneVerified: false, documentVerified: true, addressVerified: false }
+                  badges: [{ code: TRUSTED_MEMBER, name: Membro Confiável, badgeType: PERMANENT }]
+                  memberSince: '2026-08-09T12:00:00.000Z'
+
+  /trust-profile/visibility:
+    get:
+      tags: [Trust Score]
+      summary: TRS-016 — Minhas políticas de visibilidade pública
+      operationId: getVisibility
+      responses: { '200': { description: '{showScore, showLevel, showBadges, showVerifications} (default tudo true)' } }
+    put:
+      tags: [Trust Score]
+      summary: TRS-016 — Atualizar o que aparece no perfil público
+      operationId: updateVisibility
+      responses: { '200': { description: Política atualizada } }
+
+  /trust-profile/shares:
+    post:
+      tags: [Trust Score]
+      summary: TRS-017 — Criar link compartilhável do perfil (token HMAC, expira)
+      operationId: createProfileShare
+      requestBody: { content: { application/json: { schema: { type: object, properties: { expiresInDays: { type: integer, default: 30, maximum: 90 } } } } } }
+      responses: { '201': { description: '{shareId, shareUrl (APP_BASE_URL/p/<token>), expiresAt}' } }
+    get:
+      tags: [Trust Score]
+      summary: TRS-017 — Listar meus links (ACTIVE/EXPIRED/REVOKED)
+      operationId: listProfileShares
+      responses: { '200': { description: Lista com status } }
+
+  /trust-profile/shares/{id}:
+    delete:
+      tags: [Trust Score]
+      summary: TRS-019 — Revogar link compartilhado
+      operationId: revokeProfileShare
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '204': { description: 'Revogado; o link público passa a responder 410' } }
+
+  /trust-profile/shares/{id}/access-history:
+    get:
+      tags: [Trust Score]
+      summary: TRS-020 — Histórico de acessos ao link (dono; paginado)
+      operationId: shareAccessHistory
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: '[{accessedAt, ipAddress, userAgent}] + pagination' } }
+
+  /public/trust-profile/{token}:
+    get:
+      tags: [Trust Score]
+      summary: TRS-015 — Perfil PÚBLICO via link compartilhado (sem auth)
+      description: Respeita as políticas de visibilidade; nome abreviado; registra o acesso (TRS-020).
+      operationId: getSharedProfile
+      security: []
+      parameters: [{ name: token, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: PUBLIC_VIEW do perfil }
+        '404': { description: Link inexistente/forjado (SHARE_NOT_FOUND) }
+        '410': { description: Link expirado ou revogado (SHARE_LINK_GONE) }
+
+  /public/trust-profile/{token}/verify:
+    get:
+      tags: [Trust Score]
+      summary: TRS-018 — Verificar autenticidade do link (HMAC; sem auth)
+      operationId: verifySharedProfile
+      security: []
+      parameters: [{ name: token, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: '{authentic: true, issuedAt, expiresAt} ou {authentic: false, reason: INVALID_SIGNATURE|UNKNOWN_LINK|REVOKED|EXPIRED}' }
+
+  /admin/trust-badges:
+    get: { tags: [Trust Score], summary: TRS-012 — Listar catálogo de badges (ADMIN), operationId: listBadges, responses: { '200': { description: OK } } }
+    post: { tags: [Trust Score], summary: TRS-012 — Criar badge (ADMIN), operationId: createBadge, responses: { '201': { description: 'code/name/description/badgeType(PERMANENT|DYNAMIC)/criteria JSON sobre {score, level}' } } }
+
+  /admin/trust-badges/{id}:
+    patch:
+      tags: [Trust Score]
+      summary: TRS-012 — Editar badge (ADMIN)
+      operationId: updateBadge
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: Atualizado } }
+
 components:
   securitySchemes:
     bearerAuth:

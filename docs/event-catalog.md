@@ -29,6 +29,13 @@
 
 ## Eventos ativos
 
+### TrustBadge.Awarded (v1.0) · TrustBadge.Revoked (v1.0)
+
+- **Descrição**: badge concedido/revogado pelo motor (TRS-013). PERMANENT nunca é revogado; DYNAMIC reflete o estado atual. SÓ o TRS publica `TrustBadge.*`.
+- **Produtor**: trust-engine
+- **Consumidores**: ✅ `trs.award-badges` consome `TrustScore.Calculated` para avaliar o catálogo; os eventos de badge não têm consumidores no MVP (analytics/notificações futuras).
+- **Payloads**: `{ trustPassportId, identityId, badgeCode, awardedAt|revokedAt }`
+
 ### TrustScore.Created (v1.0) · TrustScore.Calculated (v1.0) · TrustLevel.Changed (v1.0)
 
 - **Descrição**: ciclo do Trust Engine (TRS-001/003/004). SÓ o TRS publica eventos `TrustScore.*`/`TrustLevel.*` (regra de ouro TP-001).

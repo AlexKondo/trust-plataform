@@ -10,3 +10,4 @@ export * from '../../../modules/identity/infrastructure/persistence/password-res
 export * from '../../../modules/trust-passport/infrastructure/persistence/trust-passports.schema';
 export * from '../../../modules/verification/infrastructure/persistence/verifications.schema';
 export * from '../../../modules/trust-score/infrastructure/persistence/trust-score.schema';
+export * from '../../../modules/trust-score/infrastructure/persistence/trust-reputation.schema';
