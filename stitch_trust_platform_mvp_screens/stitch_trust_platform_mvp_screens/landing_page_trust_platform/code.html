@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+
+<html lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Trust Platform - Confiança que abre portas</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-primary-fixed": "#001551",
+                    "tertiary-fixed": "#ffdbcf",
+                    "background": "#faf8ff",
+                    "tertiary": "#7f2500",
+                    "on-primary": "#ffffff",
+                    "inverse-surface": "#283044",
+                    "on-tertiary-container": "#ffc9b7",
+                    "on-tertiary-fixed-variant": "#832700",
+                    "on-secondary-fixed-variant": "#005049",
+                    "secondary-container": "#86f2e4",
+                    "surface-container-high": "#e2e7ff",
+                    "surface-bright": "#faf8ff",
+                    "inverse-on-surface": "#eef0ff",
+                    "surface-container-lowest": "#ffffff",
+                    "outline-variant": "#c4c5d7",
+                    "on-tertiary": "#ffffff",
+                    "on-primary-container": "#cad3ff",
+                    "on-surface": "#131b2e",
+                    "primary-fixed": "#dce1ff",
+                    "on-surface-variant": "#434655",
+                    "surface-container-highest": "#dae2fd",
+                    "secondary-fixed": "#89f5e7",
+                    "outline": "#747686",
+                    "secondary-fixed-dim": "#6bd8cb",
+                    "tertiary-fixed-dim": "#ffb59c",
+                    "surface": "#faf8ff",
+                    "surface-variant": "#dae2fd",
+                    "primary": "#0037b0",
+                    "on-secondary-container": "#006f66",
+                    "error": "#ba1a1a",
+                    "primary-container": "#1d4ed8",
+                    "on-error": "#ffffff",
+                    "inverse-primary": "#b7c4ff",
+                    "secondary": "#006a61",
+                    "primary-fixed-dim": "#b7c4ff",
+                    "surface-container": "#eaedff",
+                    "surface-tint": "#2151da",
+                    "surface-dim": "#d2d9f4",
+                    "on-error-container": "#93000a",
+                    "on-primary-fixed-variant": "#0039b5",
+                    "on-secondary-fixed": "#00201d",
+                    "on-background": "#131b2e",
+                    "on-tertiary-fixed": "#390c00",
+                    "on-secondary": "#ffffff",
+                    "tertiary-container": "#a73400",
+                    "surface-container-low": "#f2f3ff",
+                    "error-container": "#ffdad6"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "gutter": "1rem",
+                    "section-padding": "2rem",
+                    "margin-mobile": "1.25rem",
+                    "container-max-width": "440px",
+                    "stack-gap": "1.5rem"
+            },
+            "fontFamily": {
+                    "label-bold": [
+                            "Inter"
+                    ],
+                    "headline-md": [
+                            "Inter"
+                    ],
+                    "body-sm": [
+                            "Inter"
+                    ],
+                    "headline-lg": [
+                            "Inter"
+                    ],
+                    "body-lg": [
+                            "Inter"
+                    ],
+                    "button": [
+                            "Inter"
+                    ]
+            },
+            "fontSize": {
+                    "label-bold": [
+                            "12px",
+                            {
+                                    "lineHeight": "16px",
+                                    "letterSpacing": "0.05em",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "headline-md": [
+                            "24px",
+                            {
+                                    "lineHeight": "32px",
+                                    "letterSpacing": "-0.01em",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "body-sm": [
+                            "14px",
+                            {
+                                    "lineHeight": "20px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "headline-lg": [
+                            "30px",
+                            {
+                                    "lineHeight": "38px",
+                                    "letterSpacing": "-0.02em",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "body-lg": [
+                            "16px",
+                            {
+                                    "lineHeight": "24px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "button": [
+                            "16px",
+                            {
+                                    "lineHeight": "24px",
+                                    "fontWeight": "600"
+                            }
+                    ]
+            }
+          },
+        },
+      }
+    </script>
+</head>
+<body class="bg-background text-on-surface font-body-lg min-h-screen flex flex-col antialiased">
+<!-- TopNavBar -->
+<nav class="fixed top-0 w-full z-50 bg-surface/80 backdrop-blur-md border-b border-outline-variant shadow-sm transition-all duration-200">
+<div class="flex justify-between items-center h-20 px-gutter md:px-8 max-w-7xl mx-auto">
+<div class="flex items-center gap-3 hover:scale-95 duration-150 cursor-pointer">
+<span class="material-symbols-outlined text-[#0D9488]" data-icon="shield_check" style="font-variation-settings: 'FILL' 1;">format_image_left</span>
+<span class="font-headline-md text-headline-md font-bold text-primary">Trust Platform</span>
+</div>
+<div class="hidden md:flex items-center gap-6">
+<a class="text-primary font-bold transition-colors" href="#como-funciona">Como funciona</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors" href="#para-profissionais">Para profissionais</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors" href="#para-clientes">Para clientes</a>
+</div>
+<div class="flex items-center gap-4">
+<button class="hidden md:inline-flex items-center justify-center px-4 py-2 font-button text-button text-on-surface border border-outline-variant rounded-lg hover:bg-surface-container-low transition-colors bg-transparent">Entrar</button>
+<button class="inline-flex items-center justify-center px-4 py-2 font-button text-button text-on-primary bg-primary-container hover:bg-primary-container/90 rounded-lg transition-colors">Criar conta</button>
+</div>
+</div>
+</nav>
+<!-- Main Content -->
+<main class="flex-grow pt-24 md:pt-32">
+<!-- Hero Section -->
+<section class="max-w-7xl mx-auto px-gutter md:px-8 py-16 md:py-24">
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+<div class="flex flex-col gap-8">
+<h1 class="font-headline-lg text-headline-lg text-on-surface md:text-5xl md:leading-tight">
+                        Confiança que abre portas.
+                    </h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant text-lg">
+                        A Trust Platform transforma sua reputação em um ativo real: um passaporte digital de confiança para contratar e ser contratado com segurança.
+                    </p>
+<div class="flex flex-col sm:flex-row gap-4">
+<button class="inline-flex items-center justify-center px-6 py-3 font-button text-button text-on-primary bg-primary-container rounded-lg hover:bg-primary-container/90 transition-colors shadow-sm">
+                            Criar conta gratuita
+                        </button>
+<button class="inline-flex items-center justify-center px-6 py-3 font-button text-button text-on-surface border border-outline-variant rounded-lg hover:bg-surface-container-low transition-colors bg-transparent">
+                            Ver como funciona
+                        </button>
+</div>
+</div>
+<!-- Mockup Card -->
+<div class="relative w-full max-w-md mx-auto lg:ml-auto">
+<!-- Subtle background glow -->
+<div class="absolute inset-0 bg-primary-fixed blur-3xl opacity-30 rounded-full"></div>
+<div class="relative bg-surface-container-lowest border border-outline-variant rounded-xl p-8 shadow-[0px_10px_25px_-5px_rgba(15,23,42,0.08)] flex flex-col items-center gap-6 z-10 bg-white">
+<div class="flex flex-col items-center gap-3 w-full">
+<div class="relative">
+<img alt="Maria Silva Avatar" class="w-24 h-24 rounded-full object-cover border-4 border-surface-container-lowest shadow-sm" data-alt="A professional headshot of a woman named Maria Silva, warm lighting, trustworthy expression, corporate modern aesthetic, soft light grey background, high resolution photography." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA53j9h72UJ6Vn2Ts_YcrqbJNajvsy8ZF6f-MPWTFsHzZjPVlqskdRh80nSQjl-om7ZZk1jXw6tUANpJ03qjp2R8_64uNjsq3a8QC7eWqlwKgEcGNsS88l6QSd-cKkpbtbyWzzwsQ1OlweI3Sm-CYyTeerGlI_Q-wAwdOVq-OFipDtVynSMHSUInw8wIFfXec_c1KlGZ3G5VezUJm8mfWGpVcf0JjfKVFuq7wWSSizKkXthsbFcNm-Ofw"/>
+<div class="absolute bottom-0 right-0 bg-[#0D9488] text-white rounded-full p-1 border-2 border-white shadow-sm flex items-center justify-center">
+<span class="material-symbols-outlined text-[16px]" data-icon="verified" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+</div>
+<div class="text-center">
+<h3 class="font-headline-md text-headline-md text-on-surface">Maria Silva</h3>
+<span class="inline-block mt-1 px-3 py-1 bg-surface-container-low text-on-surface-variant text-label-bold font-label-bold rounded-full uppercase tracking-wider">Verificada</span>
+</div>
+</div>
+<div class="w-full bg-surface-container rounded-lg p-6 flex flex-col items-center gap-2 border border-outline-variant/50">
+<span class="text-body-sm font-body-sm text-on-surface-variant">Trust Score</span>
+<div class="flex items-center gap-2">
+<span class="font-headline-lg text-headline-lg text-primary">742</span>
+<span class="px-2 py-1 bg-[#FBBF24]/20 text-[#B45309] text-label-bold font-label-bold rounded uppercase">GOLD</span>
+</div>
+<!-- Circular Indicator Mockup (CSS) -->
+<div class="w-full h-2 bg-outline-variant/30 rounded-full mt-2 overflow-hidden">
+<div class="h-full bg-primary rounded-full" style="width: 74%;"></div>
+</div>
+</div>
+<div class="w-full flex justify-between gap-2">
+<div class="flex-1 flex flex-col items-center justify-center p-3 bg-surface border border-outline-variant rounded-lg">
+<span class="material-symbols-outlined text-primary mb-1" data-icon="badge">badge</span>
+<span class="text-[10px] text-on-surface-variant font-label-bold uppercase">Identidade</span>
+</div>
+<div class="flex-1 flex flex-col items-center justify-center p-3 bg-surface border border-outline-variant rounded-lg">
+<span class="material-symbols-outlined text-primary mb-1" data-icon="smartphone">smartphone</span>
+<span class="text-[10px] text-on-surface-variant font-label-bold uppercase">Telefone</span>
+</div>
+<div class="flex-1 flex flex-col items-center justify-center p-3 bg-surface border border-outline-variant rounded-lg">
+<span class="material-symbols-outlined text-primary mb-1" data-icon="home_pin">home_pin</span>
+<span class="text-[10px] text-on-surface-variant font-label-bold uppercase">Endereço</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="w-full py-12 px-gutter bg-surface-container-low border-t border-outline-variant mt-auto">
+<div class="grid grid-cols-1 md:grid-cols-4 gap-stack-gap max-w-7xl mx-auto">
+<div class="col-span-1 md:col-span-1 flex flex-col gap-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[#0D9488]" data-icon="shield_check" style="font-variation-settings: 'FILL' 1;">format_image_left</span>
+<span class="font-headline-md text-headline-md font-bold text-primary">Trust Platform</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">A camada de confiança digital para a economia de serviços locais.</p>
+</div>
+<div class="flex flex-col gap-3">
+<h4 class="font-label-bold text-label-bold text-on-surface uppercase tracking-wider mb-2">Produto</h4>
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Como funciona</a>
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Para profissionais</a>
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Para clientes</a>
+</div>
+<div class="flex flex-col gap-3">
+<h4 class="font-label-bold text-label-bold text-on-surface uppercase tracking-wider mb-2">Empresa</h4>
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Sobre nós</a>
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Carreiras</a>
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Contato</a>
+</div>
+<div class="flex flex-col gap-3">
+<h4 class="font-label-bold text-label-bold text-on-surface uppercase tracking-wider mb-2">Legal</h4>
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Termos de Uso</a>
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Política de Privacidade</a>
+</div>
+</div>
+<div class="max-w-7xl mx-auto mt-12 pt-8 border-t border-outline-variant/50 flex flex-col md:flex-row justify-between items-center gap-4">
+<p class="font-body-sm text-body-sm text-on-surface-variant">© 2026 Trust Platform. Todos os direitos reservados.</p>
+</div>
+</footer>
+</body></html>

@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+
+<html lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Configurações - Segurança | Trust Platform</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Theme Configuration -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-secondary-fixed": "#00201d",
+                    "on-tertiary": "#ffffff",
+                    "on-secondary": "#ffffff",
+                    "on-tertiary-fixed": "#390c00",
+                    "secondary-container": "#86f2e4",
+                    "on-tertiary-container": "#ffc9b7",
+                    "on-background": "#131b2e",
+                    "tertiary-fixed": "#ffdbcf",
+                    "tertiary": "#7f2500",
+                    "on-surface-variant": "#434655",
+                    "surface-bright": "#faf8ff",
+                    "inverse-on-surface": "#eef0ff",
+                    "on-primary-fixed": "#001551",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-container-low": "#f2f3ff",
+                    "error": "#ba1a1a",
+                    "surface-dim": "#d2d9f4",
+                    "surface-tint": "#2151da",
+                    "error-container": "#ffdad6",
+                    "tertiary-fixed-dim": "#ffb59c",
+                    "primary-container": "#1d4ed8",
+                    "on-tertiary-fixed-variant": "#832700",
+                    "on-error-container": "#93000a",
+                    "on-primary-container": "#cad3ff",
+                    "surface-container-highest": "#dae2fd",
+                    "on-secondary-fixed-variant": "#005049",
+                    "secondary": "#006a61",
+                    "primary-fixed-dim": "#b7c4ff",
+                    "inverse-primary": "#b7c4ff",
+                    "on-primary": "#ffffff",
+                    "surface-container-high": "#e2e7ff",
+                    "inverse-surface": "#283044",
+                    "secondary-fixed": "#89f5e7",
+                    "secondary-fixed-dim": "#6bd8cb",
+                    "on-secondary-container": "#006f66",
+                    "outline": "#747686",
+                    "tertiary-container": "#a73400",
+                    "surface-variant": "#dae2fd",
+                    "primary": "#0037b0",
+                    "on-surface": "#131b2e",
+                    "background": "#faf8ff",
+                    "primary-fixed": "#dce1ff",
+                    "outline-variant": "#c4c5d7",
+                    "on-primary-fixed-variant": "#0039b5",
+                    "surface-container": "#eaedff",
+                    "surface": "#faf8ff",
+                    "on-error": "#ffffff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "section-padding": "2rem",
+                    "stack-gap": "1.5rem",
+                    "margin-mobile": "1.25rem",
+                    "gutter": "1rem",
+                    "container-max-width": "440px"
+            },
+            "fontFamily": {
+                    "body-sm": ["Inter", "sans-serif"],
+                    "body-lg": ["Inter", "sans-serif"],
+                    "button": ["Inter", "sans-serif"],
+                    "headline-md": ["Inter", "sans-serif"],
+                    "label-bold": ["Inter", "sans-serif"],
+                    "headline-lg": ["Inter", "sans-serif"]
+            },
+            "fontSize": {
+                    "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "button": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "label-bold": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "headline-lg": ["30px", {"lineHeight": "38px", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        /* Custom input focus ring */
+        input:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px #1D4ED8;
+            border-color: transparent !important;
+        }
+
+        /* Subtle ambient shadow for the card */
+        .ambient-shadow {
+            box-shadow: 0px 10px 25px -5px rgba(15, 23, 42, 0.08);
+        }
+        
+        /* Toast Animation */
+        @keyframes slideInUp {
+            from { transform: translateY(100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .toast-enter {
+            animation: slideInUp 0.3s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background antialiased flex min-h-screen">
+<!-- SideNavBar (Shared Component) -->
+<!-- Executing styles from JSON: style_bg_color, style_component_shape, style_separation_logic, style_shell_layout -->
+<nav class="bg-surface-container-low border-r border-outline-variant fixed left-0 top-0 h-screen w-64 flex flex-col py-stack-gap px-4 z-40 hidden md:flex">
+<!-- Brand / Header -->
+<div class="flex items-center gap-3 px-2 mb-8">
+<div class="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined" data-weight="fill" style="font-variation-settings: 'FILL' 1;">shield</span>
+</div>
+<div>
+<!-- Executing style_brand_logo -->
+<h1 class="font-headline-md text-headline-md font-bold text-primary">Trust Platform</h1>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Fintech Security</p>
+</div>
+</div>
+<!-- Navigation Tabs -->
+<!-- Executing style_typography -->
+<ul class="flex flex-col gap-1 flex-1 font-label-bold text-label-bold">
+<!-- Início (Inactive) -->
+<!-- Executing style_inactive_navigation, style_universal_hover, style_interactions -->
+<li>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all translate-x-1 duration-200 group" href="#">
+<span class="material-symbols-outlined text-outline group-hover:text-on-surface-variant transition-colors">home</span>
+                    Início
+                </a>
+</li>
+<!-- Trust Passport (Inactive) -->
+<li>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all translate-x-1 duration-200 group" href="#">
+<span class="material-symbols-outlined text-outline group-hover:text-on-surface-variant transition-colors">verified_user</span>
+                    Trust Passport
+                </a>
+</li>
+<!-- Verificações (Inactive) -->
+<li>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all translate-x-1 duration-200 group" href="#">
+<span class="material-symbols-outlined text-outline group-hover:text-on-surface-variant transition-colors">fact_check</span>
+                    Verificações
+                </a>
+</li>
+<!-- Marketplace (Inactive) -->
+<li>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all translate-x-1 duration-200 group" href="#">
+<span class="material-symbols-outlined text-outline group-hover:text-on-surface-variant transition-colors">storefront</span>
+                    Marketplace
+                </a>
+</li>
+</ul>
+<!-- Configurações (Active) - Positioned at bottom as per request context -->
+<ul class="font-label-bold text-label-bold mt-auto">
+<li>
+<!-- Executing style_active_navigation, style_primary_color -->
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-primary font-bold bg-primary-container/10 transition-all translate-x-1 duration-200" href="#">
+<span class="material-symbols-outlined text-primary" data-weight="fill" style="font-variation-settings: 'FILL' 1;">settings</span>
+                    Configurações
+                </a>
+</li>
+</ul>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 md:ml-64 p-margin-mobile md:p-section-padding flex flex-col">
+<!-- Top spacer for aesthetics -->
+<div class="h-8 md:h-12 w-full"></div>
+<!-- Central Fixed Grid Container -->
+<div class="w-full max-w-[560px] mx-auto">
+<!-- Page Header -->
+<div class="mb-stack-gap">
+<div class="flex items-center gap-2 text-on-surface-variant font-body-sm text-body-sm mb-2">
+<span class="material-symbols-outlined" style="font-size: 16px;">settings</span>
+<span>Configurações</span>
+<span class="material-symbols-outlined" style="font-size: 16px;">chevron_right</span>
+<span class="font-medium text-on-surface">Segurança</span>
+</div>
+<h2 class="font-headline-lg text-headline-lg text-on-background">Segurança</h2>
+</div>
+<!-- Main Form Card -->
+<div class="bg-surface-container-lowest rounded-xl ambient-shadow border border-outline-variant/30 overflow-hidden">
+<!-- Card Header -->
+<div class="px-8 py-6 border-b border-outline-variant/30">
+<h3 class="font-headline-md text-headline-md text-on-background flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">lock_reset</span>
+                        Alterar senha
+                    </h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Atualize sua credencial de acesso principal.</p>
+</div>
+<!-- Form Body -->
+<form class="p-8 flex flex-col gap-6">
+<!-- Senha atual -->
+<div>
+<label class="font-label-bold text-label-bold text-on-surface mb-2 block uppercase tracking-wider" for="current_password">Senha atual</label>
+<div class="relative">
+<input class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-3 font-body-lg text-body-lg text-on-surface placeholder:text-outline focus:border-transparent transition-colors" id="current_password" placeholder="Insira sua senha atual" type="password"/>
+<button class="absolute right-3 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface transition-colors" type="button">
+<span class="material-symbols-outlined">visibility_off</span>
+</button>
+</div>
+</div>
+<div class="h-px bg-outline-variant/30 w-full my-2"></div>
+<!-- Nova senha -->
+<div>
+<label class="font-label-bold text-label-bold text-on-surface mb-2 block uppercase tracking-wider" for="new_password">Nova senha</label>
+<div class="relative">
+<input class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-3 font-body-lg text-body-lg text-on-surface placeholder:text-outline focus:border-transparent transition-colors" id="new_password" placeholder="Crie uma nova senha" type="password"/>
+</div>
+<!-- Password Requirements Checklist -->
+<div class="mt-4 bg-surface-container p-4 rounded-lg">
+<p class="font-label-bold text-label-bold text-on-surface-variant mb-3">REQUISITOS DA SENHA</p>
+<ul class="flex flex-col gap-2 font-body-sm text-body-sm text-on-surface-variant">
+<li class="flex items-center gap-2 text-primary">
+<span class="material-symbols-outlined text-primary" data-weight="fill" style="font-size: 18px;">check_circle</span>
+                                    Mínimo de 12 caracteres
+                                </li>
+<li class="flex items-center gap-2">
+<span class="material-symbols-outlined text-outline" style="font-size: 18px;">radio_button_unchecked</span>
+                                    Pelo menos uma letra maiúscula
+                                </li>
+<li class="flex items-center gap-2">
+<span class="material-symbols-outlined text-outline" style="font-size: 18px;">radio_button_unchecked</span>
+                                    Pelo menos um número
+                                </li>
+<li class="flex items-center gap-2">
+<span class="material-symbols-outlined text-outline" style="font-size: 18px;">radio_button_unchecked</span>
+                                    Pelo menos um caractere especial (!@#$%)
+                                </li>
+</ul>
+</div>
+</div>
+<!-- Confirmar nova senha -->
+<div>
+<label class="font-label-bold text-label-bold text-on-surface mb-2 block uppercase tracking-wider" for="confirm_password">Confirmar nova senha</label>
+<input class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-3 font-body-lg text-body-lg text-on-surface placeholder:text-outline focus:border-transparent transition-colors" id="confirm_password" placeholder="Repita a nova senha" type="password"/>
+</div>
+<!-- Info Note -->
+<div class="flex items-start gap-3 p-4 bg-inverse-on-surface rounded-lg mt-2">
+<span class="material-symbols-outlined text-primary mt-0.5">info</span>
+<p class="font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
+<strong class="text-on-surface block mb-1">Aviso de Segurança</strong>
+                            Suas outras sessões serão encerradas. Esta sessão permanecerá ativa.
+                        </p>
+</div>
+<!-- Actions -->
+<div class="mt-4 pt-6 border-t border-outline-variant/30 flex justify-end">
+<button class="bg-primary hover:bg-on-primary-fixed-variant text-on-primary font-button text-button py-3 px-8 rounded-lg transition-colors w-full sm:w-auto shadow-sm" type="button">
+                            Salvar nova senha
+                        </button>
+</div>
+</form>
+</div>
+<!-- Bottom spacer -->
+<div class="h-16 w-full"></div>
+</div>
+</main>
+<!-- Success Toast (Demonstrating state) -->
+<div class="fixed bottom-6 right-6 z-50 toast-enter">
+<div class="bg-surface-container-lowest border border-[#0D9488]/30 ambient-shadow rounded-lg p-4 flex items-center gap-3 min-w-[320px]">
+<div class="w-10 h-10 rounded-full bg-[#0D9488]/10 flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-[#0D9488]">check</span>
+</div>
+<div>
+<p class="font-label-bold text-label-bold text-on-surface mb-0.5">Sucesso</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Senha alterada com sucesso.</p>
+</div>
+<button class="ml-auto text-outline hover:text-on-surface transition-colors p-1">
+<span class="material-symbols-outlined" style="font-size: 20px;">close</span>
+</button>
+</div>
+</div>
+</body></html>

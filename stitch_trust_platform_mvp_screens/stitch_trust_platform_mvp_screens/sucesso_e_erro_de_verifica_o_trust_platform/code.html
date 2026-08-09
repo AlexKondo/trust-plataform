@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+
+<html lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Trust Platform - Verificação de E-mail</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-secondary-fixed": "#00201d",
+                      "on-tertiary": "#ffffff",
+                      "on-secondary": "#ffffff",
+                      "on-tertiary-fixed": "#390c00",
+                      "secondary-container": "#86f2e4",
+                      "on-tertiary-container": "#ffc9b7",
+                      "on-background": "#131b2e",
+                      "tertiary-fixed": "#ffdbcf",
+                      "tertiary": "#7f2500",
+                      "on-surface-variant": "#434655",
+                      "surface-bright": "#faf8ff",
+                      "inverse-on-surface": "#eef0ff",
+                      "on-primary-fixed": "#001551",
+                      "surface-container-lowest": "#ffffff",
+                      "surface-container-low": "#f2f3ff",
+                      "error": "#ba1a1a",
+                      "surface-dim": "#d2d9f4",
+                      "surface-tint": "#2151da",
+                      "error-container": "#ffdad6",
+                      "tertiary-fixed-dim": "#ffb59c",
+                      "primary-container": "#1d4ed8",
+                      "on-tertiary-fixed-variant": "#832700",
+                      "on-error-container": "#93000a",
+                      "on-primary-container": "#cad3ff",
+                      "surface-container-highest": "#dae2fd",
+                      "on-secondary-fixed-variant": "#005049",
+                      "secondary": "#006a61",
+                      "primary-fixed-dim": "#b7c4ff",
+                      "inverse-primary": "#b7c4ff",
+                      "on-primary": "#ffffff",
+                      "surface-container-high": "#e2e7ff",
+                      "inverse-surface": "#283044",
+                      "secondary-fixed": "#89f5e7",
+                      "secondary-fixed-dim": "#6bd8cb",
+                      "on-secondary-container": "#006f66",
+                      "outline": "#747686",
+                      "tertiary-container": "#a73400",
+                      "surface-variant": "#dae2fd",
+                      "primary": "#0037b0",
+                      "on-surface": "#131b2e",
+                      "background": "#faf8ff",
+                      "primary-fixed": "#dce1ff",
+                      "outline-variant": "#c4c5d7",
+                      "on-primary-fixed-variant": "#0039b5",
+                      "surface-container": "#eaedff",
+                      "surface": "#faf8ff",
+                      "on-error": "#ffffff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "section-padding": "2rem",
+                      "stack-gap": "1.5rem",
+                      "margin-mobile": "1.25rem",
+                      "gutter": "1rem",
+                      "container-max-width": "440px"
+              },
+              "fontFamily": {
+                      "body-sm": [
+                              "Inter"
+                      ],
+                      "body-lg": [
+                              "Inter"
+                      ],
+                      "button": [
+                              "Inter"
+                      ],
+                      "headline-md": [
+                              "Inter"
+                      ],
+                      "label-bold": [
+                              "Inter"
+                      ],
+                      "headline-lg": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "body-sm": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-lg": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "button": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "label-bold": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-lg": [
+                              "30px",
+                              {
+                                      "lineHeight": "38px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+<style>
+        .trust-shadow {
+            box-shadow: 0px 10px 25px -5px rgba(15, 23, 42, 0.08);
+        }
+        .spinner {
+            border: 3px solid rgba(29, 78, 216, 0.1);
+            border-radius: 50%;
+            border-top: 3px solid #1D4ED8;
+            width: 48px;
+            height: 48px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex flex-col antialiased">
+<!-- TopNav - Hidden as this is a transactional flow, but kept minimal for branding -->
+<header class="w-full h-16 flex items-center justify-center bg-surface shadow-sm sticky top-0 z-50">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[#0D9488]" style="font-variation-settings: 'FILL' 1;">security</span>
+<span class="font-headline-md text-headline-md text-primary">Trust Platform</span>
+</div>
+</header>
+<main class="flex-grow flex items-center justify-center p-margin-mobile md:p-section-padding">
+<div class="w-full max-w-container-max-width space-y-8">
+<!-- Variant: Loading -->
+<div class="bg-surface-container-lowest trust-shadow rounded-xl p-8 flex flex-col items-center text-center hidden" id="state-loading">
+<div class="mb-6 flex justify-center">
+<div class="spinner"></div>
+</div>
+<h2 class="font-headline-md text-headline-md text-on-surface mb-2">Validando seu link...</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Aguarde um momento enquanto verificamos suas informações de segurança.</p>
+</div>
+<!-- Variant A: Success -->
+<div class="bg-surface-container-lowest trust-shadow rounded-xl p-8 flex flex-col items-center text-center" id="state-success">
+<div class="mb-6 flex justify-center items-center w-16 h-16 rounded-full bg-secondary-container/20">
+<span class="material-symbols-outlined text-4xl text-[#0D9488]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<h2 class="font-headline-md text-headline-md text-on-surface mb-2">E-mail confirmado!</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant mb-8">Sua conta está ativa. Faça login para começar a usar a Trust Platform com segurança.</p>
+<button class="w-full bg-primary-container text-on-primary py-3 px-4 rounded-lg font-button text-button hover:bg-primary transition-colors duration-200">
+                    Ir para o login
+                </button>
+</div>
+<!-- Variant B: Error -->
+<div class="bg-surface-container-lowest trust-shadow rounded-xl p-8 flex flex-col items-center text-center mt-8 border border-error-container" id="state-error">
+<div class="mb-6 flex justify-center items-center w-16 h-16 rounded-full bg-error-container/30">
+<span class="material-symbols-outlined text-4xl text-error" style="font-variation-settings: 'FILL' 1;">warning</span>
+</div>
+<h2 class="font-headline-md text-headline-md text-on-surface mb-2">Link inválido ou expirado</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant mb-8">Este link de confirmação não é mais válido. Solicite um novo para continuar o processo de segurança.</p>
+<div class="w-full space-y-3">
+<button class="w-full bg-primary-container text-on-primary py-3 px-4 rounded-lg font-button text-button hover:bg-primary transition-colors duration-200">
+                        Reenviar e-mail de confirmação
+                    </button>
+<button class="w-full bg-transparent border border-outline text-on-surface py-3 px-4 rounded-lg font-button text-button hover:bg-surface-variant transition-colors duration-200">
+                        Voltar ao login
+                    </button>
+</div>
+</div>
+</div>
+</main>
+<!-- Demo script to cycle states (for visualization purposes) -->
+<script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const loading = document.getElementById('state-loading');
+            const success = document.getElementById('state-success');
+            const error = document.getElementById('state-error');
+            
+            // In a real app, logic would determine which state to show.
+            // For this layout demonstration, we show them all to satisfy the prompt,
+            // but normally you'd toggle classes like 'hidden' based on state.
+            
+            // Example of how it might look to cycle them:
+            /*
+            let states = [loading, success, error];
+            let current = 0;
+            
+            setInterval(() => {
+                states.forEach(s => s.classList.add('hidden'));
+                states[current].classList.remove('hidden');
+                current = (current + 1) % states.length;
+            }, 3000);
+            */
+        });
+    </script>
+</body></html>

@@ -23,6 +23,8 @@ export async function createApp(): Promise<NestFastifyApplication> {
   // Rate limiting por IP (DOC-002: obrigatório em APIs públicas; limite configurável).
   // Lockout por conta é tratado no AuthenticateIdentityUseCase.
   const config = app.get(AppConfigService);
+  // CORS: apenas o frontend (APP_BASE_URL) pode chamar a API pelo navegador
+  app.enableCors({ origin: config.appBaseUrl, credentials: false });
   await app.register(rateLimit, {
     max: config.rateLimitMaxPerMinute,
     timeWindow: '1 minute',

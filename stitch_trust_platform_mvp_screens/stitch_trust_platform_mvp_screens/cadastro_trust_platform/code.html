@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+
+<html lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Trust Platform - Criar sua conta</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-fixed": "#00201d",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "on-tertiary-fixed": "#390c00",
+                        "secondary-container": "#86f2e4",
+                        "on-tertiary-container": "#ffc9b7",
+                        "on-background": "#131b2e",
+                        "tertiary-fixed": "#ffdbcf",
+                        "tertiary": "#7f2500",
+                        "on-surface-variant": "#434655",
+                        "surface-bright": "#faf8ff",
+                        "inverse-on-surface": "#eef0ff",
+                        "on-primary-fixed": "#001551",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-low": "#f2f3ff",
+                        "error": "#ba1a1a",
+                        "surface-dim": "#d2d9f4",
+                        "surface-tint": "#2151da",
+                        "error-container": "#ffdad6",
+                        "tertiary-fixed-dim": "#ffb59c",
+                        "primary-container": "#1d4ed8",
+                        "on-tertiary-fixed-variant": "#832700",
+                        "on-error-container": "#93000a",
+                        "on-primary-container": "#cad3ff",
+                        "surface-container-highest": "#dae2fd",
+                        "on-secondary-fixed-variant": "#005049",
+                        "secondary": "#006a61",
+                        "primary-fixed-dim": "#b7c4ff",
+                        "inverse-primary": "#b7c4ff",
+                        "on-primary": "#ffffff",
+                        "surface-container-high": "#e2e7ff",
+                        "inverse-surface": "#283044",
+                        "secondary-fixed": "#89f5e7",
+                        "secondary-fixed-dim": "#6bd8cb",
+                        "on-secondary-container": "#006f66",
+                        "outline": "#747686",
+                        "tertiary-container": "#a73400",
+                        "surface-variant": "#dae2fd",
+                        "primary": "#0037b0",
+                        "on-surface": "#131b2e",
+                        "background": "#faf8ff",
+                        "primary-fixed": "#dce1ff",
+                        "outline-variant": "#c4c5d7",
+                        "on-primary-fixed-variant": "#0039b5",
+                        "surface-container": "#eaedff",
+                        "surface": "#faf8ff",
+                        "on-error": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "section-padding": "2rem",
+                        "stack-gap": "1.5rem",
+                        "margin-mobile": "1.25rem",
+                        "gutter": "1rem",
+                        "container-max-width": "440px"
+                    },
+                    "fontFamily": {
+                        "body-sm": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "button": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "label-bold": ["Inter"],
+                        "headline-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "body-sm": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "button": ["16px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "label-bold": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "headline-lg": ["30px", { "lineHeight": "38px", "letterSpacing": "-0.02em", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .custom-shadow { box-shadow: 0px 10px 25px -5px rgba(15, 23, 42, 0.08); }
+        .input-ring-focus:focus-within { box-shadow: 0 0 0 2px #1D4ED8; border-color: transparent; }
+        .input-ring-error { box-shadow: 0 0 0 2px #ba1a1a; border-color: transparent; }
+    </style>
+</head>
+<body class="bg-background min-h-screen flex items-center justify-center p-margin-mobile md:p-section-padding antialiased font-body-lg text-on-surface">
+<!-- Main Card Container -->
+<main class="w-full max-w-[440px] bg-surface-container-lowest rounded-xl custom-shadow p-8 flex flex-col gap-8 relative overflow-hidden">
+<!-- Header / Brand -->
+<div class="flex flex-col items-center text-center gap-2">
+<div class="flex items-center justify-center gap-2 mb-2">
+<span class="material-symbols-outlined text-[32px] text-[#0D9488]" style="font-variation-settings: 'FILL' 1;">shield</span>
+<span class="font-headline-md text-headline-md text-primary-container">Trust Platform</span>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-on-surface">Criar sua conta</h1>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Comece a construir sua reputação digital</p>
+</div>
+<!-- Form -->
+<form class="flex flex-col gap-6" onsubmit="event.preventDefault();">
+<!-- Nome Completo -->
+<div class="flex flex-col gap-2">
+<label class="font-label-bold text-label-bold text-on-surface" for="name">Nome completo</label>
+<div class="relative flex items-center border border-outline-variant rounded-lg bg-surface-container-lowest input-ring-focus transition-shadow">
+<span aria-hidden="true" class="material-symbols-outlined absolute left-3 text-on-surface-variant">person</span>
+<input class="w-full bg-transparent border-none rounded-lg py-3 pl-10 pr-3 font-body-lg text-body-lg text-on-surface placeholder:text-outline focus:ring-0" id="name" placeholder="Ex: João da Silva" required="" type="text"/>
+</div>
+</div>
+<!-- E-mail (Error State Example) -->
+<div class="flex flex-col gap-2">
+<label class="font-label-bold text-label-bold text-error" for="email">E-mail</label>
+<div class="relative flex items-center border border-error rounded-lg bg-surface-container-lowest input-ring-error transition-shadow">
+<span aria-hidden="true" class="material-symbols-outlined absolute left-3 text-error">mail</span>
+<input class="w-full bg-transparent border-none rounded-lg py-3 pl-10 pr-10 font-body-lg text-body-lg text-on-surface focus:ring-0" id="email" required="" type="email" value="joao@exemplo.com"/>
+<span aria-hidden="true" class="material-symbols-outlined absolute right-3 text-error">error</span>
+</div>
+<p class="font-body-sm text-body-sm text-error flex items-center gap-1 mt-1">Este e-mail já está cadastrado.</p>
+</div>
+<!-- Senha -->
+<div class="flex flex-col gap-2">
+<label class="font-label-bold text-label-bold text-on-surface" for="password">Senha</label>
+<div class="relative flex items-center border border-outline-variant rounded-lg bg-surface-container-lowest input-ring-focus transition-shadow">
+<span aria-hidden="true" class="material-symbols-outlined absolute left-3 text-on-surface-variant">lock</span>
+<input class="w-full bg-transparent border-none rounded-lg py-3 pl-10 pr-10 font-body-lg text-body-lg text-on-surface placeholder:text-outline focus:ring-0" id="password" placeholder="••••••••" required="" type="password"/>
+<button aria-label="Toggle password visibility" class="absolute right-3 text-on-surface-variant hover:text-on-surface transition-colors focus:outline-none" type="button">
+<span class="material-symbols-outlined">visibility_off</span>
+</button>
+</div>
+<!-- Password Requirements Checklist -->
+<ul class="flex flex-col gap-1 mt-2 font-body-sm text-body-sm text-on-surface-variant">
+<li class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-secondary">check_circle</span>
+                        Mínimo de 12 caracteres
+                    </li>
+<li class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-outline-variant">radio_button_unchecked</span>
+                        Uma letra maiúscula e uma minúscula
+                    </li>
+<li class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-outline-variant">radio_button_unchecked</span>
+                        Um número
+                    </li>
+<li class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-outline-variant">radio_button_unchecked</span>
+                        Um caractere especial
+                    </li>
+</ul>
+</div>
+<!-- Confirmar Senha -->
+<div class="flex flex-col gap-2">
+<label class="font-label-bold text-label-bold text-on-surface" for="confirm-password">Confirmar senha</label>
+<div class="relative flex items-center border border-outline-variant rounded-lg bg-surface-container-lowest input-ring-focus transition-shadow">
+<span aria-hidden="true" class="material-symbols-outlined absolute left-3 text-on-surface-variant">lock</span>
+<input class="w-full bg-transparent border-none rounded-lg py-3 pl-10 pr-3 font-body-lg text-body-lg text-on-surface placeholder:text-outline focus:ring-0" id="confirm-password" placeholder="••••••••" required="" type="password"/>
+</div>
+</div>
+<!-- Terms Checkbox -->
+<div class="flex items-start gap-3 mt-2">
+<div class="flex items-center h-6">
+<input class="w-4 h-4 rounded border-outline-variant text-primary-container focus:ring-primary-container focus:ring-2 focus:ring-offset-0 bg-surface-container-lowest cursor-pointer" id="terms" required="" type="checkbox"/>
+</div>
+<label class="font-body-sm text-body-sm text-on-surface-variant cursor-pointer select-none leading-5" for="terms">
+                    Li e aceito os <a class="text-primary-container hover:underline underline-offset-2" href="#">Termos de Uso</a> e a <a class="text-primary-container hover:underline underline-offset-2" href="#">Política de Privacidade</a>
+</label>
+</div>
+<!-- Submit Button -->
+<button class="w-full bg-primary-container text-on-primary py-3 px-4 rounded-lg font-button text-button flex items-center justify-center gap-2 hover:bg-primary transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-container mt-2" type="submit">
+                Criar conta
+                <span aria-hidden="true" class="material-symbols-outlined text-[20px]">arrow_forward</span>
+</button>
+</form>
+<!-- Divider & Login Link -->
+<div class="flex flex-col items-center gap-4 mt-2">
+<div class="w-full h-px bg-outline-variant/50"></div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+                Já tem uma conta? <a class="font-label-bold text-label-bold text-primary-container hover:underline underline-offset-2 ml-1" href="#">Entrar</a>
+</p>
+</div>
+</main>
+</body></html>

@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+
+<html lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Definir nova senha - Trust Platform</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-secondary-fixed": "#00201d",
+                      "on-tertiary": "#ffffff",
+                      "on-secondary": "#ffffff",
+                      "on-tertiary-fixed": "#390c00",
+                      "secondary-container": "#86f2e4",
+                      "on-tertiary-container": "#ffc9b7",
+                      "on-background": "#131b2e",
+                      "tertiary-fixed": "#ffdbcf",
+                      "tertiary": "#7f2500",
+                      "on-surface-variant": "#434655",
+                      "surface-bright": "#faf8ff",
+                      "inverse-on-surface": "#eef0ff",
+                      "on-primary-fixed": "#001551",
+                      "surface-container-lowest": "#ffffff",
+                      "surface-container-low": "#f2f3ff",
+                      "error": "#ba1a1a",
+                      "surface-dim": "#d2d9f4",
+                      "surface-tint": "#2151da",
+                      "error-container": "#ffdad6",
+                      "tertiary-fixed-dim": "#ffb59c",
+                      "primary-container": "#1d4ed8",
+                      "on-tertiary-fixed-variant": "#832700",
+                      "on-error-container": "#93000a",
+                      "on-primary-container": "#cad3ff",
+                      "surface-container-highest": "#dae2fd",
+                      "on-secondary-fixed-variant": "#005049",
+                      "secondary": "#006a61",
+                      "primary-fixed-dim": "#b7c4ff",
+                      "inverse-primary": "#b7c4ff",
+                      "on-primary": "#ffffff",
+                      "surface-container-high": "#e2e7ff",
+                      "inverse-surface": "#283044",
+                      "secondary-fixed": "#89f5e7",
+                      "secondary-fixed-dim": "#6bd8cb",
+                      "on-secondary-container": "#006f66",
+                      "outline": "#747686",
+                      "tertiary-container": "#a73400",
+                      "surface-variant": "#dae2fd",
+                      "primary": "#0037b0",
+                      "on-surface": "#131b2e",
+                      "background": "#faf8ff",
+                      "primary-fixed": "#dce1ff",
+                      "outline-variant": "#c4c5d7",
+                      "on-primary-fixed-variant": "#0039b5",
+                      "surface-container": "#eaedff",
+                      "surface": "#faf8ff",
+                      "on-error": "#ffffff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "section-padding": "2rem",
+                      "stack-gap": "1.5rem",
+                      "margin-mobile": "1.25rem",
+                      "gutter": "1rem",
+                      "container-max-width": "440px"
+              },
+              "fontFamily": {
+                      "body-sm": ["Inter"],
+                      "body-lg": ["Inter"],
+                      "button": ["Inter"],
+                      "headline-md": ["Inter"],
+                      "label-bold": ["Inter"],
+                      "headline-lg": ["Inter"]
+              },
+              "fontSize": {
+                      "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                      "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                      "button": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+                      "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                      "label-bold": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                      "headline-lg": ["30px", {"lineHeight": "38px", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+              }
+            },
+          }
+        }
+    </script>
+<style>
+        /* Base styles */
+        body {
+            background-color: #F8FAFC;
+        }
+        
+        /* Custom Shadows as per spec */
+        .ambient-shadow {
+            box-shadow: 0px 10px 25px -5px rgba(15, 23, 42, 0.08);
+        }
+        
+        /* Custom Focus */
+        .input-focus-ring:focus {
+            outline: none;
+            border-color: #1D4ED8;
+            border-width: 2px;
+            box-shadow: none; /* No glow */
+        }
+        
+        /* Specific brand colors from spec if missing from theme or overriding for strict match */
+        .text-brand-blue { color: #1D4ED8; }
+        .bg-brand-blue { background-color: #1D4ED8; }
+        .text-brand-teal { color: #0D9488; }
+        .border-subtle { border-color: #E2E8F0; }
+        .text-near-black { color: #0F172A; }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-margin-mobile md:p-section-padding bg-background text-on-surface">
+<!-- Container for both states, controlled by JS for demo -->
+<div class="w-full max-w-container-max-width mx-auto flex flex-col gap-stack-gap" id="app-container">
+<!-- View Toggle (For presentation purposes) -->
+<div class="flex justify-center mb-8 gap-4">
+<button class="text-body-sm text-primary hover:underline" onclick="showView('reset')">Show Reset View</button>
+<button class="text-body-sm text-error hover:underline" onclick="showView('error')">Show Error View</button>
+</div>
+<!-- MAIN RESET VIEW -->
+<main class="bg-surface-container-lowest rounded-xl ambient-shadow p-8 flex flex-col w-full relative z-10 transition-opacity duration-300" id="view-reset">
+<!-- Branding -->
+<div class="flex flex-col items-center mb-8">
+<div class="flex items-center gap-2 mb-6">
+<span class="material-symbols-outlined text-brand-teal text-4xl" style="font-variation-settings: 'FILL' 1;">security</span>
+<h1 class="font-headline-lg text-headline-lg text-brand-blue">Trust Platform</h1>
+</div>
+<h2 class="font-headline-md text-headline-md text-near-black">Definir nova senha</h2>
+</div>
+<form class="flex flex-col gap-6">
+<!-- Password Field -->
+<div class="flex flex-col gap-2">
+<label class="font-label-bold text-label-bold text-near-black" for="new-password">Nova senha</label>
+<div class="relative">
+<input class="w-full h-12 px-4 bg-surface-container-lowest border border-subtle rounded-lg text-body-lg text-on-surface input-focus-ring placeholder-on-surface-variant/50" id="new-password" placeholder="Digite sua nova senha" type="password"/>
+<button class="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors" onclick="togglePassword('new-password', 'icon-new-password')" type="button">
+<span class="material-symbols-outlined" id="icon-new-password">visibility</span>
+</button>
+</div>
+</div>
+<!-- Confirm Password Field -->
+<div class="flex flex-col gap-2">
+<label class="font-label-bold text-label-bold text-near-black" for="confirm-password">Confirmar nova senha</label>
+<div class="relative">
+<input class="w-full h-12 px-4 bg-surface-container-lowest border border-subtle rounded-lg text-body-lg text-on-surface input-focus-ring placeholder-on-surface-variant/50" id="confirm-password" placeholder="Confirme sua nova senha" type="password"/>
+<button class="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors" onclick="togglePassword('confirm-password', 'icon-confirm-password')" type="button">
+<span class="material-symbols-outlined" id="icon-confirm-password">visibility</span>
+</button>
+</div>
+</div>
+<!-- Password Requirements Checklist -->
+<div class="bg-surface-container-low rounded-lg p-4 flex flex-col gap-2 border border-subtle">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="font-body-sm text-body-sm">Mínimo de 12 caracteres</span>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 0;">radio_button_unchecked</span>
+<span class="font-body-sm text-body-sm">Uma letra maiúscula e uma minúscula</span>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 0;">radio_button_unchecked</span>
+<span class="font-body-sm text-body-sm">Um número</span>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 0;">radio_button_unchecked</span>
+<span class="font-body-sm text-body-sm">Um caractere especial</span>
+</div>
+</div>
+<!-- Info Note -->
+<div class="bg-primary-fixed rounded-lg p-4 flex items-start gap-3 mt-2 border border-primary-fixed-dim">
+<span class="material-symbols-outlined text-primary mt-0.5">shield_locked</span>
+<p class="font-body-sm text-body-sm text-on-primary-fixed flex-1">
+                        Por segurança, todas as suas sessões serão encerradas e você precisará entrar novamente.
+                    </p>
+</div>
+<!-- Submit Button -->
+<button class="w-full bg-brand-blue text-on-primary font-button text-button py-3 rounded-lg hover:bg-primary-fixed-variant transition-colors mt-2" type="submit">
+                    Redefinir senha
+                </button>
+</form>
+</main>
+<!-- ERROR VIEW -->
+<main class="bg-surface-container-lowest rounded-xl ambient-shadow p-8 flex flex-col items-center text-center w-full relative z-10 hidden transition-opacity duration-300" id="view-error">
+<!-- Branding -->
+<div class="flex items-center gap-2 mb-10 w-full justify-center">
+<span class="material-symbols-outlined text-brand-teal text-3xl" style="font-variation-settings: 'FILL' 1;">security</span>
+<span class="font-headline-md text-headline-md text-brand-blue tracking-tight">Trust Platform</span>
+</div>
+<!-- Error Icon & Content -->
+<div class="bg-error-container/20 rounded-full p-4 mb-6">
+<span class="material-symbols-outlined text-error text-5xl" style="font-variation-settings: 'FILL' 1;">warning</span>
+</div>
+<h2 class="font-headline-md text-headline-md text-near-black mb-3">Link inválido ou expirado</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant mb-8">
+                Solicite uma nova recuperação de senha.
+            </p>
+<!-- Action Button -->
+<button class="w-full bg-transparent border border-subtle text-near-black font-button text-button py-3 rounded-lg hover:bg-surface-container-low transition-colors" type="button">
+                Solicitar novamente
+            </button>
+</main>
+</div>
+<script>
+        // Password toggle logic
+        function togglePassword(inputId, iconId) {
+            const input = document.getElementById(inputId);
+            const icon = document.getElementById(iconId);
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.textContent = 'visibility_off';
+            } else {
+                input.type = 'password';
+                icon.textContent = 'visibility';
+            }
+        }
+
+        // View toggle logic for presentation
+        function showView(viewName) {
+            const resetView = document.getElementById('view-reset');
+            const errorView = document.getElementById('view-error');
+            
+            if (viewName === 'reset') {
+                errorView.classList.add('hidden');
+                resetView.classList.remove('hidden');
+            } else {
+                resetView.classList.add('hidden');
+                errorView.classList.remove('hidden');
+            }
+        }
+    </script>
+</body></html>

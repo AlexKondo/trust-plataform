@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+
+<html lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Trust Platform - Recuperar Senha</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-secondary-fixed": "#00201d",
+                    "on-tertiary": "#ffffff",
+                    "on-secondary": "#ffffff",
+                    "on-tertiary-fixed": "#390c00",
+                    "secondary-container": "#86f2e4",
+                    "on-tertiary-container": "#ffc9b7",
+                    "on-background": "#131b2e",
+                    "tertiary-fixed": "#ffdbcf",
+                    "tertiary": "#7f2500",
+                    "on-surface-variant": "#434655",
+                    "surface-bright": "#faf8ff",
+                    "inverse-on-surface": "#eef0ff",
+                    "on-primary-fixed": "#001551",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-container-low": "#f2f3ff",
+                    "error": "#ba1a1a",
+                    "surface-dim": "#d2d9f4",
+                    "surface-tint": "#2151da",
+                    "error-container": "#ffdad6",
+                    "tertiary-fixed-dim": "#ffb59c",
+                    "primary-container": "#1d4ed8",
+                    "on-tertiary-fixed-variant": "#832700",
+                    "on-error-container": "#93000a",
+                    "on-primary-container": "#cad3ff",
+                    "surface-container-highest": "#dae2fd",
+                    "on-secondary-fixed-variant": "#005049",
+                    "secondary": "#006a61",
+                    "primary-fixed-dim": "#b7c4ff",
+                    "inverse-primary": "#b7c4ff",
+                    "on-primary": "#ffffff",
+                    "surface-container-high": "#e2e7ff",
+                    "inverse-surface": "#283044",
+                    "secondary-fixed": "#89f5e7",
+                    "secondary-fixed-dim": "#6bd8cb",
+                    "on-secondary-container": "#006f66",
+                    "outline": "#747686",
+                    "tertiary-container": "#a73400",
+                    "surface-variant": "#dae2fd",
+                    "primary": "#0037b0",
+                    "on-surface": "#131b2e",
+                    "background": "#faf8ff",
+                    "primary-fixed": "#dce1ff",
+                    "outline-variant": "#c4c5d7",
+                    "on-primary-fixed-variant": "#0039b5",
+                    "surface-container": "#eaedff",
+                    "surface": "#faf8ff",
+                    "on-error": "#ffffff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "section-padding": "2rem",
+                    "stack-gap": "1.5rem",
+                    "margin-mobile": "1.25rem",
+                    "gutter": "1rem",
+                    "container-max-width": "440px"
+            },
+            "fontFamily": {
+                    "body-sm": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "button": ["Inter"],
+                    "headline-md": ["Inter"],
+                    "label-bold": ["Inter"],
+                    "headline-lg": ["Inter"]
+            },
+            "fontSize": {
+                    "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "button": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "label-bold": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "headline-lg": ["30px", {"lineHeight": "38px", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        body {
+            background-color: #F8FAFC;
+        }
+        .main-card {
+            box-shadow: 0px 10px 25px -5px rgba(15, 23, 42, 0.08);
+            max-width: 440px;
+        }
+        .logo-color {
+            color: #0D9488;
+        }
+        .input-border {
+            border-color: #E2E8F0;
+        }
+        .input-focus:focus {
+            border-color: #1D4ED8;
+            outline: none;
+            box-shadow: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-margin-mobile md:p-section-padding text-on-surface">
+<div class="main-card w-full bg-surface-container-lowest rounded-xl p-[32px] mx-auto transition-all duration-300" id="reset-card">
+<!-- Branding -->
+<div class="flex flex-col items-center justify-center mb-8">
+<span class="material-symbols-outlined logo-color text-4xl mb-2" style="font-variation-settings: 'FILL' 1;">security</span>
+<h1 class="font-headline-lg text-headline-lg text-primary-container text-center">Trust Platform</h1>
+</div>
+<!-- Initial Form State -->
+<div class="block" id="form-state">
+<div class="text-center mb-8">
+<h2 class="font-headline-md text-headline-md text-on-surface mb-2">Recuperar senha</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Informe seu e-mail e enviaremos as instruções.</p>
+</div>
+<form class="space-y-6" id="reset-form" onsubmit="event.preventDefault(); showSuccessState();">
+<div class="space-y-2">
+<label class="block font-label-bold text-label-bold text-on-surface" for="email">E-mail</label>
+<input class="w-full bg-surface-container-lowest border input-border rounded-lg px-4 py-3 font-body-lg text-body-lg text-on-surface input-focus transition-colors" id="email" placeholder="seu.email@empresa.com" required="" type="email"/>
+</div>
+<button class="w-full bg-primary-container hover:bg-primary-fixed-variant text-on-primary font-button text-button py-[12px] rounded-lg transition-colors flex justify-center items-center" type="submit">
+                    Enviar instruções
+                </button>
+</form>
+<div class="mt-8 text-center">
+<a class="font-button text-button text-on-surface-variant hover:text-primary-container transition-colors inline-flex items-center" href="#">
+<span class="material-symbols-outlined mr-2 text-sm">arrow_back</span>
+                    Voltar ao login
+                </a>
+</div>
+</div>
+<!-- Success State (Initially Hidden) -->
+<div class="hidden text-center" id="success-state">
+<div class="mb-6 inline-flex items-center justify-center w-16 h-16 rounded-full bg-surface-container-low text-primary-container">
+<span class="material-symbols-outlined text-3xl" style="font-variation-settings: 'FILL' 1;">send</span>
+</div>
+<h2 class="font-headline-md text-headline-md text-on-surface mb-4">Verifique seu e-mail</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant mb-8 px-2">
+                Se existir uma conta para este e-mail, as instruções de recuperação foram enviadas. O link vale por 30 minutos.
+            </p>
+<button class="w-full bg-transparent border input-border text-on-surface font-button text-button py-[12px] rounded-lg hover:bg-surface-container-low transition-colors" onclick="resetForm()">
+                Tentar outro e-mail
+            </button>
+<div class="mt-6 text-center">
+<a class="font-button text-button text-primary-container hover:text-primary-fixed-variant transition-colors" href="#">
+                    Voltar ao login
+                </a>
+</div>
+</div>
+</div>
+<script>
+        function showSuccessState() {
+            const formState = document.getElementById('form-state');
+            const successState = document.getElementById('success-state');
+            
+            formState.style.opacity = '0';
+            setTimeout(() => {
+                formState.classList.add('hidden');
+                formState.classList.remove('block');
+                
+                successState.classList.remove('hidden');
+                successState.classList.add('block');
+                successState.style.opacity = '0';
+                
+                requestAnimationFrame(() => {
+                    successState.style.transition = 'opacity 0.3s ease-in';
+                    successState.style.opacity = '1';
+                });
+            }, 300);
+        }
+
+        function resetForm() {
+            const formState = document.getElementById('form-state');
+            const successState = document.getElementById('success-state');
+            const emailInput = document.getElementById('email');
+            
+            emailInput.value = '';
+            
+            successState.style.opacity = '0';
+            setTimeout(() => {
+                successState.classList.add('hidden');
+                successState.classList.remove('block');
+                
+                formState.classList.remove('hidden');
+                formState.classList.add('block');
+                formState.style.opacity = '0';
+                
+                requestAnimationFrame(() => {
+                    formState.style.transition = 'opacity 0.3s ease-in';
+                    formState.style.opacity = '1';
+                });
+            }, 300);
+        }
+    </script>
+</body></html>
