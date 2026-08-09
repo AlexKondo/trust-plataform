@@ -29,4 +29,6 @@ if (process.env.TEST_DATABASE_URL) {
   // Storage de evidências em memória nos testes ('' = ausente no env schema)
   process.env.SUPABASE_URL = '';
   process.env.SUPABASE_SERVICE_ROLE_KEY = '';
+  // Loops de polling dos e2e não devem esbarrar no rate limit
+  process.env.RATE_LIMIT_MAX_PER_MINUTE = '100000';
 }

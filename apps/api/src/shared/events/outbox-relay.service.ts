@@ -65,8 +65,11 @@ export class OutboxRelayService implements OnApplicationBootstrap, OnApplication
       .filter((instance): instance is EventConsumer => instance instanceof EventConsumer);
 
     for (const consumer of consumers) {
-      await this.ensureQueue(consumer.eventName);
-      await this.boss!.work(consumer.eventName, async (jobs: PgBoss.Job<EventEnvelope>[]) => {
+      // Fan-out: fila própria por consumer, inscrita no evento — cada consumer
+      // recebe SUA cópia do evento (pg-boss é fila de jobs, não pub/sub por queue)
+      await this.ensureQueue(consumer.consumerName);
+      await this.boss!.subscribe(consumer.eventName, consumer.consumerName);
+      await this.boss!.work(consumer.consumerName, async (jobs: PgBoss.Job<EventEnvelope>[]) => {
         for (const job of jobs) {
           await this.consume(consumer, job.data);
         }
@@ -174,9 +177,9 @@ export class OutboxRelayService implements OnApplicationBootstrap, OnApplication
     };
 
     try {
-      await this.ensureQueue(row.eventName);
-      // singletonKey = eventId → o próprio broker deduplica reenvios do relay
-      await this.boss!.send(row.eventName, envelope, { singletonKey: row.eventId });
+      // publish = fan-out para todas as filas inscritas no evento (0..N consumers);
+      // singletonKey = eventId → o broker deduplica reenvios do relay por fila
+      await this.boss!.publish(row.eventName, envelope, { singletonKey: row.eventId });
       await tx
         .update(outboxEvents)
         .set({
@@ -219,11 +222,12 @@ export class OutboxRelayService implements OnApplicationBootstrap, OnApplication
     if (this.ensuredQueues.has(name)) {
       return;
     }
-    // Retry com backoff para falhas de consumer (ex.: dependência ainda não criada)
+    // Retry com backoff exponencial (2s, 4s, 8s…) — dependências entre consumers
+    // (ex.: score ainda não criado quando a verificação pontua) se resolvem rápido
     await this.boss!.createQueue(name, {
       name,
-      retryLimit: 10,
-      retryDelay: 15,
+      retryLimit: 12,
+      retryDelay: 2,
       retryBackoff: true,
     });
     this.ensuredQueues.add(name);

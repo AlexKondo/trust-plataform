@@ -28,3 +28,4 @@ Thumbs.db
 #Arquivos do projeto
 *.docx
 *.xlsx
+.pgdata-e2e/

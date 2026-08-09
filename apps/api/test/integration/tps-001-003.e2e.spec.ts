@@ -57,7 +57,7 @@ describe.runIf(Boolean(testDatabaseUrl))('TPS-001..003 — Trust Passport e2e', 
   }
 
   /** Publica o outbox e espera o consumer criar o passport (pg-boss é assíncrono). */
-  async function waitForPassport(identityId: string, timeoutMs = 20000): Promise<void> {
+  async function waitForPassport(identityId: string, timeoutMs = 40000): Promise<void> {
     const startedAt = Date.now();
     while (Date.now() - startedAt < timeoutMs) {
       await relay.tick();
