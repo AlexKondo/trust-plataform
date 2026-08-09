@@ -8,7 +8,6 @@ import { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
-import { generateKeyPairSync } from 'node:crypto';
 import { resolve } from 'node:path';
 import postgres from 'postgres';
 import { v7 as uuidv7 } from 'uuid';
@@ -25,19 +24,9 @@ const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 describe.runIf(Boolean(testDatabaseUrl))('Módulo 0 — e2e', () => {
   let app: NestFastifyApplication;
 
+  // Env de teste (DATABASE_URL, chaves JWT etc.) é definida em test/setup-env.ts,
+  // que roda ANTES dos imports — ConfigModule.forRoot executa no import do AppModule.
   beforeAll(async () => {
-    const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
-    process.env.NODE_ENV = 'test';
-    process.env.DATABASE_URL = testDatabaseUrl;
-    process.env.DIRECT_DATABASE_URL = testDatabaseUrl;
-    process.env.JWT_PRIVATE_KEY = Buffer.from(
-      privateKey.export({ type: 'pkcs8', format: 'pem' }),
-    ).toString('base64');
-    process.env.JWT_PUBLIC_KEY = Buffer.from(
-      publicKey.export({ type: 'spki', format: 'pem' }),
-    ).toString('base64');
-    process.env.OUTBOX_POLL_INTERVAL_MS = '60000';
-
     const client = postgres(testDatabaseUrl!, { max: 1, prepare: false });
     await migrate(drizzle(client), {
       migrationsFolder: resolve(__dirname, '../../drizzle'),

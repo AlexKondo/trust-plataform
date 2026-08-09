@@ -13,6 +13,7 @@ servers:
 tags:
   - name: Platform
   - name: Identity
+  - name: Auth
 
 paths:
   /health:
@@ -165,6 +166,45 @@ paths:
           description: Identity não encontrada (IDENTITY_NOT_FOUND)
         '409':
           description: E-mail já verificado (EMAIL_ALREADY_VERIFIED)
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: IDN-003 — Login com e-mail e senha (público)
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Autenticado; access token ES256 (15 min) + refresh token opaco (30 dias, rotação no refresh)
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  accessToken: 'eyJhbGciOiJFUzI1NiIs…'
+                  refreshToken: 'gxqi_Qxn7CtKd560gtE7jZ…'
+                  expiresIn: 900
+        '400':
+          description: Request malformado (VALIDATION_ERROR)
+        '401':
+          description: Credenciais inválidas — mensagem opaca, igual para e-mail inexistente e senha errada (INVALID_CREDENTIALS)
+        '403':
+          description: Conta não ativada — e-mail ainda não verificado (IDENTITY_NOT_ACTIVE)
+        '429':
+          description: Conta temporariamente bloqueada por tentativas falhas (ACCOUNT_LOCKED) ou rate limit por IP (RATE_LIMIT_EXCEEDED)
 
 components:
   securitySchemes:

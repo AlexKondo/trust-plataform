@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import helmet from '@fastify/helmet';
+import rateLimit from '@fastify/rate-limit';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Logger } from 'nestjs-pino';
@@ -18,6 +19,21 @@ export async function createApp(): Promise<NestFastifyApplication> {
   app.setGlobalPrefix('api/v1');
   app.enableShutdownHooks();
   await app.register(helmet);
+
+  // Rate limiting por IP (DOC-002: obrigatório em APIs públicas; limite configurável).
+  // Lockout por conta é tratado no AuthenticateIdentityUseCase.
+  const config = app.get(AppConfigService);
+  await app.register(rateLimit, {
+    max: config.rateLimitMaxPerMinute,
+    timeWindow: '1 minute',
+    errorResponseBuilder: () => ({
+      success: false,
+      error: {
+        code: 'RATE_LIMIT_EXCEEDED',
+        message: 'Too many requests. Try again later.',
+      },
+    }),
+  });
 
   return app;
 }

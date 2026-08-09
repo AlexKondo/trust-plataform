@@ -54,6 +54,18 @@ export class AppConfigService {
     return this.config.get('OUTBOX_MAX_ATTEMPTS', { infer: true });
   }
 
+  get loginMaxFailedAttempts(): number {
+    return this.config.get('LOGIN_MAX_FAILED_ATTEMPTS', { infer: true });
+  }
+
+  get loginLockoutMinutes(): number {
+    return this.config.get('LOGIN_LOCKOUT_MINUTES', { infer: true });
+  }
+
+  get rateLimitMaxPerMinute(): number {
+    return this.config.get('RATE_LIMIT_MAX_PER_MINUTE', { infer: true });
+  }
+
   get brevoApiKey(): string | undefined {
     return this.config.get('BREVO_API_KEY', { infer: true });
   }

@@ -43,6 +43,18 @@
   { "eventId": "019fe41e-…", "eventName": "Identity.Created", "eventVersion": "1.0", "occurredAt": "2026-08-08T22:00:00Z", "producer": "identity-service", "correlationId": "019fe41e-…", "payload": { "identityId": "019fe41e-…" } }
   ```
 
+### Identity.Authenticated (v1.0)
+
+- **Descrição**: login bem-sucedido; sessão criada (IDN-003).
+- **Produtor**: identity-service
+- **Consumidores**: TRS (futuro — sinal de atividade para o Trust Engine); auditoria/analytics.
+- **Payload**:
+  | campo | tipo | descrição |
+  |---|---|---|
+  | identityId | UUID | Identity autenticada |
+  | sessionId | UUID | sessão criada |
+  | authenticatedAt | ISO 8601 UTC | momento do login |
+
 ### Identity.EmailVerified (v1.0)
 
 - **Descrição**: e-mail confirmado pelo dono da conta (IDN-002). `causationId` aponta para o `Identity.Created` da mesma transação.

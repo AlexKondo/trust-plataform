@@ -4,3 +4,4 @@ export * from './outbox-events';
 // o re-export aqui existe só para o Drizzle montar o schema completo do banco)
 export * from '../../../modules/identity/infrastructure/persistence/identities.schema';
 export * from '../../../modules/identity/infrastructure/persistence/email-verification-tokens.schema';
+export * from '../../../modules/identity/infrastructure/persistence/sessions.schema';

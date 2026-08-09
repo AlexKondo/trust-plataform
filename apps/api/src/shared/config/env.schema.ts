@@ -20,6 +20,11 @@ export const envSchema = z.object({
   OUTBOX_BATCH_SIZE: z.coerce.number().int().min(1).default(50),
   OUTBOX_MAX_ATTEMPTS: z.coerce.number().int().min(1).default(10),
 
+  // Lockout e rate limiting (DOC-002: configuráveis, nunca hardcoded)
+  LOGIN_MAX_FAILED_ATTEMPTS: z.coerce.number().int().min(1).default(5),
+  LOGIN_LOCKOUT_MINUTES: z.coerce.number().int().min(1).default(15),
+  RATE_LIMIT_MAX_PER_MINUTE: z.coerce.number().int().min(1).default(100),
+
   BREVO_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().email().default('no-reply@trustplatform.com'),
   /** Base do frontend para montar links de e-mail (verify, reset). */

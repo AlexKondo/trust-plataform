@@ -1,4 +1,4 @@
-import { pgTable, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import { integer, pgTable, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 
 /**
  * Tabela do módulo Identity (IDN-001). Colunas conforme spec canônica
@@ -14,6 +14,9 @@ export const identities = pgTable(
     passwordHash: varchar('password_hash', { length: 255 }).notNull(),
     status: varchar('status', { length: 30 }).notNull(),
     termsAcceptedAt: timestamp('terms_accepted_at', { withTimezone: true, mode: 'date' }).notNull(),
+    lastLoginAt: timestamp('last_login_at', { withTimezone: true, mode: 'date' }),
+    failedLoginAttempts: integer('failed_login_attempts').notNull().default(0),
+    lockedUntil: timestamp('locked_until', { withTimezone: true, mode: 'date' }),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
     deletedAt: timestamp('deleted_at', { withTimezone: true, mode: 'date' }),
