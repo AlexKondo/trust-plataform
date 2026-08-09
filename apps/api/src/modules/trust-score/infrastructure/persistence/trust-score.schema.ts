@@ -110,6 +110,26 @@ export const trustLevelHistory = pgTable(
   (table) => [index('idx_trust_level_history_passport').on(table.trustPassportId, table.changedAt)],
 );
 
+/**
+ * Benefícios por nível/score (TRS-010/011). Elegibilidade avaliada ON-DEMAND
+ * contra {score, level} — nada é "concedido"/persistido por usuário.
+ */
+export const trustBenefits = pgTable(
+  'trust_benefits',
+  {
+    id: uuid('id').primaryKey(),
+    name: varchar('name', { length: 120 }).notNull(),
+    description: text('description').notNull(),
+    /** Condições JSON (P5) sobre {score, level} — mesma semântica das score rules. */
+    eligibility: jsonb('eligibility').notNull().default([]),
+    active: boolean('active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => [index('idx_trust_benefit_active').on(table.active)],
+);
+
+export type TrustBenefitRow = typeof trustBenefits.$inferSelect;
 export type TrustScoreRow = typeof trustScores.$inferSelect;
 export type TrustEventRow = typeof trustEvents.$inferSelect;
 export type TrustScoreRuleRow = typeof trustScoreRules.$inferSelect;

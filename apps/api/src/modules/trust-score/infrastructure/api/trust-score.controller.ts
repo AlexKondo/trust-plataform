@@ -18,7 +18,14 @@ import { EntityNotFoundException } from '../../../../shared/domain/exceptions/do
 import { AuthenticatedIdentity } from '../../../../shared/security/authenticated-identity';
 import { CurrentIdentity } from '../../../../shared/security/current-identity.decorator';
 import { AdminGuard } from '../../../identity/infrastructure/security/admin.guard';
+import {
+  RuleCondition,
+  calculateScore,
+  conditionsMatch,
+  determineLevel,
+} from '../../domain/services/trust-score-engine';
 import { TrustScoreRepository } from '../persistence/drizzle-trust-score.repository';
+import { OutboxService } from '../../../../shared/events/outbox.service';
 
 class TrustScoreNotFoundException extends EntityNotFoundException {
   readonly code = 'TRUST_SCORE_NOT_FOUND';
@@ -61,9 +68,19 @@ const updateLevelRuleSchema = z.object({
 
 const idSchema = z.string().uuid();
 
+const benefitSchema = z.object({
+  name: z.string().min(3).max(120),
+  description: z.string().min(3).max(500),
+  eligibility: z.array(conditionSchema).default([]),
+  active: z.boolean().default(true),
+});
+
 @Controller()
 export class TrustScoreController {
-  constructor(private readonly repository: TrustScoreRepository) {}
+  constructor(
+    private readonly repository: TrustScoreRepository,
+    private readonly outboxService: OutboxService,
+  ) {}
 
   /** TRS-005 — meu score/nível consolidado. */
   @Get('trust-scores/me')
@@ -108,6 +125,96 @@ export class TrustScoreController {
       size,
       totalItems,
     );
+  }
+
+  /** TRS-011 — meus benefícios: elegibilidade avaliada on-demand (nada é "concedido"). */
+  @Get('trust-benefits/me')
+  async getMyBenefits(@CurrentIdentity() identity: AuthenticatedIdentity) {
+    const score = await this.repository.findScoreByIdentityId(identity.identityId);
+    if (!score) {
+      throw new TrustScoreNotFoundException();
+    }
+    const context = { score: score.score, level: score.level };
+    const benefits = await this.repository.listBenefits(true);
+    return benefits.map((benefit) => ({
+      id: benefit.id,
+      name: benefit.name,
+      description: benefit.description,
+      eligible: conditionsMatch(benefit.eligibility as RuleCondition[], context),
+    }));
+  }
+
+  /** TRS-007 (versão síncrona do MVP) — recalcula do event store (ADMIN). */
+  @Post('admin/trust-scores/:trustPassportId/rebuild')
+  @UseGuards(AdminGuard)
+  @HttpCode(HttpStatus.OK)
+  async rebuild(
+    @Param('trustPassportId', new ZodValidationPipe(idSchema)) trustPassportId: string,
+  ) {
+    const scoreRow = await this.repository.findScoreByPassportId(trustPassportId);
+    if (!scoreRow) {
+      throw new TrustScoreNotFoundException();
+    }
+    const points = await this.repository.listPoints(trustPassportId);
+    const score = calculateScore(points);
+    const levelRules = await this.repository.listLevelRules();
+    const level = determineLevel(levelRules, score);
+    const calculatedAt = new Date();
+    await this.repository.updateScore(scoreRow.id, score, level, calculatedAt);
+    await this.outboxService.enqueueStandalone({
+      eventName: 'TrustScore.Calculated',
+      producer: 'trust-engine',
+      correlationId: scoreRow.id,
+      payload: {
+        trustPassportId,
+        identityId: scoreRow.identityId,
+        score,
+        level,
+        calculatedAt: calculatedAt.toISOString(),
+        rebuild: true,
+      },
+    });
+    return { trustPassportId, score, level, calculatedAt: calculatedAt.toISOString() };
+  }
+
+  /** TRS-010 — admin: gestão de benefícios. */
+  @Get('admin/trust-benefits')
+  @UseGuards(AdminGuard)
+  async listBenefitsAdmin() {
+    return this.repository.listBenefits(false);
+  }
+
+  @Post('admin/trust-benefits')
+  @UseGuards(AdminGuard)
+  @HttpCode(HttpStatus.CREATED)
+  async createBenefit(
+    @Body(new ZodValidationPipe(benefitSchema)) body: z.infer<typeof benefitSchema>,
+  ) {
+    const now = new Date();
+    const benefit = { id: uuidv7(), ...body, createdAt: now, updatedAt: now };
+    await this.repository.upsertBenefit(benefit);
+    return benefit;
+  }
+
+  @Patch('admin/trust-benefits/:id')
+  @UseGuards(AdminGuard)
+  async updateBenefit(
+    @Param('id', new ZodValidationPipe(idSchema)) id: string,
+    @Body(new ZodValidationPipe(benefitSchema.partial()))
+    body: Partial<z.infer<typeof benefitSchema>>,
+  ) {
+    const existing = await this.repository.findBenefit(id);
+    if (!existing) {
+      throw new TrustScoreNotFoundException();
+    }
+    const updated = {
+      ...existing,
+      ...body,
+      eligibility: body.eligibility ?? (existing.eligibility as never),
+      updatedAt: new Date(),
+    };
+    await this.repository.upsertBenefit(updated);
+    return updated;
   }
 
   /** TRS-009 — admin: listar/criar/editar regras de pontuação. */

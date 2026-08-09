@@ -3,10 +3,12 @@ import { desc, eq, sql } from 'drizzle-orm';
 import { DRIZZLE, Database, DatabaseExecutor } from '../../../../shared/database/database.module';
 import { LevelRule, ScoreRule } from '../../domain/services/trust-score-engine';
 import {
+  TrustBenefitRow,
   TrustEventRow,
   TrustLevelRuleRow,
   TrustScoreRow,
   TrustScoreRuleRow,
+  trustBenefits,
   trustEvents,
   trustLevelHistory,
   trustLevelRules,
@@ -184,6 +186,38 @@ export class TrustScoreRepository {
       .update(trustLevelRules)
       .set({ ...changes, updatedAt: new Date() })
       .where(eq(trustLevelRules.id, id));
+  }
+
+  async listBenefits(activeOnly: boolean): Promise<TrustBenefitRow[]> {
+    if (activeOnly) {
+      return this.db.select().from(trustBenefits).where(eq(trustBenefits.active, true));
+    }
+    return this.db.select().from(trustBenefits).orderBy(trustBenefits.name);
+  }
+
+  async findBenefit(id: string): Promise<TrustBenefitRow | null> {
+    const [row] = await this.db
+      .select()
+      .from(trustBenefits)
+      .where(eq(trustBenefits.id, id))
+      .limit(1);
+    return row ?? null;
+  }
+
+  async upsertBenefit(row: TrustBenefitRow): Promise<void> {
+    await this.db
+      .insert(trustBenefits)
+      .values(row)
+      .onConflictDoUpdate({
+        target: trustBenefits.id,
+        set: {
+          name: row.name,
+          description: row.description,
+          eligibility: row.eligibility,
+          active: row.active,
+          updatedAt: new Date(),
+        },
+      });
   }
 
   async insertLevelHistory(

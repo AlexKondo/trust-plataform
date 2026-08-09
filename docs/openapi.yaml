@@ -666,6 +666,51 @@ paths:
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: Faixa atualizada } }
 
+  /trust-benefits/me:
+    get:
+      tags: [Trust Score]
+      summary: TRS-011 — Meus benefícios (elegibilidade avaliada on-demand)
+      operationId: getMyTrustBenefits
+      responses:
+        '200':
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  - { id: '019fe7…', name: Selo Verificado no Marketplace, description: '…', eligible: true }
+                  - { id: '019fe7…', name: Destaque nas buscas, description: '…', eligible: false }
+
+  /admin/trust-benefits:
+    get:
+      tags: [Trust Score]
+      summary: TRS-010 — Listar benefícios (ADMIN)
+      operationId: listTrustBenefits
+      responses: { '200': { description: Benefícios com condições de elegibilidade sobre {score, level} } }
+    post:
+      tags: [Trust Score]
+      summary: TRS-010 — Criar benefício (ADMIN)
+      operationId: createTrustBenefit
+      responses: { '201': { description: Criado } }
+
+  /admin/trust-benefits/{id}:
+    patch:
+      tags: [Trust Score]
+      summary: TRS-010 — Editar benefício (ADMIN)
+      operationId: updateTrustBenefit
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: Atualizado } }
+
+  /admin/trust-scores/{trustPassportId}/rebuild:
+    post:
+      tags: [Trust Score]
+      summary: TRS-007 — Recalcular score do event store (ADMIN; síncrono no MVP)
+      operationId: rebuildTrustScore
+      parameters: [{ name: trustPassportId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: 'Score recalculado deterministicamente; publica TrustScore.Calculated com rebuild: true' }
+        '404': { description: Score não encontrado (TRUST_SCORE_NOT_FOUND) }
+
 components:
   securitySchemes:
     bearerAuth:

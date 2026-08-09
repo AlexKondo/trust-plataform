@@ -71,6 +71,20 @@
       "when": 1786292370134,
       "tag": "0009_trust_rules_seed",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786293887258,
+      "tag": "0010_stormy_maestro",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786293888940,
+      "tag": "0011_trust_benefits_seed",
+      "breakpoints": true
     }
   ]
 }

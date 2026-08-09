@@ -279,6 +279,38 @@ describe.runIf(Boolean(testDatabaseUrl))('VRF-001..006 — Verification e2e', ()
       expect(body.data.map((e) => e.points).sort((a, b) => a - b)).toEqual([25, 150]);
     }
 
+    // TRS-011: benefícios avaliados on-demand contra {score: 175, level: BRONZE}
+    {
+      const benefits = await app.inject({
+        method: 'GET',
+        url: '/api/v1/trust-benefits/me',
+        headers: { authorization: `Bearer ${user.accessToken}` },
+      });
+      expect(benefits.statusCode).toBe(200);
+      const list = benefits.json<{ data: Array<{ name: string; eligible: boolean }> }>().data;
+      const byName = Object.fromEntries(list.map((b) => [b.name, b.eligible]));
+      expect(byName['Selo Verificado no Marketplace']).toBe(true); // score >= 100
+      expect(byName['Destaque nas buscas']).toBe(false); // exige GOLD+
+    }
+
+    // TRS-007: rebuild admin reproduz o mesmo score (determinismo)
+    {
+      const [passport] = await db
+        .select({ id: trustPassports.id })
+        .from(trustPassports)
+        .where(eq(trustPassports.identityId, user.identityId));
+      const rebuild = await app.inject({
+        method: 'POST',
+        url: `/api/v1/admin/trust-scores/${passport!.id}/rebuild`,
+        headers: { authorization: `Bearer ${admin.accessToken}` },
+      });
+      expect(rebuild.statusCode).toBe(200);
+      expect(rebuild.json<{ data: { score: number; level: string } }>().data).toMatchObject({
+        score: 175,
+        level: 'BRONZE',
+      });
+    }
+
     // VRF-006: dono consulta com review/decisão/evidências (só metadados)
     const details = await app.inject({
       method: 'GET',
