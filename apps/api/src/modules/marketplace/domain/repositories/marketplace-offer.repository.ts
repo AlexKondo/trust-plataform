@@ -1,6 +1,5 @@
 import { DatabaseExecutor } from '../../../../shared/database/database.module';
 import { MarketplaceOffer } from '../entities/marketplace-offer';
-import { MarketplaceOrder } from '../entities/marketplace-order';
 
 export abstract class MarketplaceOfferRepository {
   abstract save(offer: MarketplaceOffer, executor?: DatabaseExecutor): Promise<void>;
@@ -21,14 +20,4 @@ export abstract class MarketplaceOfferRepository {
   ): Promise<MarketplaceOffer[]>;
 
   abstract findByParentOffer(parentOfferId: string): Promise<MarketplaceOffer | null>;
-
-  // ── Pedidos (MRK-015; criados só pelo aceite) ──────────────────────────────
-  abstract saveOrder(order: MarketplaceOrder, executor?: DatabaseExecutor): Promise<void>;
-  abstract findOrderById(id: string): Promise<MarketplaceOrder | null>;
-  abstract findOrderByOfferId(offerId: string): Promise<MarketplaceOrder | null>;
-  abstract listOrdersForParticipant(
-    identityId: string,
-    page: number,
-    pageSize: number,
-  ): Promise<{ items: MarketplaceOrder[]; totalItems: number }>;
 }

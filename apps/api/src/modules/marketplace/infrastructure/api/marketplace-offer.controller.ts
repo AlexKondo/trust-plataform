@@ -7,7 +7,6 @@ import {
   Param,
   Post,
   Put,
-  Query,
   Req,
 } from '@nestjs/common';
 import { FastifyRequest } from 'fastify';
@@ -26,7 +25,7 @@ import {
   offerReasonRequestSchema,
   updateOfferRequestSchema,
 } from '../../application/dto/marketplace-offer.dtos';
-import { RequestMeta, paginationQuerySchema } from '../../application/dto/marketplace.dtos';
+import { RequestMeta } from '../../application/dto/marketplace.dtos';
 import { AcceptOfferUseCase } from '../../application/usecases/accept-offer.usecase';
 import { CounterOfferUseCase } from '../../application/usecases/counter-offer.usecase';
 import { CreateOfferUseCase } from '../../application/usecases/create-offer.usecase';
@@ -42,8 +41,9 @@ type RequestWithContext = FastifyRequest & { requestContext?: RequestContext };
 const idSchema = z.string().uuid();
 
 /**
- * Propostas e pedidos (MRK-009..015). Rotas de conversa e de proposta convivem
- * aqui porque compartilham o mesmo agregado de negociação.
+ * Propostas (MRK-009..014). Rotas de conversa e de proposta convivem aqui
+ * porque compartilham o mesmo agregado de negociação; o pedido gerado pelo
+ * aceite tem controller próprio (MRK-016..022).
  */
 @Controller('marketplace')
 export class MarketplaceOfferController {
@@ -81,24 +81,6 @@ export class MarketplaceOfferController {
     @Param('conversationId', new ZodValidationPipe(idSchema)) conversationId: string,
   ) {
     return this.getUseCase.listByConversation(identity.identityId, conversationId);
-  }
-
-  /** Meus pedidos — o ciclo de vida completo chega no Módulo 8. */
-  @Get('orders')
-  async listOrders(
-    @CurrentIdentity() identity: AuthenticatedIdentity,
-    @Query('page', new ZodValidationPipe(paginationQuerySchema)) page = 1,
-    @Query('size', new ZodValidationPipe(paginationQuerySchema)) size = 20,
-  ) {
-    return this.getUseCase.listMyOrders(identity.identityId, page, Math.min(size, 50));
-  }
-
-  @Get('orders/:orderId')
-  async getOrder(
-    @CurrentIdentity() identity: AuthenticatedIdentity,
-    @Param('orderId', new ZodValidationPipe(idSchema)) orderId: string,
-  ) {
-    return this.getUseCase.getOrder(identity.identityId, orderId);
   }
 
   @Get('offers/:offerId')

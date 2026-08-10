@@ -7,7 +7,9 @@ import { CloseConversationUseCase } from './application/usecases/close-conversat
 import { CounterOfferUseCase } from './application/usecases/counter-offer.usecase';
 import { CreateOfferUseCase } from './application/usecases/create-offer.usecase';
 import { GetOffersUseCase } from './application/usecases/get-offers.usecase';
+import { ManageOrderUseCase } from './application/usecases/manage-order.usecase';
 import { MarketplaceOfferService } from './application/usecases/marketplace-offer.service';
+import { OrderLifecycleService } from './application/usecases/order-lifecycle.service';
 import {
   RejectOfferUseCase,
   WithdrawOfferUseCase,
@@ -23,18 +25,29 @@ import { UpdateListingUseCase } from './application/usecases/update-listing.usec
 import { MarketplaceConversationRepository } from './domain/repositories/marketplace-conversation.repository';
 import { MarketplaceListingRepository } from './domain/repositories/marketplace-listing.repository';
 import { MarketplaceOfferRepository } from './domain/repositories/marketplace-offer.repository';
+import { MarketplaceOrderRepository } from './domain/repositories/marketplace-order.repository';
 import { MarketplaceConversationController } from './infrastructure/api/marketplace-conversation.controller';
 import { MarketplaceListingController } from './infrastructure/api/marketplace-listing.controller';
 import { MarketplaceOfferController } from './infrastructure/api/marketplace-offer.controller';
+import { MarketplaceOrderController } from './infrastructure/api/marketplace-order.controller';
+import {
+  CompleteOrderOnConfirmationConsumer,
+  ReleaseListingOnCancelConsumer,
+} from './infrastructure/consumers/order-lifecycle.consumers';
 import { DrizzleMarketplaceConversationRepository } from './infrastructure/persistence/drizzle-marketplace-conversation.repository';
 import { DrizzleMarketplaceListingRepository } from './infrastructure/persistence/drizzle-marketplace-listing.repository';
 import { DrizzleMarketplaceOfferRepository } from './infrastructure/persistence/drizzle-marketplace-offer.repository';
+import { DrizzleMarketplaceOrderRepository } from './infrastructure/persistence/drizzle-marketplace-order.repository';
 
 /**
- * Marketplace: Módulo 6 (MRK-001..008 — anúncios e conversas) e Módulo 7
- * (MRK-009..014 — propostas, contraofertas e aceite, que já cria o pedido).
- * É o primeiro módulo de negócio que CONSOME a Trust Layer (nível mínimo para
- * publicar, reputação na busca e no detalhe) — e nunca a altera (regra TP-001).
+ * Marketplace — Módulos 6 a 8:
+ * - MRK-001..008: anúncios e conversas;
+ * - MRK-009..014: propostas, contraofertas e aceite (que cria o pedido);
+ * - MRK-015..022: ciclo de vida do pedido (13 estados).
+ *
+ * CONSOME a Trust Layer (nível mínimo para publicar, reputação na busca) e a
+ * ALIMENTA por eventos — mas nunca calcula score: quem pontua é o Trust Engine
+ * (regra de ouro TP-001).
  */
 @Module({
   imports: [IdentityModule, TrustPassportModule, TrustScoreModule],
@@ -42,6 +55,7 @@ import { DrizzleMarketplaceOfferRepository } from './infrastructure/persistence/
     MarketplaceListingController,
     MarketplaceConversationController,
     MarketplaceOfferController,
+    MarketplaceOrderController,
   ],
   providers: [
     CreateListingUseCase,
@@ -60,14 +74,20 @@ import { DrizzleMarketplaceOfferRepository } from './infrastructure/persistence/
     AcceptOfferUseCase,
     RejectOfferUseCase,
     GetOffersUseCase,
+    OrderLifecycleService,
+    ManageOrderUseCase,
+    ReleaseListingOnCancelConsumer,
+    CompleteOrderOnConfirmationConsumer,
     { provide: MarketplaceListingRepository, useClass: DrizzleMarketplaceListingRepository },
     { provide: MarketplaceConversationRepository, useClass: DrizzleMarketplaceConversationRepository },
     { provide: MarketplaceOfferRepository, useClass: DrizzleMarketplaceOfferRepository },
+    { provide: MarketplaceOrderRepository, useClass: DrizzleMarketplaceOrderRepository },
   ],
   exports: [
     MarketplaceListingRepository,
     MarketplaceConversationRepository,
     MarketplaceOfferRepository,
+    MarketplaceOrderRepository,
   ],
 })
 export class MarketplaceModule {}

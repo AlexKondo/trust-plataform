@@ -250,6 +250,18 @@ export class MarketplaceListing {
     this.props.updatedAt = now;
   }
 
+  /**
+   * INCONSISTENCIAS #12 — pedido cancelado devolve o anúncio para a vitrine.
+   * Idempotente: chamar em anúncio não reservado não faz nada.
+   */
+  release(now = new Date()): void {
+    if (this.props.status !== LISTING_STATUS.RESERVED) {
+      return;
+    }
+    this.props.status = LISTING_STATUS.PUBLISHED;
+    this.props.updatedAt = now;
+  }
+
   /** MRK-005 BR-004 — registra uma visualização. */
   registerView(now = new Date()): void {
     this.props.viewCount += 1;

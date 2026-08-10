@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { OrderResponse } from './marketplace-order.dtos';
 
 const amountSchema = z
   .number()
@@ -83,20 +84,6 @@ export interface OfferResponse {
   acceptedAt: string | null;
   createdAt: string;
   updatedAt: string;
-}
-
-export interface OrderResponse {
-  orderId: string;
-  listingId: string;
-  offerId: string;
-  conversationId: string;
-  buyerId: string;
-  sellerId: string;
-  amount: number;
-  currency: string;
-  quantity: number;
-  status: string;
-  createdAt: string;
 }
 
 /** MRK-013 — o aceite devolve os três efeitos da mesma transação. */

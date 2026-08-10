@@ -1,9 +1,11 @@
 import { MarketplaceListing } from '../../domain/entities/marketplace-listing';
 import { MarketplaceConversation, MarketplaceMessage } from '../../domain/entities/marketplace-conversation';
 import { MarketplaceOffer } from '../../domain/entities/marketplace-offer';
+import { Scheduling } from '../../domain/entities/marketplace-order-execution';
 import { MarketplaceOrder } from '../../domain/entities/marketplace-order';
 import { MarketplaceCategory, ListingSearchRow } from '../../domain/repositories/marketplace-listing.repository';
-import { OfferResponse, OrderResponse } from '../dto/marketplace-offer.dtos';
+import { OfferResponse } from '../dto/marketplace-offer.dtos';
+import { OrderResponse, SchedulingResponse } from '../dto/marketplace-order.dtos';
 import {
   ConversationResponse,
   ListingResponse,
@@ -116,7 +118,26 @@ export function toOrderResponse(order: MarketplaceOrder): OrderResponse {
     currency: order.currency,
     quantity: order.quantity,
     status: order.status,
+    nextAction: order.nextAction,
+    startedAt: order.startedAt?.toISOString() ?? null,
+    completedAt: order.completedAt?.toISOString() ?? null,
+    actualDuration: order.actualDuration,
+    customerConfirmedAt: order.customerConfirmedAt?.toISOString() ?? null,
+    cancelledAt: order.cancelledAt?.toISOString() ?? null,
+    cancellationReason: order.cancellationReason,
     createdAt: order.createdAt.toISOString(),
+    updatedAt: order.updatedAt.toISOString(),
+  };
+}
+
+export function toSchedulingResponse(scheduling: Scheduling): SchedulingResponse {
+  return {
+    schedulingId: scheduling.id,
+    scheduledStart: scheduling.scheduledStart.toISOString(),
+    scheduledEnd: scheduling.scheduledEnd.toISOString(),
+    estimatedDuration: scheduling.estimatedDuration,
+    timezone: scheduling.timezone,
+    status: scheduling.status,
   };
 }
 

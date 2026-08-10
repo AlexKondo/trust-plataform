@@ -1,6 +1,16 @@
 import { v7 as uuidv7 } from 'uuid';
+import {
+  MarketplaceOrderAccessDeniedException,
+  MarketplaceOrderCancellationNotAllowedException,
+  MarketplaceOrderTransitionException,
+} from '../exceptions/marketplace.exceptions';
 import { MarketplaceOffer } from './marketplace-offer';
-import { ORDER_STATUS, OrderStatus } from './marketplace-types';
+import {
+  CANCELLABLE_STATUSES,
+  ORDER_STATUS,
+  ORDER_TRANSITIONS,
+  OrderStatus,
+} from './marketplace-types';
 
 export interface MarketplaceOrderProps {
   id: string;
@@ -13,15 +23,44 @@ export interface MarketplaceOrderProps {
   currency: string;
   quantity: number;
   status: OrderStatus;
+  startedAt: Date | null;
+  startedBy: string | null;
+  completedAt: Date | null;
+  completedBy: string | null;
+  actualDuration: number | null;
+  customerConfirmedAt: Date | null;
+  customerConfirmedBy: string | null;
+  closedAt: Date | null;
+  cancelledAt: Date | null;
+  cancelledBy: string | null;
+  cancellationReason: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
 
+/** Próxima ação esperada (MRK-016 BR-004) — o que a tela precisa dizer ao usuário. */
+export const NEXT_ACTION: Readonly<Record<OrderStatus, string>> = {
+  CREATED: 'AWAITING_SCHEDULING',
+  AWAITING_SCHEDULING: 'AWAITING_SCHEDULING',
+  SCHEDULED: 'AWAITING_SERVICE_START',
+  AWAITING_EXECUTION: 'AWAITING_SERVICE_START',
+  IN_PROGRESS: 'AWAITING_SERVICE_COMPLETION',
+  AWAITING_CUSTOMER_CONFIRMATION: 'AWAITING_CUSTOMER_CONFIRMATION',
+  CUSTOMER_CONFIRMED: 'PROCESSING_COMPLETION',
+  COMPLETED: 'AWAITING_REVIEW',
+  CLOSED: 'NONE',
+  CANCELLED: 'NONE',
+  DISPUTE_OPEN: 'AWAITING_DISPUTE_RESOLUTION',
+  DISPUTE_RESOLVED: 'PROCESSING_COMPLETION',
+  REFUNDED: 'NONE',
+};
+
 /**
- * Pedido (MRK-015), na forma mínima que o Módulo 7 precisa.
- * Nasce **apenas** do aceite de uma proposta (BR-001: não há criação manual) e
- * congela os valores negociados (BR-005). Participantes são imutáveis (BR-006).
- * A máquina de 13 estados e as transições chegam no Módulo 8.
+ * Aggregate root do pedido (MRK-015..022) — a entidade que orquestra a execução.
+ *
+ * Invariantes: dados comerciais são imutáveis depois do aceite (MRK-017 BR-001);
+ * toda mudança de status passa por `transitionTo`, que recusa saltos (BR-004);
+ * marcos de execução (check-in, check-out, confirmação) são permanentes.
  */
 export class MarketplaceOrder {
   private constructor(private readonly props: MarketplaceOrderProps) {}
@@ -38,6 +77,17 @@ export class MarketplaceOrder {
       currency: offer.currency,
       quantity: offer.quantity,
       status: ORDER_STATUS.CREATED,
+      startedAt: null,
+      startedBy: null,
+      completedAt: null,
+      completedBy: null,
+      actualDuration: null,
+      customerConfirmedAt: null,
+      customerConfirmedBy: null,
+      closedAt: null,
+      cancelledAt: null,
+      cancelledBy: null,
+      cancellationReason: null,
       createdAt: now,
       updatedAt: now,
     });
@@ -87,12 +137,132 @@ export class MarketplaceOrder {
     return this.props.status;
   }
 
+  get startedAt(): Date | null {
+    return this.props.startedAt;
+  }
+
+  get startedBy(): string | null {
+    return this.props.startedBy;
+  }
+
+  get completedAt(): Date | null {
+    return this.props.completedAt;
+  }
+
+  get completedBy(): string | null {
+    return this.props.completedBy;
+  }
+
+  get actualDuration(): number | null {
+    return this.props.actualDuration;
+  }
+
+  get customerConfirmedAt(): Date | null {
+    return this.props.customerConfirmedAt;
+  }
+
+  get customerConfirmedBy(): string | null {
+    return this.props.customerConfirmedBy;
+  }
+
+  get closedAt(): Date | null {
+    return this.props.closedAt;
+  }
+
+  get cancelledAt(): Date | null {
+    return this.props.cancelledAt;
+  }
+
+  get cancelledBy(): string | null {
+    return this.props.cancelledBy;
+  }
+
+  get cancellationReason(): string | null {
+    return this.props.cancellationReason;
+  }
+
   get createdAt(): Date {
     return this.props.createdAt;
   }
 
   get updatedAt(): Date {
     return this.props.updatedAt;
+  }
+
+  get nextAction(): string {
+    return NEXT_ACTION[this.props.status];
+  }
+
+  isParticipant(identityId: string): boolean {
+    return this.props.buyerId === identityId || this.props.sellerId === identityId;
+  }
+
+  /** MRK-016 BR-001 — só comprador e vendedor consultam o pedido. */
+  assertParticipant(identityId: string): void {
+    if (!this.isParticipant(identityId)) {
+      throw new MarketplaceOrderAccessDeniedException();
+    }
+  }
+
+  canTransitionTo(target: OrderStatus): boolean {
+    return ORDER_TRANSITIONS[this.props.status].includes(target);
+  }
+
+  /** MRK-017 BR-003/BR-004 — porta única de mudança de status. */
+  transitionTo(target: OrderStatus, now = new Date()): void {
+    if (!this.canTransitionTo(target)) {
+      throw new MarketplaceOrderTransitionException(this.props.status, target);
+    }
+    this.props.status = target;
+    this.props.updatedAt = now;
+  }
+
+  /** MRK-019 BR-005 — agendamento confirmado. */
+  markScheduled(now = new Date()): void {
+    this.transitionTo(ORDER_STATUS.SCHEDULED, now);
+  }
+
+  /** MRK-020 — check-in do prestador: a execução começou (BR-005). */
+  start(performedBy: string, now = new Date()): void {
+    this.transitionTo(ORDER_STATUS.IN_PROGRESS, now);
+    this.props.startedAt = now;
+    this.props.startedBy = performedBy;
+  }
+
+  /**
+   * MRK-021 — check-out: a execução terminou e a bola passa para o cliente
+   * (BR-005). A duração efetiva sai do intervalo entre os dois marcos (BR-004).
+   */
+  completeExecution(performedBy: string, now = new Date()): void {
+    this.transitionTo(ORDER_STATUS.AWAITING_CUSTOMER_CONFIRMATION, now);
+    this.props.completedAt = now;
+    this.props.completedBy = performedBy;
+    this.props.actualDuration = this.props.startedAt
+      ? Math.max(1, Math.round((now.getTime() - this.props.startedAt.getTime()) / 60000))
+      : null;
+  }
+
+  /** MRK-022 — confirmação do cliente; ainda NÃO encerra o pedido (BR-006). */
+  confirmByCustomer(confirmedBy: string, now = new Date()): void {
+    this.transitionTo(ORDER_STATUS.CUSTOMER_CONFIRMED, now);
+    this.props.customerConfirmedAt = now;
+    this.props.customerConfirmedBy = confirmedBy;
+  }
+
+  /** MRK-022 BR-007 — só depois dos processos obrigatórios o pedido conclui. */
+  complete(now = new Date()): void {
+    this.transitionTo(ORDER_STATUS.COMPLETED, now);
+  }
+
+  /** MRK-018 — cancelamento com motivo obrigatório; o pedido nunca é apagado. */
+  cancel(cancelledBy: string, reason: string, now = new Date()): void {
+    if (!CANCELLABLE_STATUSES.includes(this.props.status)) {
+      throw new MarketplaceOrderCancellationNotAllowedException(this.props.status);
+    }
+    this.transitionTo(ORDER_STATUS.CANCELLED, now);
+    this.props.cancelledAt = now;
+    this.props.cancelledBy = cancelledBy;
+    this.props.cancellationReason = reason.trim();
   }
 
   toProps(): MarketplaceOrderProps {

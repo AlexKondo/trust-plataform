@@ -71,7 +71,7 @@ Create → Update → Withdraw → Counter (`parentOfferId`, sem limite de rodad
 - `marketplace_orders` nasce aqui (MRK-015 BR-007 exige atomicidade com o aceite — INCONSISTENCIAS #32); o Módulo 8 estende com a máquina de 13 estados
 - Uma proposta viva por negociação (#34); expiração derivada de `expires_at`, sem job (#33)
 
-### Módulo 8 — MRK Orders (Sprints 9–11) — MRK-015..022
+### Módulo 8 — MRK Orders (Sprints 9–11) — MRK-015..022 ✅ CONCLUÍDO (2026-08-10)
 Máquina de estados canônica (13 estados, incluindo `CUSTOMER_CONFIRMED` — ver INCONSISTENCIAS #8):
 ```
 CREATED → AWAITING_SCHEDULING → SCHEDULED → AWAITING_EXECUTION → IN_PROGRESS
@@ -79,7 +79,10 @@ CREATED → AWAITING_SCHEDULING → SCHEDULED → AWAITING_EXECUTION → IN_PROG
    (+ CANCELLED, DISPUTE_OPEN, DISPUTE_RESOLVED, REFUNDED)
 ```
 Create (automático no aceite) → Get → Update (LifecycleService centraliza transições) → Cancel (política por estado) → Schedule → Start (check-in) → Complete (check-out) → Confirm Completion.
-- **Ao cancelar pedido, liberar a reserva do listing** (gap das specs — ver INCONSISTENCIAS #12)
+- **Ao cancelar pedido, liberar a reserva do listing** (gap das specs — ver INCONSISTENCIAS #12): consumer `mrk.release-listing-on-cancel`
+- **É aqui que o marketplace passa a alimentar o Trust Score** (INCONSISTENCIAS #13): `MarketplaceOrder.CustomerConfirmed` → +40 para o prestador; `MarketplaceOrder.Cancelled` → −20 para quem cancelou
+- Tabelas: `marketplace_order_schedulings`, `marketplace_order_execution_events` (CHECK_IN/CHECK_OUT numa só — #35), `marketplace_confirmations`
+- `AWAITING_SCHEDULING`/`AWAITING_EXECUTION` existem na máquina mas ninguém os produz no MVP (#36); `CLOSED` depende da janela de avaliação do Módulo 9 (#37)
 
 ### Módulo 9 — MRK Disputes + Reviews (Sprint 11) — MRK-023..025
 Open Dispute (1 ativa por pedido) → Resolve (decisão imutável) → Review (1 por participante por pedido, nota 1–5).

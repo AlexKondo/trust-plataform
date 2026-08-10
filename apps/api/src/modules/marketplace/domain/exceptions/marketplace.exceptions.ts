@@ -190,11 +190,60 @@ export class MarketplaceOfferAlreadyExistsException extends StateConflictExcepti
   }
 }
 
+// ── Pedidos (MRK-015..022) ──────────────────────────────────────────────────
+
 export class MarketplaceOrderNotFoundException extends EntityNotFoundException {
   readonly code = 'MARKETPLACE_ORDER_NOT_FOUND';
 
   constructor() {
     super('Marketplace order not found.');
+  }
+}
+
+/** MRK-016 BR-001: só comprador e vendedor acessam o pedido → 403. */
+export class MarketplaceOrderAccessDeniedException extends ForbiddenOperationException {
+  readonly code = 'MARKETPLACE_ORDER_FORBIDDEN';
+
+  constructor(message = 'Only the buyer and the seller can access this order.') {
+    super(message);
+  }
+}
+
+/** MRK-017 BR-003/BR-004: salto de estado não permitido → 409. */
+export class MarketplaceOrderTransitionException extends StateConflictException {
+  readonly code = 'MARKETPLACE_ORDER_INVALID_TRANSITION';
+
+  constructor(from: string, to: string) {
+    super(`Order cannot move from ${from} to ${to}.`);
+  }
+}
+
+/** MRK-018 BR-002: estado atual não admite cancelamento direto → 409. */
+export class MarketplaceOrderCancellationNotAllowedException extends StateConflictException {
+  readonly code = 'MARKETPLACE_ORDER_CANCELLATION_NOT_ALLOWED';
+
+  constructor(status: string) {
+    super(
+      `An order in ${status} cannot be cancelled directly; open a dispute or request administrative review.`,
+    );
+  }
+}
+
+/** MRK-019 BR-004: agenda do prestador já ocupada na janela pedida → 409. */
+export class SchedulingConflictException extends StateConflictException {
+  readonly code = 'MARKETPLACE_SCHEDULING_CONFLICT';
+
+  constructor() {
+    super('The provider already has another service scheduled in this time window.');
+  }
+}
+
+/** MRK-019 BR-002: janela de agendamento inválida → 422. */
+export class InvalidSchedulingWindowException extends BusinessRuleViolationException {
+  readonly code = 'MARKETPLACE_INVALID_SCHEDULING_WINDOW';
+
+  constructor(message: string) {
+    super(message);
   }
 }
 

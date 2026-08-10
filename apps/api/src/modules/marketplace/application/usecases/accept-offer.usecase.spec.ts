@@ -13,6 +13,7 @@ import {
 } from '../../domain/exceptions/marketplace.exceptions';
 import { MarketplaceListingRepository } from '../../domain/repositories/marketplace-listing.repository';
 import { MarketplaceOfferRepository } from '../../domain/repositories/marketplace-offer.repository';
+import { MarketplaceOrderRepository } from '../../domain/repositories/marketplace-order.repository';
 import { AcceptOfferUseCase } from './accept-offer.usecase';
 import { MarketplaceOfferService } from './marketplace-offer.service';
 
@@ -58,8 +59,10 @@ function scenario(options: { competitors?: MarketplaceOffer[]; listing?: Marketp
     findById: vi.fn().mockResolvedValue(offer),
     findPendingByConversation: vi.fn().mockResolvedValue([offer, ...(options.competitors ?? [])]),
     saveAll: vi.fn().mockResolvedValue(undefined),
-    saveOrder: vi.fn().mockResolvedValue(undefined),
   } as unknown as MarketplaceOfferRepository;
+  const orderRepository = {
+    save: vi.fn().mockResolvedValue(undefined),
+  } as unknown as MarketplaceOrderRepository;
   const listingRepository = {
     findById: vi.fn().mockResolvedValue(listing),
     save: vi.fn().mockResolvedValue(undefined),
@@ -85,10 +88,12 @@ function scenario(options: { competitors?: MarketplaceOffer[]; listing?: Marketp
     offer,
     listing,
     offerRepository,
+    orderRepository,
     listingRepository,
     outbox,
     useCase: new AcceptOfferUseCase(
       offerRepository,
+      orderRepository,
       listingRepository,
       offerService,
       outbox,
@@ -104,7 +109,7 @@ const eventNames = (outbox: OutboxService) =>
 
 describe('AcceptOfferUseCase (MRK-013) — o pivô da negociação', () => {
   it('aceita, reserva o anúncio e cria o pedido na mesma transação', async () => {
-    const { useCase, offer, listing, offerRepository } = scenario();
+    const { useCase, offer, listing, orderRepository } = scenario();
 
     const result = await useCase.execute(SELLER, offer.id);
 
@@ -114,7 +119,7 @@ describe('AcceptOfferUseCase (MRK-013) — o pivô da negociação', () => {
     // BR-005 do MRK-015: o pedido congela os valores da proposta
     expect(result.order).toMatchObject({ amount: 550, currency: 'BRL', status: 'CREATED' });
     expect(result.order.offerId).toBe(offer.id);
-    expect(offerRepository.saveOrder).toHaveBeenCalledTimes(1);
+    expect(orderRepository.save).toHaveBeenCalledTimes(1);
   });
 
   it('publica os três eventos do aceite (BR-009)', async () => {

@@ -1201,11 +1201,12 @@ paths:
         '403': { description: Não é o destinatário da proposta }
         '409': { description: Já decidida ou vencida }
 
+  # ── Ciclo do pedido (Módulo 8 — MRK-015..022) ─────────────────────────────
   /marketplace/orders:
     get:
       tags: [Marketplace]
       summary: Meus pedidos (como comprador ou vendedor)
-      description: 'Pedidos nascem apenas do aceite (MRK-015 BR-001): não há criação manual. O ciclo de vida completo chega no Módulo 8.'
+      description: 'Pedidos nascem apenas do aceite (MRK-015 BR-001): não há criação manual.'
       operationId: listMarketplaceOrders
       parameters:
         - { name: page, in: query, schema: { type: integer, default: 1 } }
@@ -1215,13 +1216,144 @@ paths:
   /marketplace/orders/{orderId}:
     get:
       tags: [Marketplace]
-      summary: Consultar pedido (comprador ou vendedor)
+      summary: MRK-016 — Consultar pedido (visão consolidada)
+      description: >
+        Traz status, **próxima ação esperada**, agendamento e a linha do tempo
+        da transação (criação, agendamento, check-in, check-out, confirmação,
+        cancelamento). Toda consulta é auditada (BR-005).
       operationId: getMarketplaceOrder
       parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
-        '200': { description: Pedido com os valores congelados da proposta aceita }
-        '403': { description: Não é participante }
+        '200':
+          description: Pedido consolidado
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  orderId: 019fe8f0-0000-7000-8000-000000000020
+                  status: AWAITING_CUSTOMER_CONFIRMATION
+                  nextAction: AWAITING_CUSTOMER_CONFIRMATION
+                  amount: 1100
+                  currency: BRL
+                  actualDuration: 240
+                  listingTitle: Pintura de apartamento com massa corrida
+                  scheduling:
+                    scheduledStart: '2026-08-11T12:00:00.000Z'
+                    scheduledEnd: '2026-08-11T16:00:00.000Z'
+                    estimatedDuration: 240
+                    timezone: America/Sao_Paulo
+                    status: ACTIVE
+                  timeline:
+                    - { type: ORDER_CREATED, occurredAt: '2026-08-10T10:00:00.000Z' }
+                    - { type: SCHEDULED, occurredAt: '2026-08-10T10:05:00.000Z' }
+                    - { type: CHECK_IN, occurredAt: '2026-08-11T12:00:00.000Z' }
+                    - { type: CHECK_OUT, occurredAt: '2026-08-11T16:00:00.000Z' }
+        '403': { description: Não é participante (MARKETPLACE_ORDER_FORBIDDEN) }
         '404': { description: Não encontrado (MARKETPLACE_ORDER_NOT_FOUND) }
+
+  /marketplace/orders/{orderId}/schedule:
+    post:
+      tags: [Marketplace]
+      summary: MRK-019 — Agendar o serviço
+      description: >
+        Válido em CREATED/AWAITING_SCHEDULING. O fim previsto é derivado do
+        início + duração e a agenda do prestador é checada contra sobreposição
+        (BR-004). Status vai para SCHEDULED.
+      operationId: scheduleMarketplaceOrder
+      parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              scheduledStart: '2026-08-11T12:00:00Z'
+              estimatedDuration: 240
+              timezone: America/Sao_Paulo
+      responses:
+        '200': { description: 'SCHEDULED; publica MarketplaceOrder.Scheduled' }
+        '409': { description: 'Agenda ocupada (MARKETPLACE_SCHEDULING_CONFLICT) ou transição inválida' }
+        '422': { description: 'Janela inválida (MARKETPLACE_INVALID_SCHEDULING_WINDOW)' }
+
+  /marketplace/orders/{orderId}/start:
+    post:
+      tags: [Marketplace]
+      summary: MRK-020 — Check-in do prestador (inicia a execução)
+      description: >
+        Só o prestador. Geolocalização, endereço e observações são opcionais e
+        informativos — nunca bloqueiam o início (BR-004). Status → IN_PROGRESS.
+      operationId: startMarketplaceOrder
+      parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        content:
+          application/json:
+            example: { latitude: -23.5505, longitude: -46.6333, accuracy: 12.5, notes: Cheguei ao local. }
+      responses:
+        '200': { description: 'IN_PROGRESS; publica MarketplaceOrder.Started' }
+        '403': { description: Não é o prestador }
+        '409': { description: 'Pedido não está agendado (MARKETPLACE_ORDER_INVALID_TRANSITION)' }
+
+  /marketplace/orders/{orderId}/complete:
+    post:
+      tags: [Marketplace]
+      summary: MRK-021 — Check-out do prestador (conclui a execução)
+      description: >
+        Calcula a duração efetiva (check-in → check-out) e passa a bola ao
+        cliente. Status → AWAITING_CUSTOMER_CONFIRMATION. O evento publicado é
+        `MarketplaceOrder.ExecutionCompleted` (INCONSISTENCIAS #24 — check-out
+        não é pedido concluído).
+      operationId: completeMarketplaceOrderExecution
+      parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        content:
+          application/json:
+            example: { notes: Serviço finalizado, ambiente limpo. }
+      responses:
+        '200': { description: AWAITING_CUSTOMER_CONFIRMATION + actualDuration }
+        '403': { description: Não é o prestador }
+        '409': { description: Pedido não está em execução }
+
+  /marketplace/orders/{orderId}/confirm-completion:
+    post:
+      tags: [Marketplace]
+      summary: MRK-022 — Cliente confirma a conclusão
+      description: >
+        Só o comprador. **Não encerra o pedido** (BR-006): publica
+        `MarketplaceOrder.CustomerConfirmed`, que dispara os processos
+        obrigatórios — atualização do Trust Score (+40 para o prestador) e a
+        transição automática para COMPLETED.
+      operationId: confirmMarketplaceOrderCompletion
+      parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        content:
+          application/json:
+            example: { comments: Ficou impecável! }
+      responses:
+        '200': { description: 'CUSTOMER_CONFIRMED (COMPLETED chega logo depois, de forma assíncrona)' }
+        '403': { description: Só o cliente confirma }
+        '409': { description: Pedido não está aguardando confirmação }
+
+  /marketplace/orders/{orderId}/cancel:
+    post:
+      tags: [Marketplace]
+      summary: MRK-018 — Cancelar pedido (motivo obrigatório)
+      description: >
+        Permitido em CREATED, AWAITING_SCHEDULING, SCHEDULED e
+        AWAITING_EXECUTION. A partir de IN_PROGRESS exige disputa ou revisão
+        administrativa (BR-002). O cancelamento devolve o anúncio para
+        PUBLISHED (INCONSISTENCIAS #12) e penaliza quem cancelou no Trust Score.
+      operationId: cancelMarketplaceOrder
+      parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example: { reason: Mudança de planos do cliente. }
+      responses:
+        '200': { description: 'CANCELLED; publica MarketplaceOrder.Cancelled' }
+        '400': { description: Motivo ausente (VALIDATION_ERROR) }
+        '403': { description: Não é participante }
+        '409': { description: 'Estado não admite cancelamento (MARKETPLACE_ORDER_CANCELLATION_NOT_ALLOWED)' }
 
 components:
   securitySchemes:

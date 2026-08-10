@@ -120,6 +120,20 @@
       "when": 1786360294919,
       "tag": "0016_easy_mantis",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1786363021811,
+      "tag": "0017_aromatic_vivisector",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1786363023811,
+      "tag": "0018_marketplace_trust_rules_seed",
+      "breakpoints": true
     }
   ]
 }

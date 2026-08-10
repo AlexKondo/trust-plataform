@@ -61,12 +61,80 @@ export const OFFER_STATUS = {
 
 export type OfferStatus = (typeof OFFER_STATUS)[keyof typeof OFFER_STATUS];
 
-/** Estados do pedido. O Módulo 7 só cria em CREATED; o resto vem no Módulo 8. */
+/**
+ * Máquina de estados do pedido — 13 estados, incluindo `CUSTOMER_CONFIRMED`
+ * (INCONSISTENCIAS #8: a confirmação do cliente é marco de negócio próprio,
+ * não um efeito colateral do check-out).
+ */
 export const ORDER_STATUS = {
   CREATED: 'CREATED',
+  AWAITING_SCHEDULING: 'AWAITING_SCHEDULING',
+  SCHEDULED: 'SCHEDULED',
+  AWAITING_EXECUTION: 'AWAITING_EXECUTION',
+  IN_PROGRESS: 'IN_PROGRESS',
+  AWAITING_CUSTOMER_CONFIRMATION: 'AWAITING_CUSTOMER_CONFIRMATION',
+  CUSTOMER_CONFIRMED: 'CUSTOMER_CONFIRMED',
+  COMPLETED: 'COMPLETED',
+  CLOSED: 'CLOSED',
+  CANCELLED: 'CANCELLED',
+  DISPUTE_OPEN: 'DISPUTE_OPEN',
+  DISPUTE_RESOLVED: 'DISPUTE_RESOLVED',
+  REFUNDED: 'REFUNDED',
 } as const;
 
 export type OrderStatus = (typeof ORDER_STATUS)[keyof typeof ORDER_STATUS];
+
+/**
+ * Transições válidas (MRK-017 BR-003/BR-004: nenhum salto de estado).
+ * As saídas para DISPUTE_* e REFUNDED já estão declaradas para a máquina nascer
+ * completa, mas quem as dispara é o Módulo 9.
+ */
+export const ORDER_TRANSITIONS: Readonly<Record<OrderStatus, readonly OrderStatus[]>> = {
+  CREATED: [ORDER_STATUS.AWAITING_SCHEDULING, ORDER_STATUS.SCHEDULED, ORDER_STATUS.CANCELLED],
+  AWAITING_SCHEDULING: [ORDER_STATUS.SCHEDULED, ORDER_STATUS.CANCELLED],
+  SCHEDULED: [
+    ORDER_STATUS.AWAITING_EXECUTION,
+    ORDER_STATUS.IN_PROGRESS,
+    ORDER_STATUS.CANCELLED,
+  ],
+  AWAITING_EXECUTION: [ORDER_STATUS.IN_PROGRESS, ORDER_STATUS.CANCELLED],
+  IN_PROGRESS: [ORDER_STATUS.AWAITING_CUSTOMER_CONFIRMATION, ORDER_STATUS.DISPUTE_OPEN],
+  AWAITING_CUSTOMER_CONFIRMATION: [ORDER_STATUS.CUSTOMER_CONFIRMED, ORDER_STATUS.DISPUTE_OPEN],
+  CUSTOMER_CONFIRMED: [ORDER_STATUS.COMPLETED],
+  COMPLETED: [ORDER_STATUS.CLOSED, ORDER_STATUS.DISPUTE_OPEN],
+  CLOSED: [],
+  CANCELLED: [],
+  DISPUTE_OPEN: [ORDER_STATUS.DISPUTE_RESOLVED],
+  DISPUTE_RESOLVED: [ORDER_STATUS.COMPLETED, ORDER_STATUS.REFUNDED, ORDER_STATUS.CLOSED],
+  REFUNDED: [ORDER_STATUS.CLOSED],
+};
+
+/**
+ * MRK-018 BR-002 — cancelamento direto só antes da execução começar. A partir de
+ * IN_PROGRESS o caminho é disputa ou autorização administrativa (Módulo 9).
+ * Prazos, multas e taxas são política configurável (BR-008), fora desta regra.
+ */
+export const CANCELLABLE_STATUSES: readonly OrderStatus[] = [
+  ORDER_STATUS.CREATED,
+  ORDER_STATUS.AWAITING_SCHEDULING,
+  ORDER_STATUS.SCHEDULED,
+  ORDER_STATUS.AWAITING_EXECUTION,
+];
+
+export const SCHEDULING_STATUS = {
+  ACTIVE: 'ACTIVE',
+  CANCELLED: 'CANCELLED',
+} as const;
+
+export type SchedulingStatus = (typeof SCHEDULING_STATUS)[keyof typeof SCHEDULING_STATUS];
+
+export const EXECUTION_EVENT_TYPE = {
+  CHECK_IN: 'CHECK_IN',
+  CHECK_OUT: 'CHECK_OUT',
+} as const;
+
+export type ExecutionEventType =
+  (typeof EXECUTION_EVENT_TYPE)[keyof typeof EXECUTION_EVENT_TYPE];
 
 /** Ordenações aceitas na busca (MRK-004 BR-005). */
 export const SEARCH_SORT = {

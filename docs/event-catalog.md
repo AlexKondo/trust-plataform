@@ -29,6 +29,38 @@
 
 ## Eventos ativos
 
+### MarketplaceOrder.Scheduled (v1.0) · MarketplaceOrder.Started (v1.0) · MarketplaceOrder.ExecutionCompleted (v1.0)
+
+- **Descrição**: marcos da execução (MRK-019/020/021). `ExecutionCompleted` é o **check-out do prestador**, que leva o pedido a `AWAITING_CUSTOMER_CONFIRMATION` — não é a conclusão do pedido (INCONSISTENCIAS #24).
+- **Produtor**: marketplace-service
+- **Consumidores**: nenhum no MVP (agenda, notificações e SLA são pós-MVP).
+- **Payloads**: `Scheduled {orderId, listingId, buyerId, sellerId, schedulingId, scheduledStart, scheduledEnd, status}`; `Started {orderId, listingId, buyerId, sellerId, startedBy, startedAt, status}`; `ExecutionCompleted {orderId, listingId, buyerId, sellerId, completedBy, completedAt, actualDuration, status}`
+
+### MarketplaceOrder.CustomerConfirmed (v1.0)
+
+- **Descrição**: o cliente confirmou a entrega (MRK-022). **É o fato de negócio mais importante da plataforma**: fecha o ciclo confiança → trabalho → confiança. Não encerra o pedido (BR-006) — dispara os processos obrigatórios.
+- **Produtor**: marketplace-service
+- **Consumidores**: ✅ `trs.score-order-confirmed` (INCONSISTENCIAS #13 — registra Trust Event e pontua **o prestador**, +40) · ✅ `mrk.complete-confirmed-order` (transiciona `CUSTOMER_CONFIRMED` → `COMPLETED`). Fan-out real: cada consumer tem fila própria.
+- **Payload**: `{ orderId, listingId, conversationId, buyerId, sellerId, confirmedBy, amount, currency, confirmedAt, status }`
+- **Exemplo**:
+  ```json
+  { "eventId": "019fe8f0-…", "eventName": "MarketplaceOrder.CustomerConfirmed", "eventVersion": "1.0", "occurredAt": "2026-08-10T16:00:00Z", "producer": "marketplace-service", "correlationId": "019fe8f0-…", "payload": { "orderId": "019fe8f0-…", "listingId": "019fe8f0-…", "buyerId": "019fe41e-…", "sellerId": "019fe41e-…", "confirmedBy": "019fe41e-…", "amount": 1100, "currency": "BRL", "confirmedAt": "2026-08-10T16:00:00Z", "status": "CUSTOMER_CONFIRMED" } }
+  ```
+
+### MarketplaceOrder.Completed (v1.0)
+
+- **Descrição**: pedido concluído após os processos obrigatórios (MRK-022 BR-007). Publicado pelo consumer, não por requisição.
+- **Produtor**: marketplace-service
+- **Consumidores**: nenhum no MVP. `CLOSED` (pós-janela de avaliação) fica para o Módulo 9.
+- **Payload**: `{ orderId, listingId, buyerId, sellerId, amount, currency, status: "COMPLETED", completedAt }`
+
+### MarketplaceOrder.Cancelled (v1.0) · MarketplaceListing.Released (v1.0)
+
+- **Descrição**: cancelamento do pedido (MRK-018) e a liberação do anúncio que ele provoca. Sem o `Released`, o anúncio ficaria `RESERVED` para sempre (INCONSISTENCIAS #12).
+- **Produtor**: marketplace-service
+- **Consumidores**: `Cancelled` → ✅ `mrk.release-listing-on-cancel` (devolve o anúncio para `PUBLISHED`) · ✅ `trs.score-order-cancelled` (penaliza **quem cancelou**, −20). `Released` não tem consumidores.
+- **Payloads**: `Cancelled {orderId, listingId, conversationId, buyerId, sellerId, cancelledBy, cancelledByRole, previousStatus, reason, cancelledAt, status}`; `Released {listingId, ownerId, orderId, status: "PUBLISHED", releasedAt}`
+
 ### MarketplaceOffer.Created (v1.0) · MarketplaceOffer.Updated (v1.0) · MarketplaceOffer.Withdrawn (v1.0) · MarketplaceOffer.Rejected (v1.0)
 
 - **Descrição**: rodadas da negociação (MRK-009/010/011/014). `Withdrawn` é a desistência de quem propôs; `Rejected` é a recusa de quem recebeu — a conversa segue aberta nos dois casos.

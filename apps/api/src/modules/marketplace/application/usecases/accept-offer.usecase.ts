@@ -6,6 +6,7 @@ import { OutboxService } from '../../../../shared/events/outbox.service';
 import { MarketplaceOrder } from '../../domain/entities/marketplace-order';
 import { MarketplaceListingRepository } from '../../domain/repositories/marketplace-listing.repository';
 import { MarketplaceOfferRepository } from '../../domain/repositories/marketplace-offer.repository';
+import { MarketplaceOrderRepository } from '../../domain/repositories/marketplace-order.repository';
 import { AcceptOfferResponse } from '../dto/marketplace-offer.dtos';
 import { RequestMeta } from '../dto/marketplace.dtos';
 import { toOfferResponse, toOrderResponse } from '../mapper/marketplace.mapper';
@@ -25,6 +26,7 @@ import { MarketplaceOfferService } from './marketplace-offer.service';
 export class AcceptOfferUseCase {
   constructor(
     private readonly offerRepository: MarketplaceOfferRepository,
+    private readonly orderRepository: MarketplaceOrderRepository,
     private readonly listingRepository: MarketplaceListingRepository,
     private readonly offerService: MarketplaceOfferService,
     private readonly outboxService: OutboxService,
@@ -65,7 +67,7 @@ export class AcceptOfferUseCase {
 
       await this.offerRepository.saveAll([offer, ...superseded], tx);
       await this.listingRepository.save(listing, tx);
-      await this.offerRepository.saveOrder(order, tx);
+      await this.orderRepository.save(order, tx);
 
       await this.outboxService.enqueue(tx, {
         eventName: 'MarketplaceOffer.Accepted',
