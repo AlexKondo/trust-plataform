@@ -51,7 +51,7 @@ As decisões canônicas do módulo financeiro estão em [PLANO-DE-PAGAMENTOS.md]
 
 | # | Conflito | Resolução |
 |---|---|---|
-| P1 | PAY-001 BR-002 cria o Payment ao consumir `MarketplaceOrder.CustomerConfirmed` — cobrando o cliente DEPOIS de ele confirmar a entrega, o que esvazia a custódia (a confirmação é a condição de LIBERAÇÃO no PAY-ARCH-002 §8) | **O Payment nasce com o pedido** (`MarketplaceOrder.Created`); a confirmação do cliente passa a ser o gatilho de liberação. Isolado em um único consumer (`pay.create-payment-on-order`). **Pendente de confirmação do founder** — muda quando o cliente é cobrado. |
+| P1 | PAY-001 BR-002 cria o Payment ao consumir `MarketplaceOrder.CustomerConfirmed` — cobrando o cliente DEPOIS de ele confirmar a entrega, o que esvazia a custódia (a confirmação é a condição de LIBERAÇÃO no PAY-ARCH-002 §8) | **O Payment nasce com o pedido** (`MarketplaceOrder.Created`); a confirmação do cliente passa a ser o gatilho de liberação. Isolado em um único consumer (`pay.create-payment-on-order`). **CONFIRMADO pelo founder em 2026-08-10.** |
 
 ## Decisões de stack e infraestrutura (DECIDIDO em 2026-08-08)
 
