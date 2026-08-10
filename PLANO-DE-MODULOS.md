@@ -64,9 +64,12 @@ Ordem funcional corrigida:
 - Tabelas: `marketplace_listings`, `marketplace_conversations`, `marketplace_messages` + `marketplace_categories` e `marketplace_listing_images` (lacunas das specs — INCONSISTENCIAS #30/#31)
 - Primeiro módulo que **consome** a Trust Layer: nível mínimo por categoria como porteiro da publicação, reputação do anunciante na busca (filtro + ordenação) e no detalhe (respeitando as Visibility Policies do TRS-016)
 
-### Módulo 7 — MRK Offers (Sprints 8–9) — MRK-009..014
+### Módulo 7 — MRK Offers (Sprints 8–9) — MRK-009..014 ✅ CONCLUÍDO (2026-08-10)
 Create → Update → Withdraw → Counter (`parentOfferId`, sem limite de rodadas) → **Accept** (pivô: encerra concorrentes como `CLOSED`, listing → `RESERVED`, cria Order na mesma transação) → Reject.
 - Estados da oferta: `PENDING → ACCEPTED | REJECTED | WITHDRAWN | COUNTERED | EXPIRED | CLOSED`
+- Duas autorizações distintas: **quem propôs** atualiza/retira; **quem recebeu** aceita/rejeita/contrapõe (a contraoferta inverte os papéis a cada rodada)
+- `marketplace_orders` nasce aqui (MRK-015 BR-007 exige atomicidade com o aceite — INCONSISTENCIAS #32); o Módulo 8 estende com a máquina de 13 estados
+- Uma proposta viva por negociação (#34); expiração derivada de `expires_at`, sem job (#33)
 
 ### Módulo 8 — MRK Orders (Sprints 9–11) — MRK-015..022
 Máquina de estados canônica (13 estados, incluindo `CUSTOMER_CONFIRMED` — ver INCONSISTENCIAS #8):

@@ -29,6 +29,31 @@
 
 ## Eventos ativos
 
+### MarketplaceOffer.Created (v1.0) · MarketplaceOffer.Updated (v1.0) · MarketplaceOffer.Withdrawn (v1.0) · MarketplaceOffer.Rejected (v1.0)
+
+- **Descrição**: rodadas da negociação (MRK-009/010/011/014). `Withdrawn` é a desistência de quem propôs; `Rejected` é a recusa de quem recebeu — a conversa segue aberta nos dois casos.
+- **Produtor**: marketplace-service
+- **Consumidores**: nenhum no MVP. As notificações às partes (MRK-011/014 §11) entram quando o módulo Notifications existir — estes eventos já são o ponto de integração.
+- **Payloads**: `Created {offerId, conversationId, listingId, buyerId, sellerId, amount, currency, status: "PENDING", createdAt}`; `Updated {offerId, conversationId, buyerId, updatedFields: string[], updatedAt}`; `Withdrawn {offerId, conversationId, listingId, buyerId, sellerId, status: "WITHDRAWN", withdrawnAt}`; `Rejected {offerId, conversationId, listingId, buyerId, sellerId, rejectedBy, rejectedAt}`
+
+### MarketplaceOffer.Countered (v1.0)
+
+- **Descrição**: contraoferta criada por quem recebeu a proposta (MRK-012). O `payload.offerId` é a **nova** rodada; `parentOfferId` é a proposta que virou `COUNTERED`.
+- **Produtor**: marketplace-service
+- **Consumidores**: nenhum no MVP (notificação ao comprador é pós-MVP).
+- **Payload**: `{ offerId, parentOfferId, conversationId, listingId, buyerId, sellerId, amount, currency, status: "PENDING", createdAt }`
+
+### MarketplaceOffer.Accepted (v1.0) · MarketplaceListing.Reserved (v1.0) · MarketplaceOrder.Created (v1.0)
+
+- **Descrição**: os três fatos do aceite (MRK-013), publicados **na mesma transação** em que a proposta vira `ACCEPTED`, o anúncio vira `RESERVED` e o pedido nasce (BR-008/BR-009). Se qualquer etapa falhar, nenhum dos três existe.
+- **Produtor**: marketplace-service
+- **Consumidores**: nenhum no MVP. Ponto de integração declarado das specs para Orders, Notifications, Trust Score e Analytics — a pontuação de confiança por transação entra com `MarketplaceOrder.CustomerConfirmed` e reviews (Módulos 8–9, INCONSISTENCIAS #13).
+- **Payloads**: `Accepted {offerId, conversationId, listingId, buyerId, sellerId, acceptedBy, orderId, acceptedAt}`; `Reserved {listingId, ownerId, orderId, status: "RESERVED", reservedAt}`; `OrderCreated {orderId, offerId, conversationId, listingId, buyerId, sellerId, amount, currency, status: "CREATED", createdAt}`
+- **Exemplo**:
+  ```json
+  { "eventId": "019fe8f0-…", "eventName": "MarketplaceOrder.Created", "eventVersion": "1.0", "occurredAt": "2026-08-10T12:00:00Z", "producer": "marketplace-service", "correlationId": "019fe8f0-…", "payload": { "orderId": "019fe8f0-…", "offerId": "019fe8f0-…", "conversationId": "019fe8f0-…", "listingId": "019fe8f0-…", "buyerId": "019fe41e-…", "sellerId": "019fe41e-…", "amount": 540, "currency": "BRL", "status": "CREATED", "createdAt": "2026-08-10T12:00:00Z" } }
+  ```
+
 ### MarketplaceListing.Created (v1.0) · MarketplaceListing.Updated (v1.0) · MarketplaceListing.Published (v1.0)
 
 - **Descrição**: ciclo de vida do anúncio (MRK-001/002/003). `Created` sai com `status: DRAFT` (o anúncio ainda não é visível); `Published` é o marco que o torna pesquisável.

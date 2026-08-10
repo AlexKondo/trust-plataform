@@ -2,6 +2,7 @@ import { v7 as uuidv7 } from 'uuid';
 import {
   MarketplaceListingAlreadyPublishedException,
   MarketplaceListingIncompleteException,
+  MarketplaceListingNotAvailableForOrderException,
   MarketplaceListingNotEditableException,
 } from '../exceptions/marketplace.exceptions';
 import {
@@ -233,6 +234,19 @@ export class MarketplaceListing {
     }
     this.props.status = LISTING_STATUS.PUBLISHED;
     this.props.publishedAt = now;
+    this.props.updatedAt = now;
+  }
+
+  /**
+   * MRK-013 BR-005 — o aceite de uma proposta reserva o anúncio: ele sai da
+   * vitrine até o pedido se resolver (o retorno para PUBLISHED no cancelamento
+   * é responsabilidade do Módulo 8 — INCONSISTENCIAS #12).
+   */
+  reserve(now = new Date()): void {
+    if (this.props.status !== LISTING_STATUS.PUBLISHED || this.props.deletedAt) {
+      throw new MarketplaceListingNotAvailableForOrderException(this.props.status);
+    }
+    this.props.status = LISTING_STATUS.RESERVED;
     this.props.updatedAt = now;
   }
 

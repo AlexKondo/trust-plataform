@@ -1055,6 +1055,174 @@ paths:
         '403': { description: Não é participante }
         '409': { description: Já encerrada (MARKETPLACE_CONVERSATION_ALREADY_CLOSED) }
 
+  # ── Negociação (Módulo 7 — MRK-009..014 + o pedido do MRK-015) ────────────
+  /marketplace/conversations/{conversationId}/offers:
+    post:
+      tags: [Marketplace]
+      summary: MRK-009 — Enviar proposta (só o comprador da conversa)
+      description: >
+        Exige conversa OPEN e anúncio PUBLISHED. Uma proposta viva por
+        negociação: com outra PENDING em aberto responde 409 — atualize, retire
+        ou decida antes (INCONSISTENCIAS #34). Moeda omitida herda a do anúncio.
+      operationId: createMarketplaceOffer
+      parameters: [{ name: conversationId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              amount: 540
+              quantity: 1
+              expiresAt: '2026-08-17T23:59:59Z'
+              notes: Posso pagar à vista.
+      responses:
+        '201': { description: 'Proposta PENDING; publica MarketplaceOffer.Created' }
+        '403': { description: 'Não é o comprador da conversa (MARKETPLACE_OFFER_NOT_RECIPIENT)' }
+        '404': { description: 'Conversa inexistente ou anúncio indisponível' }
+        '409': { description: 'Conversa encerrada (MARKETPLACE_CONVERSATION_CLOSED) ou já há proposta viva (MARKETPLACE_OFFER_ALREADY_EXISTS)' }
+        '422': { description: 'Valor/quantidade ≤ 0 ou validade no passado (MARKETPLACE_OFFER_INVALID)' }
+    get:
+      tags: [Marketplace]
+      summary: MRK-012 — Histórico da negociação (cadeia de propostas)
+      operationId: listMarketplaceOffers
+      parameters: [{ name: conversationId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: 'Rodadas da mais antiga para a mais nova, com parentOfferId encadeado' }
+        '403': { description: Não é participante }
+
+  /marketplace/offers/{offerId}:
+    get:
+      tags: [Marketplace]
+      summary: Consultar proposta (comprador ou vendedor)
+      operationId: getMarketplaceOffer
+      parameters: [{ name: offerId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: 'Proposta; `status` é o efetivo — PENDING vencida aparece como EXPIRED' }
+        '403': { description: Não é participante }
+        '404': { description: Não encontrada (MARKETPLACE_OFFER_NOT_FOUND) }
+    put:
+      tags: [Marketplace]
+      summary: MRK-010 — Atualizar proposta pendente (só quem a criou)
+      description: 'Campos alteráveis: amount, quantity, expiresAt, notes. Moeda e partes não mudam.'
+      operationId: updateMarketplaceOffer
+      parameters: [{ name: offerId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example: { amount: 520 }
+      responses:
+        '200': { description: 'Atualizada; publica MarketplaceOffer.Updated com updatedFields' }
+        '403': { description: Não foi quem propôs (MARKETPLACE_OFFER_FORBIDDEN) }
+        '409': { description: 'Já decidida (MARKETPLACE_OFFER_ALREADY_RESOLVED) ou vencida (MARKETPLACE_OFFER_EXPIRED)' }
+
+  /marketplace/offers/{offerId}/withdraw:
+    post:
+      tags: [Marketplace]
+      summary: MRK-011 — Retirar proposta (só quem a criou)
+      operationId: withdrawMarketplaceOffer
+      parameters: [{ name: offerId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        content:
+          application/json:
+            example: { reason: Encontrei outra solução. }
+      responses:
+        '200': { description: 'WITHDRAWN com autor/momento/motivo; a proposta nunca é apagada' }
+        '403': { description: Não foi quem propôs }
+        '409': { description: Já decidida ou vencida }
+
+  /marketplace/offers/{offerId}/counter:
+    post:
+      tags: [Marketplace]
+      summary: MRK-012 — Contrapor (só quem RECEBEU a proposta)
+      description: >
+        A proposta recebida vira COUNTERED e nasce a rodada seguinte com
+        `parentOfferId` apontando para ela. A moeda é herdada da negociação e
+        quem decide passa a ser o outro lado. Sem limite de rodadas.
+      operationId: counterMarketplaceOffer
+      parameters: [{ name: offerId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              amount: 580
+              expiresAt: '2026-08-15T23:59:59Z'
+              notes: Consigo fechar nesse valor.
+      responses:
+        '201': { description: 'Contraoferta PENDING; publica MarketplaceOffer.Countered' }
+        '403': { description: 'Quem propôs não contrapõe a si mesmo (MARKETPLACE_OFFER_NOT_RECIPIENT)' }
+        '409': { description: Proposta já decidida ou vencida }
+
+  /marketplace/offers/{offerId}/accept:
+    post:
+      tags: [Marketplace]
+      summary: MRK-013 — Aceitar proposta (só quem a RECEBEU)
+      description: >
+        Pivô do marketplace, tudo em UMA transação: proposta → ACCEPTED, demais
+        propostas vivas → CLOSED, anúncio → RESERVED e criação do
+        MarketplaceOrder. Publica MarketplaceOffer.Accepted,
+        MarketplaceListing.Reserved e MarketplaceOrder.Created.
+      operationId: acceptMarketplaceOffer
+      parameters: [{ name: offerId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200':
+          description: Negociação convertida em pedido
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  offer: { offerId: 019fe8f0-0000-7000-8000-000000000010, status: ACCEPTED }
+                  order:
+                    orderId: 019fe8f0-0000-7000-8000-000000000020
+                    offerId: 019fe8f0-0000-7000-8000-000000000010
+                    amount: 540
+                    currency: BRL
+                    status: CREATED
+                  listingStatus: RESERVED
+                  closedOfferIds: []
+        '403': { description: Quem propôs não aceita a própria proposta }
+        '409': { description: 'Proposta já decidida/vencida ou anúncio não reservável (MARKETPLACE_LISTING_NOT_AVAILABLE)' }
+
+  /marketplace/offers/{offerId}/reject:
+    post:
+      tags: [Marketplace]
+      summary: MRK-014 — Rejeitar proposta (só quem a RECEBEU)
+      description: A conversa permanece aberta; uma nova rodada pode começar em seguida.
+      operationId: rejectMarketplaceOffer
+      parameters: [{ name: offerId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        content:
+          application/json:
+            example: { reason: Valor acima do orçamento. }
+      responses:
+        '200': { description: 'REJECTED; publica MarketplaceOffer.Rejected' }
+        '403': { description: Não é o destinatário da proposta }
+        '409': { description: Já decidida ou vencida }
+
+  /marketplace/orders:
+    get:
+      tags: [Marketplace]
+      summary: Meus pedidos (como comprador ou vendedor)
+      description: 'Pedidos nascem apenas do aceite (MRK-015 BR-001): não há criação manual. O ciclo de vida completo chega no Módulo 8.'
+      operationId: listMarketplaceOrders
+      parameters:
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: size, in: query, schema: { type: integer, default: 20, maximum: 50 } }
+      responses: { '200': { description: Pedidos + pagination } }
+
+  /marketplace/orders/{orderId}:
+    get:
+      tags: [Marketplace]
+      summary: Consultar pedido (comprador ou vendedor)
+      operationId: getMarketplaceOrder
+      parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Pedido com os valores congelados da proposta aceita }
+        '403': { description: Não é participante }
+        '404': { description: Não encontrado (MARKETPLACE_ORDER_NOT_FOUND) }
+
 components:
   securitySchemes:
     bearerAuth:

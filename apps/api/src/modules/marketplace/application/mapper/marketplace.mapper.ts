@@ -1,6 +1,9 @@
 import { MarketplaceListing } from '../../domain/entities/marketplace-listing';
 import { MarketplaceConversation, MarketplaceMessage } from '../../domain/entities/marketplace-conversation';
+import { MarketplaceOffer } from '../../domain/entities/marketplace-offer';
+import { MarketplaceOrder } from '../../domain/entities/marketplace-order';
 import { MarketplaceCategory, ListingSearchRow } from '../../domain/repositories/marketplace-listing.repository';
+import { OfferResponse, OrderResponse } from '../dto/marketplace-offer.dtos';
 import {
   ConversationResponse,
   ListingResponse,
@@ -75,6 +78,46 @@ export function toListingResponse(
     };
   }
   return response;
+}
+
+export function toOfferResponse(offer: MarketplaceOffer, now = new Date()): OfferResponse {
+  return {
+    offerId: offer.id,
+    conversationId: offer.conversationId,
+    listingId: offer.listingId,
+    buyerId: offer.buyerId,
+    sellerId: offer.sellerId,
+    createdBy: offer.createdBy,
+    recipientId: offer.recipientId,
+    parentOfferId: offer.parentOfferId,
+    amount: offer.amount,
+    currency: offer.currency,
+    quantity: offer.quantity,
+    status: offer.effectiveStatus(now),
+    expiresAt: offer.expiresAt.toISOString(),
+    notes: offer.notes,
+    withdrawReason: offer.withdrawReason,
+    rejectReason: offer.rejectReason,
+    acceptedAt: offer.acceptedAt?.toISOString() ?? null,
+    createdAt: offer.createdAt.toISOString(),
+    updatedAt: offer.updatedAt.toISOString(),
+  };
+}
+
+export function toOrderResponse(order: MarketplaceOrder): OrderResponse {
+  return {
+    orderId: order.id,
+    listingId: order.listingId,
+    offerId: order.offerId,
+    conversationId: order.conversationId,
+    buyerId: order.buyerId,
+    sellerId: order.sellerId,
+    amount: order.amount,
+    currency: order.currency,
+    quantity: order.quantity,
+    status: order.status,
+    createdAt: order.createdAt.toISOString(),
+  };
 }
 
 export function toMessageResponse(message: MarketplaceMessage): MessageResponse {

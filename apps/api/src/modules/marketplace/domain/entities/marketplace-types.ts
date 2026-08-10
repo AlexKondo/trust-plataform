@@ -42,6 +42,32 @@ export const CONVERSATION_STATUS = {
 
 export type ConversationStatus = (typeof CONVERSATION_STATUS)[keyof typeof CONVERSATION_STATUS];
 
+/**
+ * Estados da proposta (MRK-009..014). **Não existe `CANCELLED`** — a spec o
+ * cita mas nunca o cria (INCONSISTENCIAS #10).
+ * PENDING → ACCEPTED | REJECTED | WITHDRAWN | COUNTERED | EXPIRED | CLOSED
+ * (`CLOSED` = encerrada por tabela quando outra proposta da mesma negociação
+ * foi aceita — MRK-013 BR-004).
+ */
+export const OFFER_STATUS = {
+  PENDING: 'PENDING',
+  ACCEPTED: 'ACCEPTED',
+  REJECTED: 'REJECTED',
+  WITHDRAWN: 'WITHDRAWN',
+  COUNTERED: 'COUNTERED',
+  EXPIRED: 'EXPIRED',
+  CLOSED: 'CLOSED',
+} as const;
+
+export type OfferStatus = (typeof OFFER_STATUS)[keyof typeof OFFER_STATUS];
+
+/** Estados do pedido. O Módulo 7 só cria em CREATED; o resto vem no Módulo 8. */
+export const ORDER_STATUS = {
+  CREATED: 'CREATED',
+} as const;
+
+export type OrderStatus = (typeof ORDER_STATUS)[keyof typeof ORDER_STATUS];
+
 /** Ordenações aceitas na busca (MRK-004 BR-005). */
 export const SEARCH_SORT = {
   RELEVANCE: 'relevance',

@@ -12,3 +12,4 @@ export * from '../../../modules/verification/infrastructure/persistence/verifica
 export * from '../../../modules/trust-score/infrastructure/persistence/trust-score.schema';
 export * from '../../../modules/trust-score/infrastructure/persistence/trust-reputation.schema';
 export * from '../../../modules/marketplace/infrastructure/persistence/marketplace.schema';
+export * from '../../../modules/marketplace/infrastructure/persistence/marketplace-offer.schema';

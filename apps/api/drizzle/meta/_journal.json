@@ -113,6 +113,13 @@
       "when": 1786318540000,
       "tag": "0015_marketplace_categories_seed",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1786360294919,
+      "tag": "0016_easy_mantis",
+      "breakpoints": true
     }
   ]
 }

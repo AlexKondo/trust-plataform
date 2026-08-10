@@ -71,6 +71,15 @@ export class MarketplacePublicationNotAllowedException extends ForbiddenOperatio
   }
 }
 
+/** MRK-013 BR-005: só anúncio publicado pode ser reservado pelo aceite → 409. */
+export class MarketplaceListingNotAvailableForOrderException extends StateConflictException {
+  readonly code = 'MARKETPLACE_LISTING_NOT_AVAILABLE';
+
+  constructor(status: string) {
+    super(`Listing is ${status} and can no longer be reserved for an order.`);
+  }
+}
+
 /** MRK-005 BR-002 / MRK-006 BR-002: anúncio existe mas não está disponível → 404. */
 export class MarketplaceListingUnavailableException extends EntityNotFoundException {
   readonly code = 'MARKETPLACE_LISTING_UNAVAILABLE';
@@ -123,5 +132,77 @@ export class MarketplaceConversationAlreadyClosedException extends StateConflict
 
   constructor() {
     super('This conversation has already been closed.');
+  }
+}
+
+// ── Propostas (MRK-009..014) ────────────────────────────────────────────────
+
+export class MarketplaceOfferNotFoundException extends EntityNotFoundException {
+  readonly code = 'MARKETPLACE_OFFER_NOT_FOUND';
+
+  constructor() {
+    super('Marketplace offer not found.');
+  }
+}
+
+/** MRK-009 BR-001 / MRK-010 BR-001 / MRK-011 BR-001: só quem propôs mexe → 403. */
+export class MarketplaceOfferOwnershipException extends ForbiddenOperationException {
+  readonly code = 'MARKETPLACE_OFFER_FORBIDDEN';
+
+  constructor(message = 'Only the participant who created this offer can perform this operation.') {
+    super(message);
+  }
+}
+
+/** MRK-013 BR-001 / MRK-014 BR-001: decidir cabe a quem RECEBEU a proposta → 403. */
+export class MarketplaceOfferNotRecipientException extends ForbiddenOperationException {
+  readonly code = 'MARKETPLACE_OFFER_NOT_RECIPIENT';
+
+  constructor() {
+    super('Only the participant who received this offer can accept, reject or counter it.');
+  }
+}
+
+/** Operação exige proposta PENDING; ela já teve desfecho → 409. */
+export class MarketplaceOfferAlreadyResolvedException extends StateConflictException {
+  readonly code = 'MARKETPLACE_OFFER_ALREADY_RESOLVED';
+
+  constructor(status: string) {
+    super(`This offer is ${status}; only PENDING offers can be changed or decided.`);
+  }
+}
+
+/** MRK-009 BR-007: proposta vencida não produz mais efeitos → 409. */
+export class MarketplaceOfferExpiredException extends StateConflictException {
+  readonly code = 'MARKETPLACE_OFFER_EXPIRED';
+
+  constructor() {
+    super('This offer has expired.');
+  }
+}
+
+/** Uma proposta viva por vez em cada negociação (MRK-009 §6.3) → 409. */
+export class MarketplaceOfferAlreadyExistsException extends StateConflictException {
+  readonly code = 'MARKETPLACE_OFFER_ALREADY_EXISTS';
+
+  constructor() {
+    super('This conversation already has a pending offer; update, withdraw or decide it first.');
+  }
+}
+
+export class MarketplaceOrderNotFoundException extends EntityNotFoundException {
+  readonly code = 'MARKETPLACE_ORDER_NOT_FOUND';
+
+  constructor() {
+    super('Marketplace order not found.');
+  }
+}
+
+/** MRK-009 BR-004/005: dados da proposta violam as regras → 422. */
+export class MarketplaceOfferValidationException extends BusinessRuleViolationException {
+  readonly code = 'MARKETPLACE_OFFER_INVALID';
+
+  constructor(message: string) {
+    super(message);
   }
 }
