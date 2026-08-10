@@ -18,6 +18,7 @@ tags:
   - name: Verification
   - name: Trust Score
   - name: Marketplace
+  - name: Notification
 
 paths:
   /health:
@@ -1519,6 +1520,61 @@ paths:
       operationId: getMarketplaceReviewSummary
       responses:
         '200': { description: '{totalReviews, averageScore, recommendationRate}' }
+
+  # ── Notificações (NTF-001) ────────────────────────────────────────────────
+  /notifications:
+    get:
+      tags: [Notification]
+      summary: Meus avisos in-app
+      description: >
+        Projeção de eventos de domínio. Não existe endpoint de criação: todo
+        aviso nasce de um evento consumido do outbox.
+      operationId: listNotifications
+      parameters:
+        - { name: onlyUnread, in: query, schema: { type: string, enum: ['true', 'false'] } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: size, in: query, schema: { type: integer, default: 20, maximum: 50 } }
+      responses:
+        '200':
+          description: Avisos + pagination
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  - notificationId: 019fe8f0-0000-7000-8000-000000000030
+                    type: OFFER_RECEIVED
+                    title: Você recebeu uma proposta
+                    body: 'Proposta de R$ 220,00. Aceite, recuse ou faça uma contraproposta.'
+                    resourceType: MarketplaceConversation
+                    resourceId: 019fe8f0-0000-7000-8000-0000000000f1
+                    read: false
+                    createdAt: '2026-08-10T18:00:00.000Z'
+                pagination: { page: 1, pageSize: 20, totalItems: 1, totalPages: 1 }
+
+  /notifications/unread-count:
+    get:
+      tags: [Notification]
+      summary: Contador de não lidas (sininho)
+      operationId: getUnreadNotificationCount
+      responses: { '200': { description: '{unread: number}' } }
+
+  /notifications/{notificationId}/read:
+    patch:
+      tags: [Notification]
+      summary: Marcar aviso como lido
+      operationId: markNotificationAsRead
+      parameters: [{ name: notificationId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: '{read: true}' }
+        '404': { description: 'Inexistente, de outro usuário ou já lida (NOTIFICATION_NOT_FOUND)' }
+
+  /notifications/read-all:
+    patch:
+      tags: [Notification]
+      summary: Marcar todos os avisos como lidos
+      operationId: markAllNotificationsAsRead
+      responses: { '200': { description: '{updated: number}' } }
 
 components:
   securitySchemes:

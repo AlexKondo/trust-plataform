@@ -27,6 +27,17 @@
   ```
 ```
 
+## Consumidor transversal: notificações (NTF-001)
+
+O módulo `notification` consome **17 eventos** (verificações, Trust Layer, mensagens, propostas, pedidos, disputas e avaliações) e os projeta em avisos in-app. Consumers `ntf.*`, um por evento, declarados na tabela `NOTIFICATION_RULES`. Regras do desenho:
+
+- nenhum módulo de negócio conhece notificação — todos apenas publicam fatos;
+- o **autor da ação nunca é notificado** do próprio ato (quem aceita não recebe "proposta aceita");
+- queda de nível não vira aviso; só promoção (`TrustLevel.Changed` com nível maior);
+- `MarketplaceDispute.Opened` avisa só a parte reclamada; `Resolved` avisa as duas.
+
+Para isso, dois payloads foram enriquecidos (adição retrocompatível): `Verification.Approved/Rejected` passaram a levar `identityId`, e `MarketplaceMessage.Sent` passou a levar `recipientId` — assim quem consome não precisa carregar Passport ou conversa só para saber a quem avisar.
+
 ## Eventos ativos
 
 ### MarketplaceReview.Created (v1.0)

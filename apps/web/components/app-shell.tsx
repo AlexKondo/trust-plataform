@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createContext, useContext, useEffect, useState } from 'react';
 import { ApiError, CurrentIdentity, authApi, logout, tokenStore } from '../lib/api';
+import { NotificationBell } from './notification-bell';
 import { Icon } from './ui';
 
 const MENU = [
@@ -119,13 +120,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Link>
             <div className="hidden md:block" />
             <div className="flex items-center gap-4">
-              <button
-                type="button"
-                aria-label="Notificações"
-                className="text-on-surface-variant transition-colors hover:text-on-surface"
-              >
-                <Icon name="notifications" size={22} />
-              </button>
+              <NotificationBell />
               <div className="flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-fixed text-primary">
                   <span className="label-bold">

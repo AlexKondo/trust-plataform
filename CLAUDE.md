@@ -26,7 +26,15 @@ Infra do frontend: [lib/api.ts](apps/web/lib/api.ts) (envelope + paginação + r
 
 **Como virar admin**: `UPDATE identities SET is_admin = true WHERE email = '...'` no banco (PLANO §4 — primeiro mecanismo admin do MVP).
 
-**O que ainda falta no frontend**: notificações (os eventos já são publicados, falta o módulo que os transforma em avisos) e a administração de regras/badges/benefícios do TRS (endpoints existem, tela não). Pendências de produto (P4 escala do score, P5 DSL de regras) em [INCONSISTENCIAS.md](INCONSISTENCIAS.md).
+## NOTIFICAÇÕES (NTF-001) + admin de regras (2026-08-10)
+
+**Módulo `notification`** — 10º módulo, puramente reativo: não expõe criação, tudo nasce de evento consumido do outbox. 17 consumers `ntf.*` declarados na tabela `NOTIFICATION_RULES` (em vez de 17 classes idênticas), construídos como providers via factory — o `OutboxRelayService` descobre por `instanceof EventConsumer`. Regras: quem age nunca é avisado do próprio ato; queda de nível não notifica; disputa aberta avisa só a parte reclamada. Frontend: sininho com contador no header + `/notifications`.
+
+Dois payloads ganharam campo (adição retrocompatível) para o consumidor não precisar resolver agregados alheios: `Verification.Approved/Rejected` + `identityId` e `MarketplaceMessage.Sent` + `recipientId`.
+
+**`/admin/trust-rules`** — pontuação por evento (editar pontos, limite por pessoa, ativar/desativar), faixas de nível, selos e benefícios, com as condições JSON renderizadas em linguagem legível. A tela avisa que mudar regra não reescreve o passado.
+
+**MVP COMPLETO**: 10 módulos, 47 suítes verdes, 76 rotas no OpenAPI, 24 telas. Pendências de produto (P4 escala do score, P5 DSL de regras) em [INCONSISTENCIAS.md](INCONSISTENCIAS.md).
 
 ## Stack oficial (decidido em 2026-08-08 — detalhes em INCONSISTENCIAS.md P1–P7)
 

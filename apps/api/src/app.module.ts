@@ -13,6 +13,7 @@ import { GlobalExceptionFilter } from './shared/api/global-exception.filter';
 import { HealthModule } from './modules/health/health.module';
 import { IdentityModule } from './modules/identity/identity.module';
 import { MarketplaceModule } from './modules/marketplace/marketplace.module';
+import { NotificationModule } from './modules/notification/notification.module';
 import { TrustPassportModule } from './modules/trust-passport/trust-passport.module';
 import { TrustScoreModule } from './modules/trust-score/trust-score.module';
 import { VerificationModule } from './modules/verification/verification.module';
@@ -31,6 +32,7 @@ import { VerificationModule } from './modules/verification/verification.module';
     VerificationModule,
     TrustScoreModule,
     MarketplaceModule,
+    NotificationModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

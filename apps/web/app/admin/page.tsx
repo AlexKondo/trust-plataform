@@ -38,6 +38,14 @@ function AdminHome() {
       count: openDisputes,
       countLabel: 'abertas',
     },
+    {
+      href: '/admin/trust-rules',
+      icon: 'tune',
+      title: 'Regras do Trust Score',
+      description: 'Pontuação por evento, faixas de nível, selos e benefícios.',
+      count: null,
+      countLabel: '',
+    },
   ];
 
   return (
