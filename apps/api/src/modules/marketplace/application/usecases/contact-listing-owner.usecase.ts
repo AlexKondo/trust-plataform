@@ -113,6 +113,7 @@ export class ContactListingOwnerUseCase {
           conversationId: conversation.id,
           messageId: message.id,
           senderId: buyerId,
+          recipientId: listing.ownerId,
           sentAt: message.sentAt.toISOString(),
         },
       });

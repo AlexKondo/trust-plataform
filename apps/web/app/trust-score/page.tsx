@@ -13,7 +13,7 @@ import {
   TrustLevelBadge,
 } from '../../components/layout';
 import { Icon } from '../../components/ui';
-import { ApiError, authApi } from '../../lib/api';
+import { authApi } from '../../lib/api';
 import {
   LEVEL_LABEL,
   LEVEL_ORDER,
@@ -23,14 +23,12 @@ import {
 } from '../../lib/labels';
 import type { TrustBadge, TrustBenefit, TrustEventEntry, TrustScore } from '../../lib/types';
 
+/** Uma seção indisponível não pode derrubar a página (ver dashboard). */
 async function safe<T>(promise: Promise<T>, fallback: T): Promise<T> {
   try {
     return await promise;
-  } catch (error) {
-    if (error instanceof ApiError) {
-      return fallback;
-    }
-    throw error;
+  } catch {
+    return fallback;
   }
 }
 

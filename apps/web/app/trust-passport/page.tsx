@@ -25,10 +25,10 @@ function PassportContent() {
 
   const load = (data: TrustPassport) => {
     setPassport(data);
-    setPhone(data.profile.phone ?? '');
-    setCountry(data.profile.addressCountry ?? 'BR');
-    setState(data.profile.addressState ?? '');
-    setCity(data.profile.addressCity ?? '');
+    setPhone(data.phone ?? '');
+    setCountry(data.address?.country ?? 'BR');
+    setState(data.address?.state ?? '');
+    setCity(data.address?.city ?? '');
   };
 
   useEffect(() => {

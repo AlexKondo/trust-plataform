@@ -122,6 +122,9 @@ export class ConversationMessagingUseCase {
           conversationId,
           messageId: message.id,
           senderId: identityId,
+          // Destinatário no payload: evita que consumidores precisem carregar a
+          // conversa só para descobrir quem deve ser avisado.
+          recipientId: conversation.counterpartOf(identityId),
           sentAt: message.sentAt.toISOString(),
         },
       });

@@ -3,19 +3,15 @@
 // ── Trust Passport (TPS) ────────────────────────────────────────────────────
 export interface TrustPassport {
   trustPassportId: string;
-  identityId: string;
   status: string;
   profileCompletion: number;
   emailVerified: boolean;
   phoneVerified: boolean;
   documentVerified: boolean;
   addressVerified: boolean;
-  profile: {
-    phone: string | null;
-    addressCountry: string | null;
-    addressState: string | null;
-    addressCity: string | null;
-  };
+  /** A API devolve o perfil ACHATADO — `phone` e `address` no topo. */
+  phone: string | null;
+  address: { country: string; state: string; city: string } | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -83,6 +83,9 @@ export class DecideVerificationUseCase {
         payload: {
           verificationId: verification.id,
           trustPassportId: verification.trustPassportId,
+          // Titular no payload: quem consome (notificações) não deveria
+          // precisar resolver o Passport para saber a quem avisar.
+          identityId: verification.identityId,
           type: verification.type,
           ...(input.decision === 'REJECTED' ? { reasonCode: input.reasonCode } : {}),
           [input.decision === 'APPROVED' ? 'approvedAt' : 'rejectedAt']: decidedAt.toISOString(),

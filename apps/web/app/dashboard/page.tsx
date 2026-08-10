@@ -13,7 +13,7 @@ import {
   TrustLevelBadge,
 } from '../../components/layout';
 import { Icon } from '../../components/ui';
-import { ApiError, authApi } from '../../lib/api';
+import { authApi } from '../../lib/api';
 import { LEVEL_LABEL, TRUST_EVENT_LABEL, formatRelative } from '../../lib/labels';
 import type {
   TrustBadge,
@@ -31,15 +31,16 @@ interface DashboardData {
   timeline: TrustEventEntry[];
 }
 
-/** Falhas isoladas não podem derrubar o painel inteiro. */
+/**
+ * Falhas isoladas não podem derrubar o painel inteiro — vale também para erro
+ * de rede e resposta não-JSON (a API no plano free hiberna e pode devolver
+ * HTML de gateway no primeiro acesso).
+ */
 async function safe<T>(promise: Promise<T>, fallback: T): Promise<T> {
   try {
     return await promise;
-  } catch (error) {
-    if (error instanceof ApiError) {
-      return fallback;
-    }
-    throw error;
+  } catch {
+    return fallback;
   }
 }
 
@@ -77,7 +78,7 @@ function DashboardContent() {
     { label: 'Confirmar e-mail', done: identity?.status === 'ACTIVE', href: null },
     {
       label: 'Completar seu Trust Passport',
-      done: Boolean(data.passport?.profile.phone && data.passport.profile.addressCity),
+      done: Boolean(data.passport?.phone && data.passport.address),
       href: '/trust-passport',
       description: 'Telefone e endereço deixam seu perfil pronto para verificação.',
     },

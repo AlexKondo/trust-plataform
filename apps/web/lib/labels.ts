@@ -155,28 +155,37 @@ export function formatCurrency(value: number | null, currency = 'BRL'): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency }).format(value);
 }
 
-export function formatDate(iso: string | null): string {
+/**
+ * Data válida ou null. `Intl.format` LANÇA em data inválida — sem esta guarda,
+ * um campo ausente na resposta derruba a página inteira.
+ */
+function parseDate(iso: string | null | undefined): Date | null {
   if (!iso) {
-    return '—';
+    return null;
   }
-  return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' }).format(new Date(iso));
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
-export function formatDateTime(iso: string | null): string {
-  if (!iso) {
-    return '—';
-  }
-  return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(
-    new Date(iso),
-  );
+export function formatDate(iso: string | null | undefined): string {
+  const date = parseDate(iso);
+  return date ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' }).format(date) : '—';
+}
+
+export function formatDateTime(iso: string | null | undefined): string {
+  const date = parseDate(iso);
+  return date
+    ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(date)
+    : '—';
 }
 
 /** "há 3 dias" — para listas de conversas e timelines. */
-export function formatRelative(iso: string | null): string {
-  if (!iso) {
+export function formatRelative(iso: string | null | undefined): string {
+  const date = parseDate(iso);
+  if (!date) {
     return '—';
   }
-  const diff = Date.now() - new Date(iso).getTime();
+  const diff = Date.now() - date.getTime();
   const minutes = Math.round(diff / 60000);
   if (minutes < 1) return 'agora';
   if (minutes < 60) return `há ${minutes} min`;
