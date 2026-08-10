@@ -8,8 +8,10 @@ import { TrustReputationController } from './infrastructure/api/trust-reputation
 import { TrustScoreController } from './infrastructure/api/trust-score.controller';
 import { AwardBadgesConsumer } from './infrastructure/consumers/award-badges.consumer';
 import {
+  DisputeResolvedScoringConsumer,
   OrderCancelledScoringConsumer,
   OrderConfirmedScoringConsumer,
+  ReviewCreatedScoringConsumer,
 } from './infrastructure/consumers/marketplace-scoring.consumers';
 import {
   TrustPassportCreatedConsumer,
@@ -34,6 +36,8 @@ import { TrustScoreRepository } from './infrastructure/persistence/drizzle-trust
     AwardBadgesConsumer,
     OrderConfirmedScoringConsumer,
     OrderCancelledScoringConsumer,
+    ReviewCreatedScoringConsumer,
+    DisputeResolvedScoringConsumer,
   ],
   // TrustProfileService é exportado para o Marketplace montar o resumo público
   // do anunciante respeitando as Visibility Policies (MRK-005 BR-003/005).

@@ -247,6 +247,70 @@ export class InvalidSchedulingWindowException extends BusinessRuleViolationExcep
   }
 }
 
+// ── Disputas e avaliações (MRK-023..025) ────────────────────────────────────
+
+export class MarketplaceDisputeNotFoundException extends EntityNotFoundException {
+  readonly code = 'MARKETPLACE_DISPUTE_NOT_FOUND';
+
+  constructor() {
+    super('Marketplace dispute not found.');
+  }
+}
+
+/** MRK-023 BR-002: uma disputa ativa por pedido → 409. */
+export class MarketplaceDisputeAlreadyOpenException extends StateConflictException {
+  readonly code = 'MARKETPLACE_DISPUTE_ALREADY_OPEN';
+
+  constructor() {
+    super('This order already has an active dispute.');
+  }
+}
+
+/** MRK-024 BR-002/BR-006: decisão é definitiva → 409. */
+export class MarketplaceDisputeAlreadyResolvedException extends StateConflictException {
+  readonly code = 'MARKETPLACE_DISPUTE_ALREADY_RESOLVED';
+
+  constructor() {
+    super('This dispute has already been resolved; decisions are final.');
+  }
+}
+
+/** MRK-023 BR-003/BR-004: dados da disputa inválidos → 422. */
+export class MarketplaceDisputeValidationException extends BusinessRuleViolationException {
+  readonly code = 'MARKETPLACE_DISPUTE_INVALID';
+
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+/** MRK-025 BR-002: um participante avalia uma vez por pedido → 409. */
+export class MarketplaceReviewAlreadyExistsException extends StateConflictException {
+  readonly code = 'MARKETPLACE_REVIEW_ALREADY_EXISTS';
+
+  constructor() {
+    super('You have already reviewed this transaction.');
+  }
+}
+
+/** MRK-025 BR-003: pedido ainda não chegou a um estado avaliável → 409. */
+export class MarketplaceReviewNotAllowedException extends StateConflictException {
+  readonly code = 'MARKETPLACE_REVIEW_NOT_ALLOWED';
+
+  constructor(status: string) {
+    super(`An order in ${status} cannot be reviewed yet.`);
+  }
+}
+
+/** MRK-025 BR-004/BR-005: notas fora da escala → 422. */
+export class MarketplaceReviewValidationException extends BusinessRuleViolationException {
+  readonly code = 'MARKETPLACE_REVIEW_INVALID';
+
+  constructor(message: string) {
+    super(message);
+  }
+}
+
 /** MRK-009 BR-004/005: dados da proposta violam as regras → 422. */
 export class MarketplaceOfferValidationException extends BusinessRuleViolationException {
   readonly code = 'MARKETPLACE_OFFER_INVALID';

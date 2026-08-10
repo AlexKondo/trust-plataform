@@ -1,11 +1,14 @@
 import { MarketplaceListing } from '../../domain/entities/marketplace-listing';
 import { MarketplaceConversation, MarketplaceMessage } from '../../domain/entities/marketplace-conversation';
+import { DisputeDecision, MarketplaceDispute } from '../../domain/entities/marketplace-dispute';
 import { MarketplaceOffer } from '../../domain/entities/marketplace-offer';
 import { Scheduling } from '../../domain/entities/marketplace-order-execution';
 import { MarketplaceOrder } from '../../domain/entities/marketplace-order';
+import { MarketplaceReview } from '../../domain/entities/marketplace-review';
 import { MarketplaceCategory, ListingSearchRow } from '../../domain/repositories/marketplace-listing.repository';
 import { OfferResponse } from '../dto/marketplace-offer.dtos';
 import { OrderResponse, SchedulingResponse } from '../dto/marketplace-order.dtos';
+import { DisputeResponse, ReviewResponse } from '../dto/marketplace-review.dtos';
 import {
   ConversationResponse,
   ListingResponse,
@@ -138,6 +141,44 @@ export function toSchedulingResponse(scheduling: Scheduling): SchedulingResponse
     estimatedDuration: scheduling.estimatedDuration,
     timezone: scheduling.timezone,
     status: scheduling.status,
+  };
+}
+
+export function toDisputeResponse(
+  dispute: MarketplaceDispute,
+  decision: DisputeDecision | null,
+): DisputeResponse {
+  return {
+    disputeId: dispute.id,
+    orderId: dispute.orderId,
+    openedBy: dispute.openedBy,
+    category: dispute.category,
+    description: dispute.description,
+    status: dispute.status,
+    openedAt: dispute.openedAt.toISOString(),
+    decision: decision
+      ? {
+          decisionId: decision.id,
+          decidedBy: decision.decidedBy,
+          decisionType: decision.decisionType,
+          justification: decision.justification,
+          decidedAt: decision.decidedAt.toISOString(),
+        }
+      : null,
+  };
+}
+
+export function toReviewResponse(review: MarketplaceReview): ReviewResponse {
+  return {
+    reviewId: review.id,
+    orderId: review.orderId,
+    reviewerId: review.reviewerId,
+    reviewedUserId: review.reviewedUserId,
+    overallScore: review.overallScore,
+    recommended: review.recommended,
+    comment: review.comment,
+    scores: review.scores,
+    createdAt: review.createdAt.toISOString(),
   };
 }
 

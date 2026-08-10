@@ -84,9 +84,11 @@ Create (automático no aceite) → Get → Update (LifecycleService centraliza t
 - Tabelas: `marketplace_order_schedulings`, `marketplace_order_execution_events` (CHECK_IN/CHECK_OUT numa só — #35), `marketplace_confirmations`
 - `AWAITING_SCHEDULING`/`AWAITING_EXECUTION` existem na máquina mas ninguém os produz no MVP (#36); `CLOSED` depende da janela de avaliação do Módulo 9 (#37)
 
-### Módulo 9 — MRK Disputes + Reviews (Sprint 11) — MRK-023..025
-Open Dispute (1 ativa por pedido) → Resolve (decisão imutável) → Review (1 por participante por pedido, nota 1–5).
-Fecha o MVP do Marketplace.
+### Módulo 9 — MRK Disputes + Reviews (Sprint 11) — MRK-023..025 ✅ CONCLUÍDO (2026-08-10)
+Open Dispute (1 ativa por pedido) → Resolve (decisão imutável, só ADMIN/mediador) → Review (1 por participante por pedido, nota 1–5).
+**Fecha o MVP do Marketplace e o ciclo de reputação**: a nota da transação e o desfecho da disputa viram Trust Events, encerrando o gap #13.
+- Critérios da avaliação em tabela própria (`marketplace_review_scores`) porque a spec os define como configuráveis pela Administração
+- Categorias de disputa e tipos de decisão são catálogo fechado no código no MVP (tela admin fica para depois)
 
 ## 3. Grafo de dependências entre módulos
 

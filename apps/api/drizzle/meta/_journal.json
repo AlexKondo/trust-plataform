@@ -134,6 +134,20 @@
       "when": 1786363023811,
       "tag": "0018_marketplace_trust_rules_seed",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1786364630411,
+      "tag": "0019_glorious_electro",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1786364632411,
+      "tag": "0020_marketplace_review_rules_seed",
+      "breakpoints": true
     }
   ]
 }

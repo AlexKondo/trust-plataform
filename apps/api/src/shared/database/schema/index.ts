@@ -14,3 +14,4 @@ export * from '../../../modules/trust-score/infrastructure/persistence/trust-rep
 export * from '../../../modules/marketplace/infrastructure/persistence/marketplace.schema';
 export * from '../../../modules/marketplace/infrastructure/persistence/marketplace-offer.schema';
 export * from '../../../modules/marketplace/infrastructure/persistence/marketplace-order.schema';
+export * from '../../../modules/marketplace/infrastructure/persistence/marketplace-review.schema';

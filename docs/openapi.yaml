@@ -1355,6 +1355,137 @@ paths:
         '403': { description: Não é participante }
         '409': { description: 'Estado não admite cancelamento (MARKETPLACE_ORDER_CANCELLATION_NOT_ALLOWED)' }
 
+  # ── Disputas e avaliações (Módulo 9 — MRK-023..025) ───────────────────────
+  /marketplace/review-catalog:
+    get:
+      tags: [Marketplace]
+      summary: Catálogos de disputa e avaliação
+      operationId: getMarketplaceReviewCatalog
+      responses:
+        '200': { description: '{disputeCategories[], decisionTypes[], reviewCriteria[]}' }
+
+  /marketplace/orders/{orderId}/disputes:
+    post:
+      tags: [Marketplace]
+      summary: MRK-023 — Abrir disputa (comprador ou vendedor)
+      description: >
+        Uma disputa ativa por pedido (BR-002). O pedido vai para DISPUTE_OPEN e
+        nenhuma evidência já registrada é alterada (BR-006).
+      operationId: openMarketplaceDispute
+      parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              category: SERVICE_PARTIALLY_EXECUTED
+              description: O prestador montou apenas o guarda-roupa e foi embora.
+      responses:
+        '201': { description: 'Disputa OPEN; publica MarketplaceDispute.Opened' }
+        '403': { description: Não é participante do pedido }
+        '409': { description: 'Já existe disputa ativa (MARKETPLACE_DISPUTE_ALREADY_OPEN) ou o estado do pedido não admite disputa' }
+        '422': { description: Categoria/descrição inválidas (MARKETPLACE_DISPUTE_INVALID) }
+    get:
+      tags: [Marketplace]
+      summary: Disputas de um pedido (participantes)
+      operationId: listMarketplaceOrderDisputes
+      parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: Disputas com a decisão, quando houver } }
+
+  /marketplace/disputes/{disputeId}:
+    get:
+      tags: [Marketplace]
+      summary: Consultar disputa (participantes ou ADMIN)
+      operationId: getMarketplaceDispute
+      parameters: [{ name: disputeId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Disputa + decisão }
+        '403': { description: Não é participante nem admin }
+        '404': { description: Não encontrada (MARKETPLACE_DISPUTE_NOT_FOUND) }
+
+  /marketplace/disputes/{disputeId}/resolve:
+    post:
+      tags: [Marketplace]
+      summary: MRK-024 — Decidir a disputa (ADMIN/mediador)
+      description: >
+        A decisão é **definitiva** (BR-006): disputa → RESOLVED e pedido →
+        DISPUTE_RESOLVED. `UPHELD` e `PARTIALLY_UPHELD` reconhecem culpa da parte
+        reclamada e viram penalidade no Trust Score; `REJECTED`, `SETTLED` e
+        `CANCELLED` não penalizam ninguém.
+      operationId: resolveMarketplaceDispute
+      parameters: [{ name: disputeId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              decisionType: UPHELD
+              justification: As fotos enviadas confirmam que apenas um móvel foi montado.
+      responses:
+        '200': { description: 'RESOLVED; publica MarketplaceDispute.Resolved' }
+        '403': { description: Não é admin (ADMIN_REQUIRED) }
+        '409': { description: 'Disputa já decidida (MARKETPLACE_DISPUTE_ALREADY_RESOLVED)' }
+
+  /admin/marketplace/disputes:
+    get:
+      tags: [Marketplace]
+      summary: MRK-024 — Fila de disputas ativas (ADMIN)
+      operationId: listActiveMarketplaceDisputes
+      parameters:
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: size, in: query, schema: { type: integer, default: 20, maximum: 50 } }
+      responses: { '200': { description: Disputas OPEN/IN_ANALYSIS/MEDIATION + pagination } }
+
+  /marketplace/orders/{orderId}/reviews:
+    post:
+      tags: [Marketplace]
+      summary: MRK-025 — Avaliar a transação
+      description: >
+        Só participantes (BR-001), uma vez por pessoa (BR-002) e só depois de
+        COMPLETED, CLOSED ou DISPUTE_RESOLVED (BR-003). A nota geral (1–5) é o
+        único campo obrigatório. **Alimenta o Trust Score de quem foi avaliado**:
+        4–5 → +30, 3 → +5, 1–2 → −30.
+      operationId: reviewMarketplaceTransaction
+      parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              overallScore: 5
+              recommended: true
+              comment: Montou tudo em duas horas e deixou o quarto limpo.
+              scores: { quality: 5, punctuality: 5, communication: 4 }
+      responses:
+        '201': { description: 'Avaliação registrada (imutável); publica MarketplaceReview.Created' }
+        '403': { description: Não é participante do pedido }
+        '409': { description: 'Já avaliou (MARKETPLACE_REVIEW_ALREADY_EXISTS) ou pedido ainda não avaliável (MARKETPLACE_REVIEW_NOT_ALLOWED)' }
+        '422': { description: Nota fora da escala 1–5 (MARKETPLACE_REVIEW_INVALID) }
+    get:
+      tags: [Marketplace]
+      summary: Avaliações de um pedido (participantes)
+      operationId: listMarketplaceOrderReviews
+      parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: Avaliações das duas partes } }
+
+  /marketplace/reviews/received:
+    get:
+      tags: [Marketplace]
+      summary: Avaliações que recebi
+      operationId: listReceivedMarketplaceReviews
+      parameters:
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: size, in: query, schema: { type: integer, default: 20, maximum: 50 } }
+      responses: { '200': { description: Avaliações recebidas + pagination } }
+
+  /marketplace/reviews/summary:
+    get:
+      tags: [Marketplace]
+      summary: Minha reputação transacional consolidada
+      operationId: getMarketplaceReviewSummary
+      responses:
+        '200': { description: '{totalReviews, averageScore, recommendationRate}' }
+
 components:
   securitySchemes:
     bearerAuth:

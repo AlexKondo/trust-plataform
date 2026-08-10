@@ -29,6 +29,25 @@
 
 ## Eventos ativos
 
+### MarketplaceReview.Created (v1.0)
+
+- **Descrição**: avaliação da transação (MRK-025). Fecha o ciclo de reputação: a opinião de quem contratou vira score de quem prestou (e vice-versa — os dois lados se avaliam).
+- **Produtor**: marketplace-service
+- **Consumidores**: ✅ `trs.score-review-created` (INCONSISTENCIAS #13 — pontua **quem foi avaliado**: 4–5 → +30, 3 → +5, 1–2 → −30).
+- **Payload**: `{ reviewId, orderId, listingId, reviewerId, reviewedUserId, overallScore, recommended, createdAt }`
+- **Exemplo**:
+  ```json
+  { "eventId": "019fe8f0-…", "eventName": "MarketplaceReview.Created", "eventVersion": "1.0", "occurredAt": "2026-08-10T18:00:00Z", "producer": "marketplace-service", "correlationId": "019fe8f0-…", "payload": { "reviewId": "019fe8f0-…", "orderId": "019fe8f0-…", "listingId": "019fe8f0-…", "reviewerId": "019fe41e-…", "reviewedUserId": "019fe41e-…", "overallScore": 5, "recommended": true, "createdAt": "2026-08-10T18:00:00Z" } }
+  ```
+
+### MarketplaceDispute.Opened (v1.0) · MarketplaceDispute.Resolved (v1.0)
+
+- **Descrição**: ciclo da disputa (MRK-023/024). `Opened` leva o pedido a `DISPUTE_OPEN`; `Resolved` traz a decisão definitiva da mediação e leva o pedido a `DISPUTE_RESOLVED`.
+- **Produtor**: marketplace-service
+- **Consumidores**: `Resolved` → ✅ `trs.score-dispute-resolved` (penaliza a parte culpada: `UPHELD` −60, `PARTIALLY_UPHELD` −30). `Opened` não tem consumidores — abrir disputa não é prova de culpa e por isso não pontua.
+- **Payloads**: `Opened {disputeId, orderId, listingId, buyerId, sellerId, openedBy, category, openedAt}`; `Resolved {disputeId, decisionId, orderId, buyerId, sellerId, openedBy, decisionType, faultIdentityId, decidedBy, decidedAt}`
+- **Nota**: `faultIdentityId` é `null` quando a decisão não atribui culpa (improcedente, acordo, cancelamento) — nesse caso o Trust Engine simplesmente ignora o evento.
+
 ### MarketplaceOrder.Scheduled (v1.0) · MarketplaceOrder.Started (v1.0) · MarketplaceOrder.ExecutionCompleted (v1.0)
 
 - **Descrição**: marcos da execução (MRK-019/020/021). `ExecutionCompleted` é o **check-out do prestador**, que leva o pedido a `AWAITING_CUSTOMER_CONFIRMATION` — não é a conclusão do pedido (INCONSISTENCIAS #24).

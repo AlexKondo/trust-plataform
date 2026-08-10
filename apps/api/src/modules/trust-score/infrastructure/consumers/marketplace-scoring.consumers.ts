@@ -92,3 +92,51 @@ export class OrderCancelledScoringConsumer extends MarketplaceScoringConsumer {
     return payload.cancelledBy as string | undefined;
   }
 }
+
+/**
+ * `MarketplaceReview.Created` → pontos para QUEM FOI AVALIADO (MRK-025).
+ * Nota 4–5 soma, 3 quase não mexe, 1–2 subtrai: a reputação passa a refletir a
+ * opinião de quem realmente contratou.
+ */
+@Injectable()
+export class ReviewCreatedScoringConsumer extends MarketplaceScoringConsumer {
+  readonly eventName = 'MarketplaceReview.Created';
+  readonly consumerName = 'trs.score-review-created';
+
+  constructor(
+    passportRepository: TrustPassportRepository,
+    registerTrustEvent: RegisterTrustEventUseCase,
+    logger: PinoLogger,
+  ) {
+    super(passportRepository, registerTrustEvent, logger);
+    this.logger.setContext(ReviewCreatedScoringConsumer.name);
+  }
+
+  protected targetIdentityId(payload: Record<string, unknown>): string | undefined {
+    return payload.reviewedUserId as string | undefined;
+  }
+}
+
+/**
+ * `MarketplaceDispute.Resolved` → penalidade para a parte considerada culpada.
+ * Desfechos sem culpa (improcedente, acordo, cancelamento) chegam com
+ * `faultIdentityId: null` e simplesmente não pontuam.
+ */
+@Injectable()
+export class DisputeResolvedScoringConsumer extends MarketplaceScoringConsumer {
+  readonly eventName = 'MarketplaceDispute.Resolved';
+  readonly consumerName = 'trs.score-dispute-resolved';
+
+  constructor(
+    passportRepository: TrustPassportRepository,
+    registerTrustEvent: RegisterTrustEventUseCase,
+    logger: PinoLogger,
+  ) {
+    super(passportRepository, registerTrustEvent, logger);
+    this.logger.setContext(DisputeResolvedScoringConsumer.name);
+  }
+
+  protected targetIdentityId(payload: Record<string, unknown>): string | undefined {
+    return (payload.faultIdentityId as string | null) ?? undefined;
+  }
+}
