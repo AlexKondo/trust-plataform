@@ -40,6 +40,22 @@ Para isso, dois payloads foram enriquecidos (adição retrocompatível): `Verifi
 
 ## Eventos ativos
 
+### Payment.Created (v1.0)
+
+- **Descrição**: pagamento aberto para um pedido (PAY-001). Nasce do aceite da proposta, não da confirmação do serviço — ver INCONSISTENCIAS P1: o cliente paga ao fechar negócio e o dinheiro fica em custódia até a confirmação.
+- **Produtor**: payment-service
+- **Consumidores**: nenhum ainda; a custódia (PAY-003) passa a consumir `Payment.Authorized` no Bloco 3.
+- **Payload**: `{ paymentId, orderId, buyerId, sellerId, amount, currency, status: "CREATED", createdAt }`
+
+### Payment.Authorized (v1.0) · Payment.AuthorizationFailed (v1.0)
+
+- **Descrição**: desfecho da tentativa de cobrança (PAY-002). Cada tentativa gera uma linha em `payment_authorizations`; o evento reflete a decisão do provedor.
+- **Produtor**: payment-service
+- **Consumidores**: `Authorized` será consumido pela custódia (Bloco 3). `AuthorizationFailed` não tem consumidor: a falha permite nova tentativa (BR-005) e não muda nada fora do pagamento.
+- **Payloads**: `Authorized {paymentId, orderId, buyerId, sellerId, authorizationId, providerId, amount, currency, status, authorizedAt}`; `AuthorizationFailed {…, failureCode, failedAt}`
+- **Nota de idempotência**: repetir a requisição com a mesma `Idempotency-Key` **não** republica o evento — a tentativa anterior é devolvida sem tocar no provedor.
+
+
 ### MarketplaceReview.Created (v1.0)
 
 - **Descrição**: avaliação da transação (MRK-025). Fecha o ciclo de reputação: a opinião de quem contratou vira score de quem prestou (e vice-versa — os dois lados se avaliam).

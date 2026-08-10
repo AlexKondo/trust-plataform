@@ -19,6 +19,7 @@ tags:
   - name: Trust Score
   - name: Marketplace
   - name: Notification
+  - name: Payment
 
 paths:
   /health:
@@ -1575,6 +1576,80 @@ paths:
       summary: Marcar todos os avisos como lidos
       operationId: markAllNotificationsAsRead
       responses: { '200': { description: '{updated: number}' } }
+
+  # ── Pagamentos (PAY-001..002) ─────────────────────────────────────────────
+  /payments:
+    get:
+      tags: [Payment]
+      summary: Meus pagamentos (como comprador ou vendedor)
+      operationId: listMyPayments
+      parameters:
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: size, in: query, schema: { type: integer, default: 20, maximum: 50 } }
+      responses: { '200': { description: Pagamentos + pagination } }
+
+  /payments/by-order/{orderId}:
+    get:
+      tags: [Payment]
+      summary: Pagamento de um pedido
+      description: 'Pagamentos nascem do aceite da proposta (PAY-001): não há criação manual.'
+      operationId: getPaymentByOrder
+      parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Pagamento + histórico de tentativas de autorização }
+        '403': { description: Não é participante (PAYMENT_FORBIDDEN) }
+        '404': { description: Sem pagamento para este pedido (PAYMENT_NOT_FOUND) }
+
+  /payments/{paymentId}:
+    get:
+      tags: [Payment]
+      summary: Consultar pagamento (comprador ou vendedor)
+      operationId: getPayment
+      parameters: [{ name: paymentId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Pagamento + autorizações }
+        '403': { description: Não é participante }
+        '404': { description: Não encontrado }
+
+  /payments/{paymentId}/authorize:
+    post:
+      tags: [Payment]
+      summary: PAY-002 — Autorizar pagamento (só o comprador)
+      description: >
+        Envie o header **Idempotency-Key**: é ele que impede cobrança dupla em
+        clique duplo ou retry de rede (PAY-ARCH-001 §9). Repetir com a mesma
+        chave devolve a autorização anterior com `replayed: true`, sem chamar o
+        provedor. Responde 200 mesmo em recusa — quem diz se o dinheiro passou é
+        o campo `authorized`. O instrumento vem TOKENIZADO; a API nunca recebe
+        número de cartão ou CVV.
+      operationId: authorizePayment
+      parameters:
+        - { name: paymentId, in: path, required: true, schema: { type: string, format: uuid } }
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema: { type: string, maxLength: 120 }
+          description: Sem ela, cada requisição é uma tentativa nova de cobrança.
+      requestBody:
+        content:
+          application/json:
+            example: { paymentMethodToken: tok_sandbox_visa }
+      responses:
+        '200':
+          description: Tentativa processada
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  authorized: true
+                  replayed: false
+                  payment: { paymentId: 019fe8f0-0000-7000-8000-000000000040, status: AUTHORIZED, paymentProviderId: sandbox }
+                  authorization: { authorizationId: 019fe8f0-0000-7000-8000-000000000041, status: APPROVED, authorizedAmount: 2400 }
+        '403': { description: 'Não é o comprador (PAYMENT_FORBIDDEN)' }
+        '404': { description: Pagamento não encontrado }
+        '409': { description: 'Estado não permite autorizar (PAYMENT_INVALID_TRANSITION)' }
+        '502': { description: 'Falha do provedor (PAYMENT_GATEWAY_ERROR)' }
 
 components:
   securitySchemes:

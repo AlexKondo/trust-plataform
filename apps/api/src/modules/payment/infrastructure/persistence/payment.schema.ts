@@ -1,4 +1,15 @@
-import { char, index, numeric, pgTable, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import {
+  char,
+  index,
+  jsonb,
+  numeric,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
 import { identities } from '../../../identity/infrastructure/persistence/identities.schema';
 import { marketplaceOrders } from '../../../marketplace/infrastructure/persistence/marketplace-order.schema';
 
@@ -41,4 +52,42 @@ export const payments = pgTable(
   ],
 );
 
+/**
+ * Tentativas de autorização (PAY-002 BR-003: cada tentativa gera um registro).
+ *
+ * `idempotency_key` é único GLOBALMENTE (PAY-ARCH-001 §9): é ele que impede a
+ * segunda cobrança quando o cliente clica duas vezes ou a rede repete a
+ * requisição. A spec não previu a coluna; ela existe porque o ADR exige.
+ */
+export const paymentAuthorizations = pgTable(
+  'payment_authorizations',
+  {
+    id: uuid('id').primaryKey(),
+    paymentId: uuid('payment_id')
+      .notNull()
+      .references(() => payments.id, { onUpdate: 'restrict', onDelete: 'restrict' }),
+    providerId: varchar('provider_id', { length: 60 }).notNull(),
+    idempotencyKey: varchar('idempotency_key', { length: 120 }).notNull(),
+    providerTransactionId: varchar('provider_transaction_id', { length: 200 }),
+    authorizationCode: varchar('authorization_code', { length: 100 }),
+    authorizedAmount: numeric('authorized_amount', { precision: 18, scale: 2 }).notNull(),
+    /** APPROVED | DECLINED | ERROR */
+    status: varchar('status', { length: 30 }).notNull(),
+    providerCode: varchar('provider_code', { length: 100 }),
+    message: text('message'),
+    authorizedAt: timestamp('authorized_at', { withTimezone: true, mode: 'date' }),
+    expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }),
+    /** Resposta do provedor SANITIZADA — nunca dado de cartão (ADR §13). */
+    gatewayResponse: jsonb('gateway_response').notNull().default({}),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('idx_payment_authorization_idempotency').on(table.idempotencyKey),
+    index('idx_payment_authorization_payment').on(table.paymentId, table.createdAt),
+    index('idx_payment_authorization_transaction').on(table.providerTransactionId),
+    index('idx_payment_authorization_status').on(table.status),
+  ],
+);
+
 export type PaymentRow = typeof payments.$inferSelect;
+export type PaymentAuthorizationRow = typeof paymentAuthorizations.$inferSelect;

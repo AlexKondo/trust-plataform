@@ -36,7 +36,7 @@ Tudo isso é observado por dois módulos passivos: o **Ledger** (registra) e a
 
 Cada bloco é entregável: compila, testa e pode ser publicado sozinho.
 
-### Bloco 1 — Fundação financeira
+### Bloco 1 — Fundação financeira ✅ CONCLUÍDO (2026-08-10)
 **Entrega**: o dinheiro tem onde morar e como ser somado sem erro.
 - `shared/money.ts`: centavos, conversão, rateio com resto, formatação
 - Tabela `payments` + agregado `Payment` com máquina de estados
@@ -44,7 +44,7 @@ Cada bloco é entregável: compila, testa e pode ser publicado sozinho.
 - Consumer `pay.create-payment-on-order` (P1)
 - Testes: máquina de estados, rateio, idempotência do consumer
 
-### Bloco 2 — Autorização (PAY-002)
+### Bloco 2 — Autorização (PAY-002) ✅ CONCLUÍDO (2026-08-10)
 **Entrega**: o cliente paga.
 - Tabela `payment_authorizations` com idempotency key única
 - `POST /payments/{id}/authorize` (comprador)
