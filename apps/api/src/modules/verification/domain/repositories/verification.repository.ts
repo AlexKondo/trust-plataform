@@ -48,6 +48,9 @@ export abstract class VerificationRepository {
     type: VerificationType,
   ): Promise<number>;
 
+  /** Todas as verificações do Passport, da mais recente para a mais antiga. */
+  abstract listByPassportId(trustPassportId: string): Promise<Verification[]>;
+
   abstract addEvidence(evidence: EvidenceRecord, executor?: DatabaseExecutor): Promise<void>;
   abstract listEvidences(verificationId: string): Promise<EvidenceRecord[]>;
 

@@ -10,7 +10,17 @@ Infraestrutura digital de confiança para a economia de serviços locais. O mark
 
 ## BACKEND DO MVP COMPLETO — 68/68 features (2026-08-10)
 
-Todos os 9 módulos entregues, 46 suítes de teste verdes, 71 rotas no OpenAPI. **Próximo passo: o frontend** — o `apps/web` ainda tem só 9 telas (cadastro, login, senha, dashboard) e todo o resto (verificações, score, badges, perfil público, marketplace, negociação, pedidos, avaliações) existe apenas via API. Prompts de tela prontos em [docs/stitch-prompts.md](docs/stitch-prompts.md). Pendências restantes (P4 escala do score, P5 DSL de regras) em [INCONSISTENCIAS.md](INCONSISTENCIAS.md).
+Todos os 9 módulos entregues, 46 suítes de teste verdes, 71 rotas no OpenAPI.
+
+## FRONTEND — onda 1 entregue (2026-08-10)
+
+`apps/web` saiu de 9 para **19 rotas**, todas consumindo a API real: dashboard com score/timeline/badges, Trust Passport, Verificações (com upload multipart), Trust Score explicável (níveis, timeline, selos, benefícios), Marketplace (busca com filtro de reputação, detalhe com cartão de confiança do anunciante, gestão de anúncios com publicação), Conversas com negociação embutida (propostas, contrapropostas, aceite), Pedidos com linha do tempo e todas as ações do ciclo (agendar/check-in/check-out/confirmar/cancelar/avaliar/disputar), perfil público `/p/[token]` e configurações de privacidade com links compartilháveis.
+
+Infra do frontend: [lib/api.ts](apps/web/lib/api.ts) (envelope + paginação + refresh automático + multipart), [lib/types.ts](apps/web/lib/types.ts) (contratos espelhando o OpenAPI), [lib/labels.ts](apps/web/lib/labels.ts) (enums da API → português) e [components/layout.tsx](apps/web/components/layout.tsx) (Card, Pill, ScoreRing, TrustLevelBadge, StarRating, EmptyState).
+
+**Adicionado ao backend nesta onda**: `GET /verifications` (listagem das próprias verificações) — a tela precisava e o endpoint não existia.
+
+**O que falta no frontend**: painel admin (fila de verificações e de disputas — hoje só via API), notificações, e o `AWAITING_EXECUTION`/lembretes que dependem de job. Pendências de produto (P4 escala do score, P5 DSL de regras) em [INCONSISTENCIAS.md](INCONSISTENCIAS.md).
 
 ## Stack oficial (decidido em 2026-08-08 — detalhes em INCONSISTENCIAS.md P1–P7)
 

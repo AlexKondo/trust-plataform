@@ -165,6 +165,12 @@ export class VerificationController {
     return this.rejectUseCase.execute(identity.identityId, verificationId, body, this.meta(request));
   }
 
+  /** VRF-006 — minhas verificações (a tela precisa saber o que já foi enviado). */
+  @Get()
+  async listMine(@CurrentIdentity() identity: AuthenticatedIdentity) {
+    return this.getUseCase.listMine(identity.identityId);
+  }
+
   /** VRF-006 — consulta (dono ou admin). */
   @Get(':verificationId')
   async get(

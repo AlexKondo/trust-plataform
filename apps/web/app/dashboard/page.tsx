@@ -1,24 +1,97 @@
 'use client';
 
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { AppShell, useIdentity } from '../../components/app-shell';
+import {
+  Card,
+  EmptyState,
+  Loading,
+  Pill,
+  ScoreRing,
+  SectionTitle,
+  TrustLevelBadge,
+} from '../../components/layout';
 import { Icon } from '../../components/ui';
+import { ApiError, authApi } from '../../lib/api';
+import { LEVEL_LABEL, TRUST_EVENT_LABEL, formatRelative } from '../../lib/labels';
+import type {
+  TrustBadge,
+  TrustEventEntry,
+  TrustPassport,
+  TrustScore,
+  Verification,
+} from '../../lib/types';
+
+interface DashboardData {
+  score: TrustScore | null;
+  passport: TrustPassport | null;
+  badges: TrustBadge[];
+  verifications: Verification[];
+  timeline: TrustEventEntry[];
+}
+
+/** Falhas isoladas não podem derrubar o painel inteiro. */
+async function safe<T>(promise: Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await promise;
+  } catch (error) {
+    if (error instanceof ApiError) {
+      return fallback;
+    }
+    throw error;
+  }
+}
 
 function DashboardContent() {
   const identity = useIdentity();
+  const [data, setData] = useState<DashboardData | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      const [score, passport, badges, verifications, timeline] = await Promise.all([
+        safe(authApi<TrustScore>('/trust-scores/me'), null),
+        safe(authApi<TrustPassport>('/trust-passports/me'), null),
+        safe(authApi<TrustBadge[]>('/trust-badges/me'), []),
+        safe(authApi<Verification[]>('/verifications'), []),
+        safe(authApi<TrustEventEntry[]>('/trust-scores/me/timeline'), []),
+      ]);
+      setData({ score, passport, badges, verifications, timeline });
+    })();
+  }, []);
+
+  if (!data) {
+    return <Loading label="Carregando seu painel..." />;
+  }
+
   const firstName = identity?.fullName.split(/\s+/)[0] ?? '';
-  const emailVerified = identity?.status === 'ACTIVE';
+  const score = data.score?.score ?? 0;
+  const level = data.score?.level ?? 'UNVERIFIED';
+  const approved = data.verifications.filter((v) => v.status === 'APPROVED').length;
+  const pending = data.verifications.filter((v) =>
+    ['WAITING_FOR_EVIDENCE', 'PENDING_REVIEW', 'IN_REVIEW'].includes(v.status),
+  ).length;
+  const completion = data.passport?.profileCompletion ?? 0;
 
   const steps = [
-    { label: 'Confirmar e-mail', done: emailVerified, description: null },
+    { label: 'Confirmar e-mail', done: identity?.status === 'ACTIVE', href: null },
     {
       label: 'Completar seu Trust Passport',
-      done: false,
-      description: 'Adicione informações básicas ao seu perfil.',
+      done: Boolean(data.passport?.profile.phone && data.passport.profile.addressCity),
+      href: '/trust-passport',
+      description: 'Telefone e endereço deixam seu perfil pronto para verificação.',
     },
     {
-      label: 'Enviar sua primeira verificação',
+      label: 'Verificar seu documento de identidade',
+      done: data.passport?.documentVerified ?? false,
+      href: '/verifications',
+      description: 'A verificação que mais pesa no seu Trust Score (+150 pontos).',
+    },
+    {
+      label: 'Publicar seu primeiro anúncio',
       done: false,
-      description: 'Valide seus documentos essenciais.',
+      href: '/marketplace/mine',
+      description: 'Ofereça um serviço e comece a receber contatos.',
     },
   ];
 
@@ -31,89 +104,87 @@ function DashboardContent() {
         </p>
       </div>
 
-      {/* Cards de resumo */}
       <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
         {/* Trust Score */}
-        <div className="relative flex flex-col items-center justify-center overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest p-6 shadow-ambient">
+        <Card className="relative flex flex-col items-center justify-center">
           <h3 className="label-bold absolute left-4 top-4 uppercase text-on-surface">Trust Score</h3>
-          <div className="relative mt-6 flex h-32 w-32 items-center justify-center">
-            <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
-              <circle cx="50" cy="50" r="45" fill="none" stroke="#E2E8F0" strokeWidth="8" />
-              <circle
-                cx="50"
-                cy="50"
-                r="45"
-                fill="none"
-                stroke="#c4c5d7"
-                strokeWidth="8"
-                strokeDasharray="283"
-                strokeDashoffset="283"
-              />
-            </svg>
-            <span className="absolute text-4xl font-bold text-outline-variant">0</span>
-          </div>
-          <div className="mt-4 rounded-full border border-outline-variant bg-surface-container px-3 py-1">
-            <span className="label-bold text-on-surface-variant">NÃO VERIFICADO</span>
-          </div>
-        </div>
+          <Link href="/trust-score" className="mt-6 flex flex-col items-center gap-4">
+            <ScoreRing score={score} level={level} />
+            <TrustLevelBadge level={level} />
+          </Link>
+          <Link
+            href="/trust-score"
+            className="body-sm mt-4 flex items-center gap-1 text-primary hover:underline"
+          >
+            Ver como foi construído
+            <Icon name="arrow_forward" size={16} />
+          </Link>
+        </Card>
 
         {/* Verificações */}
-        <div className="flex flex-col justify-between rounded-xl border border-outline-variant bg-surface-container-lowest p-6 shadow-ambient">
+        <Card className="flex flex-col justify-between">
           <div>
-            <div className="mb-2 flex items-center gap-2 text-primary">
-              <Icon name="fact_check" size={22} />
-              <h3 className="label-bold uppercase">Verificações</h3>
-            </div>
+            <SectionTitle icon="fact_check" title="Verificações" />
             <p className="headline-md mt-4 text-on-surface">
-              0 <span className="text-lg font-normal text-on-surface-variant">concluídas</span>
+              {approved}{' '}
+              <span className="text-lg font-normal text-on-surface-variant">
+                {approved === 1 ? 'aprovada' : 'aprovadas'}
+              </span>
             </p>
+            {pending > 0 ? (
+              <p className="body-sm mt-2 text-on-surface-variant">
+                {pending} em andamento
+              </p>
+            ) : null}
           </div>
-          <button
-            type="button"
-            disabled
-            className="btn-text mt-6 flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-primary-container py-3 text-on-primary opacity-60"
-            title="Disponível quando o módulo de Verificações for lançado"
+          <Link
+            href="/verifications"
+            className="btn-text mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-primary-container py-3 text-on-primary transition-colors hover:bg-primary"
           >
-            <span>Iniciar verificação</span>
+            <span>{approved > 0 ? 'Gerenciar verificações' : 'Iniciar verificação'}</span>
             <Icon name="arrow_forward" size={18} />
-          </button>
-        </div>
+          </Link>
+        </Card>
 
-        {/* Perfil */}
-        <div className="flex flex-col justify-between rounded-xl border border-outline-variant bg-surface-container-lowest p-6 shadow-ambient">
+        {/* Passport */}
+        <Card className="flex flex-col justify-between">
           <div>
-            <div className="mb-2 flex items-center gap-2 text-primary">
-              <Icon name="person" size={22} />
-              <h3 className="label-bold uppercase">Perfil</h3>
-            </div>
+            <SectionTitle icon="badge" title="Trust Passport" />
             <div className="mt-6">
               <div className="mb-2 flex justify-between">
-                <span className="label-bold text-on-surface-variant">PROGRESSO</span>
-                <span className="label-bold text-primary">{emailVerified ? '40%' : '20%'} completo</span>
+                <span className="label-bold text-on-surface-variant">COMPLETUDE</span>
+                <span className="label-bold text-primary">{completion}%</span>
               </div>
               <div className="h-2 w-full overflow-hidden rounded-full bg-surface-container-high">
                 <div
-                  className="h-full rounded-full bg-primary-container"
-                  style={{ width: emailVerified ? '40%' : '20%' }}
+                  className="h-full rounded-full bg-primary-container transition-all"
+                  style={{ width: `${completion}%` }}
                 />
               </div>
             </div>
+            {data.badges.length > 0 ? (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {data.badges.slice(0, 3).map((badge) => (
+                  <Pill key={badge.code} tone="success" icon="workspace_premium">
+                    {badge.name}
+                  </Pill>
+                ))}
+              </div>
+            ) : null}
           </div>
-          <button
-            type="button"
-            disabled
-            className="btn-text mt-6 w-full cursor-not-allowed rounded-xl border border-outline-variant bg-transparent py-3 text-on-background opacity-60"
-            title="Disponível quando o Trust Passport for lançado"
+          <Link
+            href="/trust-passport"
+            className="btn-text mt-6 w-full rounded-xl border border-outline-variant bg-transparent py-3 text-center text-on-background transition-colors hover:bg-surface-container-low"
           >
             Completar perfil
-          </button>
-        </div>
+          </Link>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
         {/* Próximos passos */}
         <div className="lg:col-span-2">
-          <div className="overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest shadow-ambient">
+          <Card padded={false} className="overflow-hidden">
             <div className="border-b border-outline-variant bg-surface-bright p-6">
               <h3 className="headline-md text-lg text-on-surface">Próximos passos</h3>
               <p className="body-sm text-on-surface-variant">
@@ -121,55 +192,115 @@ function DashboardContent() {
               </p>
             </div>
             <div>
-              {steps.map((step, index) => (
-                <div
-                  key={step.label}
-                  className={`flex items-start gap-4 p-4 ${
-                    index < steps.length - 1 ? 'border-b border-outline-variant/50' : ''
-                  } ${step.done ? 'bg-surface-container/30' : ''}`}
-                >
-                  <Icon
-                    name={step.done ? 'check_circle' : 'radio_button_unchecked'}
-                    filled={step.done}
-                    className={step.done ? 'mt-0.5 text-teal' : 'mt-0.5 text-outline-variant'}
-                    size={22}
-                  />
-                  <div>
-                    <p
-                      className={`body-lg text-on-surface ${
-                        step.done ? 'line-through opacity-70' : 'font-semibold'
-                      }`}
-                    >
-                      {step.label}
-                    </p>
-                    {step.description ? (
-                      <p className="body-sm mt-1 text-on-surface-variant">{step.description}</p>
+              {steps.map((step, index) => {
+                const content = (
+                  <div
+                    className={`flex items-start gap-4 p-4 ${
+                      index < steps.length - 1 ? 'border-b border-outline-variant/50' : ''
+                    } ${step.done ? 'bg-surface-container/30' : 'hover:bg-surface-container-low'}`}
+                  >
+                    <Icon
+                      name={step.done ? 'check_circle' : 'radio_button_unchecked'}
+                      filled={step.done}
+                      className={step.done ? 'mt-0.5 text-teal' : 'mt-0.5 text-outline-variant'}
+                      size={22}
+                    />
+                    <div className="flex-1">
+                      <p
+                        className={`body-lg text-on-surface ${
+                          step.done ? 'line-through opacity-70' : 'font-semibold'
+                        }`}
+                      >
+                        {step.label}
+                      </p>
+                      {step.description && !step.done ? (
+                        <p className="body-sm mt-1 text-on-surface-variant">{step.description}</p>
+                      ) : null}
+                    </div>
+                    {step.href && !step.done ? (
+                      <Icon name="chevron_right" className="mt-1 text-outline" size={20} />
                     ) : null}
                   </div>
-                </div>
-              ))}
+                );
+                return step.href && !step.done ? (
+                  <Link key={step.label} href={step.href} className="block">
+                    {content}
+                  </Link>
+                ) : (
+                  <div key={step.label}>{content}</div>
+                );
+              })}
             </div>
-          </div>
+          </Card>
         </div>
 
-        {/* Atividade recente */}
+        {/* Atividade recente — a timeline do Trust Score */}
         <div className="lg:col-span-1">
-          <div className="flex h-full flex-col rounded-xl border border-outline-variant bg-surface-container-lowest shadow-ambient">
+          <Card padded={false} className="flex h-full flex-col overflow-hidden">
             <div className="border-b border-outline-variant p-6">
               <h3 className="headline-md text-lg text-on-surface">Atividade recente</h3>
             </div>
-            <div className="flex flex-1 flex-col items-center justify-center bg-surface-container/20 p-8 text-center">
-              <div className="mb-4 flex h-32 w-32 items-center justify-center rounded-full bg-surface-container">
-                <Icon name="history" className="text-outline-variant opacity-50" size={48} />
-              </div>
-              <p className="body-lg font-medium text-on-surface">Nenhuma atividade ainda</p>
-              <p className="body-sm mt-2 max-w-[200px] text-on-surface-variant">
-                Suas verificações e atualizações aparecerão aqui.
+            {data.timeline.length === 0 ? (
+              <EmptyState
+                icon="history"
+                title="Nenhuma atividade ainda"
+                description="Suas verificações e transações aparecerão aqui."
+              />
+            ) : (
+              <ul className="divide-y divide-outline-variant/50">
+                {data.timeline.slice(0, 6).map((event, index) => (
+                  <li key={`${event.eventName}-${index}`} className="flex items-start gap-3 p-4">
+                    <Icon
+                      name={event.points >= 0 ? 'trending_up' : 'trending_down'}
+                      size={20}
+                      className={event.points >= 0 ? 'text-teal' : 'text-error'}
+                    />
+                    <div className="flex-1">
+                      <p className="body-sm font-medium text-on-surface">
+                        {TRUST_EVENT_LABEL[event.eventName] ?? event.eventName}
+                      </p>
+                      <p className="body-sm text-on-surface-variant">
+                        {formatRelative(event.occurredAt)}
+                      </p>
+                    </div>
+                    {event.points !== 0 ? (
+                      <span
+                        className={`label-bold ${event.points > 0 ? 'text-teal' : 'text-error'}`}
+                      >
+                        {event.points > 0 ? '+' : ''}
+                        {event.points}
+                      </span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </div>
+      </div>
+
+      {level === 'UNVERIFIED' ? (
+        <Card className="flex flex-col items-start gap-3 border-l-4 border-l-primary-container md:flex-row md:items-center md:justify-between">
+          <div className="flex items-start gap-3">
+            <Icon name="lightbulb" className="mt-0.5 text-primary" size={22} />
+            <div>
+              <p className="body-lg font-semibold text-on-surface">
+                Sua conta ainda não tem pontuação
+              </p>
+              <p className="body-sm text-on-surface-variant">
+                Verifique seu documento para chegar ao nível {LEVEL_LABEL.SILVER} e publicar em
+                categorias como Elétrica e Hidráulica.
               </p>
             </div>
           </div>
-        </div>
-      </div>
+          <Link
+            href="/verifications"
+            className="btn-text whitespace-nowrap rounded-xl bg-primary-container px-5 py-3 text-on-primary transition-colors hover:bg-primary"
+          >
+            Começar
+          </Link>
+        </Card>
+      ) : null}
     </div>
   );
 }

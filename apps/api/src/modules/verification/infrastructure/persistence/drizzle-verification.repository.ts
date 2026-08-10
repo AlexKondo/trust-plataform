@@ -94,6 +94,15 @@ export class DrizzleVerificationRepository extends VerificationRepository {
     return row?.count ?? 0;
   }
 
+  async listByPassportId(trustPassportId: string): Promise<Verification[]> {
+    const rows = await this.db
+      .select()
+      .from(verifications)
+      .where(eq(verifications.trustPassportId, trustPassportId))
+      .orderBy(desc(verifications.createdAt));
+    return rows.map((row) => this.toEntity(row));
+  }
+
   async addEvidence(evidence: EvidenceRecord, executor?: DatabaseExecutor): Promise<void> {
     const target = executor ?? this.db;
     await target.insert(verificationEvidences).values(evidence);

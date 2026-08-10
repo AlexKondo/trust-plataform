@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { AuditLogService } from '../../../../shared/audit/audit-log.service';
 import { IdentityRepository } from '../../../identity/domain/repositories/identity.repository';
+import { TrustPassportRepository } from '../../../trust-passport/domain/repositories/trust-passport.repository';
 import {
   VerificationAccessDeniedException,
   VerificationNotFoundException,
@@ -45,10 +46,65 @@ export class GetVerificationUseCase {
   constructor(
     private readonly repository: VerificationRepository,
     private readonly identityRepository: IdentityRepository,
+    private readonly trustPassportRepository: TrustPassportRepository,
     private readonly auditLogService: AuditLogService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(GetVerificationUseCase.name);
+  }
+
+  /**
+   * VRF-006 (listagem) — todas as verificações do próprio Passport, com as
+   * evidências já enviadas: é o que a tela precisa para saber o que falta.
+   */
+  async listMine(identityId: string): Promise<VerificationDetailsResponse[]> {
+    const passport = await this.trustPassportRepository.findByIdentityId(identityId);
+    if (!passport) {
+      return [];
+    }
+    const verifications = await this.repository.listByPassportId(passport.id);
+    return Promise.all(
+      verifications.map(async (verification) => {
+        const [review, decision, evidences] = await Promise.all([
+          this.repository.findLatestReview(verification.id),
+          this.repository.findDecision(verification.id),
+          this.repository.listEvidences(verification.id),
+        ]);
+        return {
+          verificationId: verification.id,
+          type: verification.type,
+          status: verification.status,
+          currentAttempt: verification.currentAttempt,
+          createdAt: verification.createdAt.toISOString(),
+          updatedAt: verification.updatedAt.toISOString(),
+          review: review
+            ? {
+                status: review.status,
+                reviewType: review.reviewType,
+                startedAt: review.startedAt.toISOString(),
+                completedAt: review.completedAt?.toISOString() ?? null,
+              }
+            : null,
+          decision: decision
+            ? {
+                decision: decision.decision,
+                decisionSource: decision.decisionSource,
+                reasonCode: decision.reasonCode,
+                comments: decision.comments,
+                decidedAt: decision.decidedAt.toISOString(),
+              }
+            : null,
+          evidences: evidences.map((evidence) => ({
+            id: evidence.id,
+            type: evidence.type,
+            fileName: evidence.fileName,
+            mimeType: evidence.mimeType,
+            fileSize: evidence.fileSize,
+            uploadedAt: evidence.uploadedAt.toISOString(),
+          })),
+        };
+      }),
+    );
   }
 
   async execute(

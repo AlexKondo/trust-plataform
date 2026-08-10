@@ -8,9 +8,12 @@ import { Icon } from './ui';
 
 const MENU = [
   { href: '/dashboard', icon: 'home', label: 'Início' },
-  { href: '#', icon: 'badge', label: 'Trust Passport', soon: true },
-  { href: '#', icon: 'fact_check', label: 'Verificações', soon: true },
-  { href: '#', icon: 'storefront', label: 'Marketplace', soon: true },
+  { href: '/trust-score', icon: 'shield', label: 'Trust Score' },
+  { href: '/trust-passport', icon: 'badge', label: 'Trust Passport' },
+  { href: '/verifications', icon: 'fact_check', label: 'Verificações' },
+  { href: '/marketplace', icon: 'storefront', label: 'Marketplace' },
+  { href: '/conversations', icon: 'forum', label: 'Conversas' },
+  { href: '/orders', icon: 'receipt_long', label: 'Pedidos' },
 ];
 
 const IdentityContext = createContext<CurrentIdentity | null>(null);
@@ -64,7 +67,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
           <nav className="flex flex-1 flex-col gap-1">
             {MENU.map((item) => {
-              const active = !item.soon && pathname.startsWith(item.href);
+              const active = pathname.startsWith(item.href);
               return (
                 <Link
                   key={item.label}
@@ -73,21 +76,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     active
                       ? 'bg-primary-fixed text-primary'
                       : 'text-on-surface-variant hover:bg-surface-container-low'
-                  } ${item.soon ? 'cursor-default opacity-60' : ''}`}
+                  }`}
                 >
                   <Icon name={item.icon} size={20} />
                   {item.label}
-                  {item.soon ? (
-                    <span className="label-bold ml-auto rounded-full bg-surface-container px-2 py-0.5 text-[10px] uppercase text-outline">
-                      Em breve
-                    </span>
-                  ) : null}
                 </Link>
               );
             })}
           </nav>
           <Link
-            href="/settings/security/change-password"
+            href="/settings"
             className={`body-sm flex items-center gap-3 rounded-lg px-4 py-3 font-medium transition-colors ${
               inSettings
                 ? 'bg-primary-fixed text-primary'
