@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Param,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -44,6 +45,10 @@ import { EvidenceFileTooLargeException } from '../../domain/exceptions/verificat
 type RequestWithContext = FastifyRequest & { requestContext?: RequestContext };
 
 const verificationIdSchema = z.string().uuid('verificationId must be a valid UUID');
+const queueStatusSchema = z
+  .enum(['WAITING_FOR_EVIDENCE', 'PENDING_REVIEW', 'IN_REVIEW', 'APPROVED', 'REJECTED'])
+  .optional();
+const pageSchema = z.coerce.number().int().min(1).optional();
 
 @Controller('verifications')
 export class VerificationController {
@@ -169,6 +174,21 @@ export class VerificationController {
   @Get()
   async listMine(@CurrentIdentity() identity: AuthenticatedIdentity) {
     return this.getUseCase.listMine(identity.identityId);
+  }
+
+  /**
+   * VRF-003 — fila de análise (ADMIN). Por padrão traz o que aguarda decisão;
+   * `status` permite inspecionar outras faixas (ex.: já aprovadas).
+   */
+  @Get('queue/pending')
+  @UseGuards(AdminGuard)
+  async queue(
+    @Query('status', new ZodValidationPipe(queueStatusSchema)) status: string | undefined,
+    @Query('page', new ZodValidationPipe(pageSchema)) page = 1,
+    @Query('size', new ZodValidationPipe(pageSchema)) size = 20,
+  ) {
+    const statuses = status ? [status] : ['PENDING_REVIEW', 'IN_REVIEW'];
+    return this.getUseCase.listQueue(statuses, page, Math.min(size, 50));
   }
 
   /** VRF-006 — consulta (dono ou admin). */

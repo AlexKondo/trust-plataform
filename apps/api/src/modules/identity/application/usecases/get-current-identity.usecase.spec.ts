@@ -39,6 +39,7 @@ describe('GetCurrentIdentityUseCase (IDN-005)', () => {
       status: 'ACTIVE',
       createdAt: identity.createdAt.toISOString(),
       lastLoginAt: identity.lastLoginAt?.toISOString(),
+      isAdmin: false,
     });
   });
 
@@ -51,11 +52,14 @@ describe('GetCurrentIdentityUseCase (IDN-005)', () => {
     expect(serialized).not.toContain('passwordHash');
     expect(serialized).not.toContain('failedLoginAttempts');
     expect(serialized).not.toContain('lockedUntil');
+    // `isAdmin` é permissão do PRÓPRIO usuário — o frontend precisa dela para
+    // decidir se mostra o painel de moderação; não é dado sensível de terceiro.
     expect(Object.keys(response).sort()).toEqual([
       'createdAt',
       'email',
       'fullName',
       'identityId',
+      'isAdmin',
       'lastLoginAt',
       'status',
     ]);

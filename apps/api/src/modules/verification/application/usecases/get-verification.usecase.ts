@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
+import { PaginatedResult } from '../../../../shared/api/api-envelope';
 import { AuditLogService } from '../../../../shared/audit/audit-log.service';
 import { IdentityRepository } from '../../../identity/domain/repositories/identity.repository';
 import { TrustPassportRepository } from '../../../trust-passport/domain/repositories/trust-passport.repository';
@@ -30,6 +31,26 @@ export interface VerificationDetailsResponse {
     comments: string | null;
     decidedAt: string;
   } | null;
+  evidences: Array<{
+    id: string;
+    type: string;
+    fileName: string;
+    mimeType: string;
+    fileSize: number;
+    uploadedAt: string;
+  }>;
+}
+
+/** Item da fila de análise (ADMIN) — resumo + identificação do titular. */
+export interface VerificationQueueItem {
+  verificationId: string;
+  identityId: string;
+  identityName: string;
+  identityEmail: string;
+  type: string;
+  status: string;
+  currentAttempt: number;
+  createdAt: string;
   evidences: Array<{
     id: string;
     type: string;
@@ -105,6 +126,45 @@ export class GetVerificationUseCase {
         };
       }),
     );
+  }
+
+  /**
+   * VRF-003 (fila) — verificações aguardando análise, para o painel admin.
+   * Inclui o nome do titular: quem revisa precisa saber de quem é o documento.
+   */
+  async listQueue(
+    statuses: readonly string[],
+    page: number,
+    pageSize: number,
+  ): Promise<PaginatedResult<VerificationQueueItem>> {
+    const { items, totalItems } = await this.repository.listByStatuses(statuses, page, pageSize);
+    const enriched = await Promise.all(
+      items.map(async (verification) => {
+        const [identity, evidences] = await Promise.all([
+          this.identityRepository.findById(verification.identityId),
+          this.repository.listEvidences(verification.id),
+        ]);
+        return {
+          verificationId: verification.id,
+          identityId: verification.identityId,
+          identityName: identity?.fullName ?? '—',
+          identityEmail: identity?.email ?? '—',
+          type: verification.type,
+          status: verification.status,
+          currentAttempt: verification.currentAttempt,
+          createdAt: verification.createdAt.toISOString(),
+          evidences: evidences.map((evidence) => ({
+            id: evidence.id,
+            type: evidence.type,
+            fileName: evidence.fileName,
+            mimeType: evidence.mimeType,
+            fileSize: evidence.fileSize,
+            uploadedAt: evidence.uploadedAt.toISOString(),
+          })),
+        };
+      }),
+    );
+    return PaginatedResult.of(enriched, page, pageSize, totalItems);
   }
 
   async execute(

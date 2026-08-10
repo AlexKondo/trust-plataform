@@ -51,6 +51,16 @@ export abstract class VerificationRepository {
   /** Todas as verificações do Passport, da mais recente para a mais antiga. */
   abstract listByPassportId(trustPassportId: string): Promise<Verification[]>;
 
+  /**
+   * Fila de análise (ADMIN): verificações nos status informados, da mais antiga
+   * para a mais nova — quem esperou mais é atendido primeiro.
+   */
+  abstract listByStatuses(
+    statuses: readonly string[],
+    page: number,
+    pageSize: number,
+  ): Promise<{ items: Verification[]; totalItems: number }>;
+
   abstract addEvidence(evidence: EvidenceRecord, executor?: DatabaseExecutor): Promise<void>;
   abstract listEvidences(verificationId: string): Promise<EvidenceRecord[]>;
 

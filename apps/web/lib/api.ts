@@ -191,4 +191,6 @@ export interface CurrentIdentity {
   status: string;
   createdAt: string;
   lastLoginAt: string | null;
+  /** Decide se o painel de moderação aparece no menu. */
+  isAdmin: boolean;
 }

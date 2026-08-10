@@ -11,4 +11,9 @@ export interface GetCurrentIdentityResponse {
   status: IdentityStatus;
   createdAt: string;
   lastLoginAt: string | null;
+  /**
+   * Permissão administrativa do próprio usuário — não é dado sensível de
+   * terceiro e o frontend precisa dela para decidir se mostra o painel admin.
+   */
+  isAdmin: boolean;
 }

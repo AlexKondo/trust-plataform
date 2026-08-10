@@ -18,9 +18,15 @@ Todos os 9 módulos entregues, 46 suítes de teste verdes, 71 rotas no OpenAPI.
 
 Infra do frontend: [lib/api.ts](apps/web/lib/api.ts) (envelope + paginação + refresh automático + multipart), [lib/types.ts](apps/web/lib/types.ts) (contratos espelhando o OpenAPI), [lib/labels.ts](apps/web/lib/labels.ts) (enums da API → português) e [components/layout.tsx](apps/web/components/layout.tsx) (Card, Pill, ScoreRing, TrustLevelBadge, StarRating, EmptyState).
 
-**Adicionado ao backend nesta onda**: `GET /verifications` (listagem das próprias verificações) — a tela precisava e o endpoint não existia.
+## FRONTEND — onda 2: painel de moderação (2026-08-10)
 
-**O que falta no frontend**: painel admin (fila de verificações e de disputas — hoje só via API), notificações, e o `AWAITING_EXECUTION`/lembretes que dependem de job. Pendências de produto (P4 escala do score, P5 DSL de regras) em [INCONSISTENCIAS.md](INCONSISTENCIAS.md).
+`/admin` com fila de **verificações** (iniciar análise → aprovar/rejeitar com motivo do catálogo) e de **disputas** (julgar com fundamentação, avisando na tela quanto cada desfecho custa em pontos). O item "Moderação" só aparece no menu para quem é admin — a autorização real continua no `AdminGuard` da API.
+
+**Adicionado ao backend para as telas**: `GET /verifications` (minhas verificações), `GET /verifications/queue/pending` (fila de análise, ADMIN) e o campo `isAdmin` em `/identities/me`.
+
+**Como virar admin**: `UPDATE identities SET is_admin = true WHERE email = '...'` no banco (PLANO §4 — primeiro mecanismo admin do MVP).
+
+**O que ainda falta no frontend**: notificações (os eventos já são publicados, falta o módulo que os transforma em avisos) e a administração de regras/badges/benefícios do TRS (endpoints existem, tela não). Pendências de produto (P4 escala do score, P5 DSL de regras) em [INCONSISTENCIAS.md](INCONSISTENCIAS.md).
 
 ## Stack oficial (decidido em 2026-08-08 — detalhes em INCONSISTENCIAS.md P1–P7)
 

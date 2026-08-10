@@ -103,6 +103,25 @@ export class DrizzleVerificationRepository extends VerificationRepository {
     return rows.map((row) => this.toEntity(row));
   }
 
+  async listByStatuses(
+    statuses: readonly string[],
+    page: number,
+    pageSize: number,
+  ): Promise<{ items: Verification[]; totalItems: number }> {
+    const where = and(inArray(verifications.status, [...statuses]), isNull(verifications.deletedAt));
+    const [rows, [total]] = await Promise.all([
+      this.db
+        .select()
+        .from(verifications)
+        .where(where)
+        .orderBy(verifications.createdAt)
+        .limit(pageSize)
+        .offset((page - 1) * pageSize),
+      this.db.select({ count: sql<number>`count(*)::int` }).from(verifications).where(where),
+    ]);
+    return { items: rows.map((row) => this.toEntity(row)), totalItems: total?.count ?? 0 };
+  }
+
   async addEvidence(evidence: EvidenceRecord, executor?: DatabaseExecutor): Promise<void> {
     const target = executor ?? this.db;
     await target.insert(verificationEvidences).values(evidence);

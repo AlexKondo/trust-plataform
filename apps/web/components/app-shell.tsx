@@ -84,6 +84,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               );
             })}
           </nav>
+          {identity?.isAdmin ? (
+            <Link
+              href="/admin"
+              className={`body-sm mb-1 flex items-center gap-3 rounded-lg px-4 py-3 font-medium transition-colors ${
+                pathname.startsWith('/admin')
+                  ? 'bg-tertiary-fixed text-on-tertiary-container'
+                  : 'text-on-surface-variant hover:bg-surface-container-low'
+              }`}
+            >
+              <Icon name="admin_panel_settings" size={20} />
+              Moderação
+            </Link>
+          ) : null}
           <Link
             href="/settings"
             className={`body-sm flex items-center gap-3 rounded-lg px-4 py-3 font-medium transition-colors ${

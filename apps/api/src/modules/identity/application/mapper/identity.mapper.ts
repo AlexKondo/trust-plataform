@@ -19,6 +19,7 @@ export const IdentityMapper = {
       status: identity.status,
       createdAt: identity.createdAt.toISOString(),
       lastLoginAt: identity.lastLoginAt?.toISOString() ?? null,
+      isAdmin: identity.isAdmin,
     };
   },
 };

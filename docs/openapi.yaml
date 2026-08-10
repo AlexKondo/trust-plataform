@@ -129,6 +129,7 @@ paths:
                   status: ACTIVE
                   createdAt: '2026-08-08T10:00:00.000Z'
                   lastLoginAt: '2026-08-08T20:30:00.000Z'
+                  isAdmin: false
         '401':
           description: Sem token ou token inválido/expirado (INVALID_TOKEN)
         '403':
@@ -468,6 +469,16 @@ paths:
           description: Passport não encontrado (TRUST_PASSPORT_NOT_FOUND)
 
   /verifications:
+    get:
+      tags: [Verification]
+      summary: VRF-006 — Minhas verificações
+      description: >
+        Todas as verificações do próprio Passport, da mais recente para a mais
+        antiga, com as evidências já enviadas — é o que a tela usa para saber o
+        que ainda falta enviar.
+      operationId: listMyVerifications
+      responses:
+        '200': { description: 'Lista com status, tentativa, evidências e decisão' }
     post:
       tags: [Verification]
       summary: VRF-001 — Iniciar verificação para o próprio Passport
@@ -495,6 +506,29 @@ paths:
         '400': { description: Tipo inválido (VALIDATION_ERROR) }
         '404': { description: Passport inexistente (TRUST_PASSPORT_NOT_FOUND) }
         '409': { description: Já existe verificação ativa deste tipo (VERIFICATION_ALREADY_EXISTS) }
+
+  /verifications/queue/pending:
+    get:
+      tags: [Verification]
+      summary: VRF-003 — Fila de análise (ADMIN)
+      description: >
+        Verificações aguardando decisão, da mais antiga para a mais recente.
+        Traz nome e e-mail do titular (quem revisa precisa saber de quem é o
+        documento) e a lista de evidências enviadas — nunca o conteúdo dos
+        arquivos (VRF-006 BR-004).
+      operationId: listVerificationQueue
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [WAITING_FOR_EVIDENCE, PENDING_REVIEW, IN_REVIEW, APPROVED, REJECTED]
+          description: 'Padrão: PENDING_REVIEW + IN_REVIEW.'
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: size, in: query, schema: { type: integer, default: 20, maximum: 50 } }
+      responses:
+        '200': { description: Itens da fila + pagination }
+        '403': { description: Não é admin (ADMIN_REQUIRED) }
 
   /verifications/{verificationId}/evidence:
     post:
