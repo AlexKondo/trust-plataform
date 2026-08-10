@@ -16,3 +16,4 @@ export * from '../../../modules/marketplace/infrastructure/persistence/marketpla
 export * from '../../../modules/marketplace/infrastructure/persistence/marketplace-order.schema';
 export * from '../../../modules/marketplace/infrastructure/persistence/marketplace-review.schema';
 export * from '../../../modules/notification/infrastructure/persistence/notifications.schema';
+export * from '../../../modules/payment/infrastructure/persistence/payment.schema';

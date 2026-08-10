@@ -80,3 +80,4 @@ Dois payloads ganharam campo (adição retrocompatível) para o consumidor não 
 | `trust-security` | Auth, endpoints sensíveis, auditoria |
 | `trust-logging` | Logs e instrumentação |
 | `trust-testing` | Escrever/revisar testes |
+| `trust-payments` | **Qualquer feature PAY-XXX**, valor monetário, gateway, custódia, liquidação, reembolso |

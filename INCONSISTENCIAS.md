@@ -45,6 +45,14 @@
 | 36 | MRK-019 BR-001 permite agendar em CREATED **e** AWAITING_SCHEDULING; MRK-020 BR-001 permite iniciar em SCHEDULED **e** AWAITING_EXECUTION — mas nada leva a esses estados intermediários | Os estados existem na máquina e são alcançáveis, mas **no MVP ninguém os produz**: agenda-se a partir de CREATED e inicia-se a partir de SCHEDULED. AWAITING_SCHEDULING/AWAITING_EXECUTION ficam reservados para o job de lembrete/janela de execução (pós-MVP). |
 | 37 | MRK-022 BR-007 exige "processos obrigatórios" antes de COMPLETED, mas o MVP não tem Pagamentos nem Trust Economy | O consumer `mrk.complete-confirmed-order` **é** esse pipeline: consome `MarketplaceOrder.CustomerConfirmed` e conclui o pedido. Hoje o único processo obrigatório real é a atualização do Trust Score. **CLOSED não é alcançado no MVP** (depende da janela de avaliação — Módulo 9). |
 
+## Módulo Payments (PAY-001..010)
+
+As decisões canônicas do módulo financeiro estão em [PLANO-DE-PAGAMENTOS.md](PLANO-DE-PAGAMENTOS.md) §2 (P1–P6), por serem inseparáveis do plano de execução em blocos. A mais relevante:
+
+| # | Conflito | Resolução |
+|---|---|---|
+| P1 | PAY-001 BR-002 cria o Payment ao consumir `MarketplaceOrder.CustomerConfirmed` — cobrando o cliente DEPOIS de ele confirmar a entrega, o que esvazia a custódia (a confirmação é a condição de LIBERAÇÃO no PAY-ARCH-002 §8) | **O Payment nasce com o pedido** (`MarketplaceOrder.Created`); a confirmação do cliente passa a ser o gatilho de liberação. Isolado em um único consumer (`pay.create-payment-on-order`). **Pendente de confirmação do founder** — muda quando o cliente é cobrado. |
+
 ## Decisões de stack e infraestrutura (DECIDIDO em 2026-08-08)
 
 | # | Decisão | Resolução |

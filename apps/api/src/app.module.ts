@@ -14,6 +14,7 @@ import { HealthModule } from './modules/health/health.module';
 import { IdentityModule } from './modules/identity/identity.module';
 import { MarketplaceModule } from './modules/marketplace/marketplace.module';
 import { NotificationModule } from './modules/notification/notification.module';
+import { PaymentModule } from './modules/payment/payment.module';
 import { TrustPassportModule } from './modules/trust-passport/trust-passport.module';
 import { TrustScoreModule } from './modules/trust-score/trust-score.module';
 import { VerificationModule } from './modules/verification/verification.module';
@@ -33,6 +34,7 @@ import { VerificationModule } from './modules/verification/verification.module';
     TrustScoreModule,
     MarketplaceModule,
     NotificationModule,
+    PaymentModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
