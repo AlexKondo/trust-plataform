@@ -29,3 +29,6 @@ Thumbs.db
 *.docx
 *.xlsx
 .pgdata-e2e/
+
+# Pastas originais .docx (a versão de trabalho é docs-extracted/)
+docs/Arquitetura-20260823T121643Z-1-001/
