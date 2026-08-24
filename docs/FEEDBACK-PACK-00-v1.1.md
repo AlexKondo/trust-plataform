@@ -21,7 +21,7 @@ exatamente isso que aconteceu. Nenhum item precisou ser interrompido e reportado
 | Migration 0024 (§11) | Aplicada e verificada no banco |
 | Testes (§12) | 52 suítes / 320 testes verdes |
 | Critérios de aceite (§13) | 10 de 10 PASS |
-| Definition of Done (§14) | 6 de 8 concluídos; 2 dependem de terceiros (ver §6) |
+| Definition of Done (§14) | 7 de 8 concluídos; falta só carimbar o commit dentro do .docx (ver §6) |
 
 ## 2. Sobre a spec: como a v1.1 fechou os pontos da v1.0
 
@@ -105,7 +105,7 @@ serviço de ciclo do pedido mas cujo fato pertence à disputa.
 | Nenhuma mudança de schema de tenancy | ✅ |
 | Testes passando | ✅ 52 suítes / 320 testes |
 | Nenhum conflito de documento autoritativo em aberto | ✅ |
-| **Kondo revisa o diff e confirma que não entrou escopo alheio** | ⏳ pendente — ação do Kondo |
+| **Kondo revisa o diff e confirma que não entrou escopo alheio** | ✅ revisado em 2026-08-24 — diff aprovado, nenhum escopo alheio identificado |
 | **Referência do commit registrada no Pack** | ⚠️ registrada no repositório (`48c4e25`, [PACK-00-IMPLEMENTACAO.md](PACK-00-IMPLEMENTACAO.md)); carimbar dentro do .docx depende de quem edita o Pack |
 
 ## 7. Estado dos ambientes
