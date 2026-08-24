@@ -77,7 +77,9 @@ export class ReviewTransactionUseCase {
     await this.db.transaction(async (tx) => {
       await this.reviewRepository.saveReview(review, tx);
       await this.outboxService.enqueue(tx, {
-        eventName: 'MarketplaceReview.Created',
+        eventType: 'MarketplaceReview.Created',
+        aggregateType: 'MarketplaceReview',
+        aggregateId: review.id,
         producer: MRK_PRODUCER,
         correlationId: meta.correlationId ?? review.id,
         payload: {

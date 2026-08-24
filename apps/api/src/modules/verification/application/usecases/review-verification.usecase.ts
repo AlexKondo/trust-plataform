@@ -52,7 +52,9 @@ export class ReviewVerificationUseCase {
       await this.repository.addReview(review, tx);
       await this.repository.save(verification, tx);
       await this.outboxService.enqueue(tx, {
-        eventName: 'Verification.ReviewStarted',
+        eventType: 'Verification.ReviewStarted',
+        aggregateType: 'Verification',
+        aggregateId: verification.id,
         producer: VRF_PRODUCER,
         correlationId: meta.correlationId ?? verification.id,
         payload: {

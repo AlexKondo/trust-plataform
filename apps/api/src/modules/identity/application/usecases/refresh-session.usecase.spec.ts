@@ -160,7 +160,7 @@ describe('RefreshSessionUseCase (IDN-004)', () => {
     await useCase.execute({ refreshToken: rawRefreshToken });
 
     const call = vi.mocked(outboxService.enqueue).mock.calls[0]?.[1];
-    expect(call).toMatchObject({ eventName: 'Session.Refreshed' });
+    expect(call).toMatchObject({ eventType: 'Session.Refreshed' });
     expect(call?.payload).toMatchObject({ sessionId: session.id, identityId: identity.id });
   });
 });

@@ -93,7 +93,9 @@ export class ContactListingOwnerUseCase {
 
       if (created) {
         await this.outboxService.enqueue(tx, {
-          eventName: 'MarketplaceConversation.Created',
+          eventType: 'MarketplaceConversation.Created',
+          aggregateType: 'MarketplaceConversation',
+          aggregateId: conversation.id,
           producer: MRK_PRODUCER,
           correlationId: meta.correlationId ?? conversation.id,
           payload: {
@@ -106,7 +108,9 @@ export class ContactListingOwnerUseCase {
         });
       }
       await this.outboxService.enqueue(tx, {
-        eventName: 'MarketplaceMessage.Sent',
+        eventType: 'MarketplaceMessage.Sent',
+        aggregateType: 'MarketplaceMessage',
+        aggregateId: message.id,
         producer: MRK_PRODUCER,
         correlationId: meta.correlationId ?? conversation.id,
         payload: {

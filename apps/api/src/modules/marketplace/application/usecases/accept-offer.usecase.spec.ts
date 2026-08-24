@@ -105,7 +105,7 @@ function scenario(options: { competitors?: MarketplaceOffer[]; listing?: Marketp
 }
 
 const eventNames = (outbox: OutboxService) =>
-  vi.mocked(outbox.enqueue).mock.calls.map((call) => (call[1] as { eventName: string }).eventName);
+  vi.mocked(outbox.enqueue).mock.calls.map((call) => (call[1] as { eventType: string }).eventType);
 
 describe('AcceptOfferUseCase (MRK-013) — o pivô da negociação', () => {
   it('aceita, reserva o anúncio e cria o pedido na mesma transação', async () => {
@@ -129,6 +129,37 @@ describe('AcceptOfferUseCase (MRK-013) — o pivô da negociação', () => {
       'MarketplaceOffer.Accepted',
       'MarketplaceListing.Reserved',
       'MarketplaceOrder.Created',
+    ]);
+  });
+
+  it('cada evento aponta o agregado responsável pelo fato (PACK-00 v1.1 §5.2)', async () => {
+    const { useCase, offer, listing, outbox } = scenario();
+    const result = await useCase.execute(SELLER, offer.id);
+
+    const events = vi
+      .mocked(outbox.enqueue)
+      .mock.calls.map(
+        (call) => call[1] as { eventType: string; aggregateType: string; aggregateId: string },
+      );
+
+    // Três eventos numa transação só, TRÊS agregados diferentes — é justamente
+    // por isso que aggregateType/aggregateId não podem ser derivados do produtor.
+    expect(events).toEqual([
+      expect.objectContaining({
+        eventType: 'MarketplaceOffer.Accepted',
+        aggregateType: 'MarketplaceOffer',
+        aggregateId: offer.id,
+      }),
+      expect.objectContaining({
+        eventType: 'MarketplaceListing.Reserved',
+        aggregateType: 'MarketplaceListing',
+        aggregateId: listing.id,
+      }),
+      expect.objectContaining({
+        eventType: 'MarketplaceOrder.Created',
+        aggregateType: 'MarketplaceOrder',
+        aggregateId: result.order.orderId,
+      }),
     ]);
   });
 

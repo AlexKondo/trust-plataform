@@ -67,7 +67,9 @@ export class CreateVerificationUseCase {
     await this.db.transaction(async (tx) => {
       await this.verificationRepository.save(verification, tx);
       await this.outboxService.enqueue(tx, {
-        eventName: 'Verification.Created',
+        eventType: 'Verification.Created',
+        aggregateType: 'Verification',
+        aggregateId: verification.id,
         producer: VRF_PRODUCER,
         correlationId: meta.correlationId ?? verification.id,
         payload: {

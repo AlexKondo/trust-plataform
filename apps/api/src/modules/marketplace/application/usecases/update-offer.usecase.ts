@@ -46,7 +46,9 @@ export class UpdateOfferUseCase {
       await this.db.transaction(async (tx) => {
         await this.offerRepository.save(offer, tx);
         await this.outboxService.enqueue(tx, {
-          eventName: 'MarketplaceOffer.Updated',
+          eventType: 'MarketplaceOffer.Updated',
+          aggregateType: 'MarketplaceOffer',
+          aggregateId: offer.id,
           producer: MRK_PRODUCER,
           correlationId: meta.correlationId ?? offer.id,
           payload: {

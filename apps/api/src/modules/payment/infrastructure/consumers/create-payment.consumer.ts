@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { DatabaseExecutor } from '../../../../shared/database/database.module';
 import { EventConsumer } from '../../../../shared/events/event-consumer';
-import { EventEnvelope } from '../../../../shared/events/event-envelope';
+import { ConsumedEvent } from '../../../../shared/events/event-envelope';
 import { OutboxService } from '../../../../shared/events/outbox.service';
 import { fromReais } from '../../../../shared/money/money';
 import { Payment } from '../../domain/entities/payment';
@@ -25,7 +25,7 @@ export const PAY_PRODUCER = 'payment-service';
  */
 @Injectable()
 export class CreatePaymentOnOrderConsumer extends EventConsumer {
-  readonly eventName = 'MarketplaceOrder.Created';
+  readonly eventType = 'MarketplaceOrder.Created';
   readonly consumerName = 'pay.create-payment-on-order';
 
   constructor(
@@ -37,7 +37,7 @@ export class CreatePaymentOnOrderConsumer extends EventConsumer {
     this.logger.setContext(CreatePaymentOnOrderConsumer.name);
   }
 
-  async handle(envelope: EventEnvelope, tx: DatabaseExecutor): Promise<void> {
+  async handle(envelope: ConsumedEvent, tx: DatabaseExecutor): Promise<void> {
     const payload = envelope.payload as {
       orderId?: string;
       buyerId?: string;
@@ -64,7 +64,9 @@ export class CreatePaymentOnOrderConsumer extends EventConsumer {
     }
 
     await this.outboxService.enqueue(tx, {
-      eventName: 'Payment.Created',
+      eventType: 'Payment.Created',
+      aggregateType: 'Payment',
+      aggregateId: payment.id,
       producer: PAY_PRODUCER,
       correlationId: envelope.correlationId,
       causationId: envelope.eventId,

@@ -21,7 +21,7 @@ export interface NotificationDraft {
  * com que texto. Retornar `[]` significa "este evento não gera aviso".
  */
 export interface NotificationRule {
-  eventName: string;
+  eventType: string;
   consumerName: string;
   build(payload: Record<string, unknown>): NotificationDraft[];
 }
@@ -51,7 +51,7 @@ function to(
 export const NOTIFICATION_RULES: NotificationRule[] = [
   // ── Verificações ──────────────────────────────────────────────────────────
   {
-    eventName: 'Verification.Approved',
+    eventType: 'Verification.Approved',
     consumerName: 'ntf.verification-approved',
     build: (payload) =>
       to(str(payload, 'identityId'), {
@@ -63,7 +63,7 @@ export const NOTIFICATION_RULES: NotificationRule[] = [
       }),
   },
   {
-    eventName: 'Verification.Rejected',
+    eventType: 'Verification.Rejected',
     consumerName: 'ntf.verification-rejected',
     build: (payload) =>
       to(str(payload, 'identityId'), {
@@ -77,7 +77,7 @@ export const NOTIFICATION_RULES: NotificationRule[] = [
 
   // ── Trust Layer ───────────────────────────────────────────────────────────
   {
-    eventName: 'TrustLevel.Changed',
+    eventType: 'TrustLevel.Changed',
     consumerName: 'ntf.trust-level-changed',
     build: (payload) => {
       const newLevel = str(payload, 'newLevel');
@@ -100,7 +100,7 @@ export const NOTIFICATION_RULES: NotificationRule[] = [
     },
   },
   {
-    eventName: 'TrustBadge.Awarded',
+    eventType: 'TrustBadge.Awarded',
     consumerName: 'ntf.badge-awarded',
     build: (payload) =>
       to(str(payload, 'identityId'), {
@@ -114,7 +114,7 @@ export const NOTIFICATION_RULES: NotificationRule[] = [
 
   // ── Conversas ─────────────────────────────────────────────────────────────
   {
-    eventName: 'MarketplaceMessage.Sent',
+    eventType: 'MarketplaceMessage.Sent',
     consumerName: 'ntf.message-sent',
     build: (payload) =>
       to(str(payload, 'recipientId'), {
@@ -128,7 +128,7 @@ export const NOTIFICATION_RULES: NotificationRule[] = [
 
   // ── Propostas ─────────────────────────────────────────────────────────────
   {
-    eventName: 'MarketplaceOffer.Created',
+    eventType: 'MarketplaceOffer.Created',
     consumerName: 'ntf.offer-created',
     build: (payload) =>
       to(str(payload, 'sellerId'), {
@@ -140,7 +140,7 @@ export const NOTIFICATION_RULES: NotificationRule[] = [
       }),
   },
   {
-    eventName: 'MarketplaceOffer.Countered',
+    eventType: 'MarketplaceOffer.Countered',
     consumerName: 'ntf.offer-countered',
     build: (payload) =>
       // A contraoferta é do vendedor: quem recebe é o comprador.
@@ -153,7 +153,7 @@ export const NOTIFICATION_RULES: NotificationRule[] = [
       }),
   },
   {
-    eventName: 'MarketplaceOffer.Accepted',
+    eventType: 'MarketplaceOffer.Accepted',
     consumerName: 'ntf.offer-accepted',
     build: (payload) => {
       const acceptedBy = str(payload, 'acceptedBy');
@@ -171,7 +171,7 @@ export const NOTIFICATION_RULES: NotificationRule[] = [
     },
   },
   {
-    eventName: 'MarketplaceOffer.Rejected',
+    eventType: 'MarketplaceOffer.Rejected',
     consumerName: 'ntf.offer-rejected',
     build: (payload) => {
       const rejectedBy = str(payload, 'rejectedBy');
@@ -187,7 +187,7 @@ export const NOTIFICATION_RULES: NotificationRule[] = [
     },
   },
   {
-    eventName: 'MarketplaceOffer.Withdrawn',
+    eventType: 'MarketplaceOffer.Withdrawn',
     consumerName: 'ntf.offer-withdrawn',
     build: (payload) =>
       to(str(payload, 'sellerId'), {
@@ -201,7 +201,7 @@ export const NOTIFICATION_RULES: NotificationRule[] = [
 
   // ── Pedidos ───────────────────────────────────────────────────────────────
   {
-    eventName: 'MarketplaceOrder.Scheduled',
+    eventType: 'MarketplaceOrder.Scheduled',
     consumerName: 'ntf.order-scheduled',
     build: (payload) =>
       to(str(payload, 'sellerId'), {
@@ -213,7 +213,7 @@ export const NOTIFICATION_RULES: NotificationRule[] = [
       }),
   },
   {
-    eventName: 'MarketplaceOrder.Started',
+    eventType: 'MarketplaceOrder.Started',
     consumerName: 'ntf.order-started',
     build: (payload) =>
       to(str(payload, 'buyerId'), {
@@ -225,7 +225,7 @@ export const NOTIFICATION_RULES: NotificationRule[] = [
       }),
   },
   {
-    eventName: 'MarketplaceOrder.ExecutionCompleted',
+    eventType: 'MarketplaceOrder.ExecutionCompleted',
     consumerName: 'ntf.order-execution-completed',
     build: (payload) =>
       to(str(payload, 'buyerId'), {
@@ -237,7 +237,7 @@ export const NOTIFICATION_RULES: NotificationRule[] = [
       }),
   },
   {
-    eventName: 'MarketplaceOrder.CustomerConfirmed',
+    eventType: 'MarketplaceOrder.CustomerConfirmed',
     consumerName: 'ntf.order-confirmed',
     build: (payload) =>
       to(str(payload, 'sellerId'), {
@@ -249,7 +249,7 @@ export const NOTIFICATION_RULES: NotificationRule[] = [
       }),
   },
   {
-    eventName: 'MarketplaceOrder.Cancelled',
+    eventType: 'MarketplaceOrder.Cancelled',
     consumerName: 'ntf.order-cancelled',
     build: (payload) => {
       const cancelledBy = str(payload, 'cancelledBy');
@@ -267,7 +267,7 @@ export const NOTIFICATION_RULES: NotificationRule[] = [
 
   // ── Disputas e avaliações ─────────────────────────────────────────────────
   {
-    eventName: 'MarketplaceDispute.Opened',
+    eventType: 'MarketplaceDispute.Opened',
     consumerName: 'ntf.dispute-opened',
     build: (payload) => {
       const openedBy = str(payload, 'openedBy');
@@ -283,7 +283,7 @@ export const NOTIFICATION_RULES: NotificationRule[] = [
     },
   },
   {
-    eventName: 'MarketplaceDispute.Resolved',
+    eventType: 'MarketplaceDispute.Resolved',
     consumerName: 'ntf.dispute-resolved',
     build: (payload) => {
       const decision = DECISION_TYPE_LABEL[str(payload, 'decisionType') ?? ''] ?? 'registrada';
@@ -302,7 +302,7 @@ export const NOTIFICATION_RULES: NotificationRule[] = [
     },
   },
   {
-    eventName: 'MarketplaceReview.Created',
+    eventType: 'MarketplaceReview.Created',
     consumerName: 'ntf.review-created',
     build: (payload) => {
       const score = num(payload, 'overallScore');

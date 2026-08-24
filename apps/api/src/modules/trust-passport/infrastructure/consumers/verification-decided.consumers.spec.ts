@@ -12,10 +12,12 @@ import {
 const logger = () =>
   ({ setContext: vi.fn(), info: vi.fn(), error: vi.fn() }) as unknown as PinoLogger;
 
-function envelope(eventName: string, payload: Record<string, unknown>): EventEnvelope {
+function envelope(eventType: string, payload: Record<string, unknown>): EventEnvelope {
   return {
     eventId: 'evt-1',
-    eventName,
+    eventType,
+    aggregateType: 'Verification',
+    aggregateId: 'vrf-1',
     eventVersion: '1.0',
     occurredAt: new Date().toISOString(),
     producer: 'verification-service',
@@ -63,7 +65,7 @@ describe('VerificationApprovedConsumer (TPS-004)', () => {
     expect(passport.profileCompletion).toBe(50);
     expect(repository.save).toHaveBeenCalledWith(passport, tx);
     const event = vi.mocked(outbox.enqueue).mock.calls[0]?.[1];
-    expect(event).toMatchObject({ eventName: 'TrustPassport.Updated', causationId: 'evt-1' });
+    expect(event).toMatchObject({ eventType: 'TrustPassport.Updated', causationId: 'evt-1' });
     expect(event?.payload).toMatchObject({
       updatedFields: ['documentVerified'],
       profileCompletion: 50,

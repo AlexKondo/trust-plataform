@@ -169,7 +169,7 @@ export class ManageOrderUseCase {
       previousStatus,
       actorId: identityId,
       operation: 'ScheduleMarketplaceOrder',
-      eventName: 'MarketplaceOrder.Scheduled',
+      eventType: 'MarketplaceOrder.Scheduled',
       eventPayload: {
         orderId,
         listingId: order.listingId,
@@ -207,7 +207,7 @@ export class ManageOrderUseCase {
       previousStatus,
       actorId: identityId,
       operation: 'StartMarketplaceOrder',
-      eventName: 'MarketplaceOrder.Started',
+      eventType: 'MarketplaceOrder.Started',
       eventPayload: {
         orderId,
         listingId: order.listingId,
@@ -244,7 +244,7 @@ export class ManageOrderUseCase {
       previousStatus,
       actorId: identityId,
       operation: 'CompleteMarketplaceOrderExecution',
-      eventName: 'MarketplaceOrder.ExecutionCompleted',
+      eventType: 'MarketplaceOrder.ExecutionCompleted',
       eventPayload: {
         orderId,
         listingId: order.listingId,
@@ -289,7 +289,7 @@ export class ManageOrderUseCase {
       previousStatus,
       actorId: identityId,
       operation: 'ConfirmMarketplaceOrderCompletion',
-      eventName: 'MarketplaceOrder.CustomerConfirmed',
+      eventType: 'MarketplaceOrder.CustomerConfirmed',
       eventPayload: {
         orderId,
         listingId: order.listingId,
@@ -330,7 +330,7 @@ export class ManageOrderUseCase {
       previousStatus,
       actorId: identityId,
       operation: 'CancelMarketplaceOrder',
-      eventName: 'MarketplaceOrder.Cancelled',
+      eventType: 'MarketplaceOrder.Cancelled',
       eventPayload: {
         orderId,
         listingId: order.listingId,

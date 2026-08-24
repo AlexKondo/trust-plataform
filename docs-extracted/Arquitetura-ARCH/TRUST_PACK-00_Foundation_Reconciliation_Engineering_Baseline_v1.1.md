@@ -1,11 +1,7 @@
-> SUPERSEDED — esta versão foi substituída INTEGRALMENTE pela v1.1 em 2026-08-24.
-> Especificação vigente: TRUST_PACK-00_Foundation_Reconciliation_Engineering_Baseline_v1.1.md
-> Mantida apenas como histórico da revisão (docs/REVISAO-PACK-00.md). NÃO implementar a partir deste arquivo.
-
 TRUST PLATFORM
 PACK-00
 Foundation Reconciliation & Engineering Baseline
-Implementation Specification • Version 1.0 • Status: READY FOR IMPLEMENTATION
+Implementation Specification • Version 1.1 • Status: READY FOR IMPLEMENTATION
 Purpose
 	Reconcile the current Trust foundation before the next incremental implementation phase.
 	
@@ -29,9 +25,9 @@ Release gate
 PACK-00 establishes the minimum canonical engineering baseline required before continuing the Trust Platform incrementally. It does not introduce new product features. Its purpose is to remove the concrete inconsistencies already identified between the historical architecture documents and the current implementation, while preventing future enterprise architecture from being implemented prematurely.
 2. Scope
 Canonicalize the Domain Event envelope.
-Add aggregateType and aggregateId to all newly created domain events.
-Standardize eventType as the canonical event-name field; retire eventName from the canonical contract.
-Canonicalize the API error body with traceId and correlationId.
+Add aggregateType and aggregateId to all newly created domain events, using strict validation for new writes.
+Standardize eventType as the canonical event-name field for new writes; keep a temporary tolerant legacy-read path for persisted eventName records when necessary.
+Canonicalize the API error body with requestId and correlationId, preserving the current request tracing model.
 Keep correlationId available in the response header where already supported.
 Record the current ownership/tenancy decision: B2C-first and identity-centric, without enterprise tenancy in the MVP.
 Establish documentation precedence for Claude AI and future implementation packs.
@@ -73,9 +69,9 @@ eventType
 	Canonical logical event name. Use business language.
 	
 eventVersion
-	Integer/String
+	String
 	Yes
-	Contract version.
+	Canonical format for current implementation: "major.minor" (e.g. "1.0").
 	
 occurredAt
 	Timestamp
@@ -85,7 +81,7 @@ occurredAt
 producer
 	String
 	Yes
-	Publishing component/service.
+	Publishing component/service. Preserve current producer IDs; new IDs use stable kebab-case service identifiers.
 	
 aggregateType
 	String
@@ -113,9 +109,9 @@ payload
 	Minimum stable business payload required by consumers.
 	
 5.1 Naming
-BoundedContext.Entity.Event
+Entity.Event
 Examples: Payment.Authorized | TrustCustody.Created | FinancialCase.Opened
-The current field eventName must not remain as a second canonical synonym. The canonical field is eventType. If backward compatibility is required during migration, eventName may be read temporarily by legacy consumers, but new events must be emitted with eventType and the compatibility path must be explicitly removable.
+The canonical write field is eventType. The logical eventType for the current Trust implementation uses two segments: Entity.Event. This matches the 37 events already implemented and the existing validator. Bounded context remains represented by domain ownership/producer and is not added as a third eventType segment in PACK-00. If backward compatibility is required, legacy persisted eventName values may be read temporarily, but all new writes must emit eventType.
 5.2 Aggregate identity
 aggregateType and aggregateId are mandatory because they identify the aggregate responsible for the published fact and allow event history to be correlated per aggregate. Example: aggregateType = Payment and aggregateId = the Payment identifier.
 5.3 Event invariants
@@ -126,18 +122,22 @@ Retry with backoff and a DLQ/equivalent recovery path remain required for non-pr
 Sensitive data and secrets must not be added to event payloads.
 6. Canonical API Error Contract
 All API errors exposed through the Trust API layer must use the following body:
+PACK-00 v1.1 decision: do not introduce OpenTelemetry tracing in this Pack. The current requestId remains the technical per-request identifier. The public error contract uses requestId + correlationId. A future observability Pack may add a distinct traceId without renaming requestId.
+details contract: preserve the existing optional array Array<{ path: string; message: string }>. Do not change it to an object in PACK-00.
 {
   "code": "STABLE_MACHINE_READABLE_CODE",
   "message": "Safe human-readable message",
-  "details": {},
-  "traceId": "trace-id",
+  "details": [
+    {"path": "fieldName", "message": "Validation message"}
+  ],
+  "requestId": "request-id",
   "correlationId": "correlation-id"
 }
 code is stable and machine-readable.
 message is safe for exposure and must not leak internal secrets.
 details contains validation/business context only when safe and useful.
-traceId is present in the JSON body for technical investigation.
-correlationId is present in the JSON body and should also remain in the response header where the current implementation already exposes it.
+requestId is present in the JSON body and carries the current per-request technical identifier already used by RequestContext.
+correlationId is present in the JSON body and remains in the existing response header.
 Business errors and technical errors must remain distinguishable.
 Existing API versioning (/api/v1/{resource}) remains unchanged.
 7. Tenancy Decision for the Current MVP
@@ -183,13 +183,13 @@ Event producers
 	Every producer must provide the correct aggregateType and aggregateId.
 	
 Event consumers
-	Update consumers expecting eventName; support a controlled compatibility transition only if required by existing persisted events.
+	Use eventType for current/new records. Legacy persisted eventName may be accepted only by an isolated tolerant read compatibility path.
 	
 Outbox persistence
-	Migration must support the canonical envelope without corrupting existing rows. Do not invent aggregate identity for historical events unless it can be derived deterministically.
+	Migrate the outbox representation for canonical new writes without rewriting unverifiable historical aggregate identity. Preserve legacy-read compatibility.
 	
 Error middleware/handler
-	Add traceId and correlationId to the JSON error body while preserving existing safe error semantics.
+	Add requestId and correlationId to the JSON error body. Preserve details?: Array<{path, message}> and existing safe error semantics.
 	
 API response headers
 	Preserve x-correlation-id or equivalent current correlation header behavior.
@@ -198,6 +198,7 @@ Tenancy
 	No schema retrofit for tenant_id/organization_id in this Pack.
 	
 11. Migration & Backward Compatibility
+Validation split: new event writes are validated strictly against the canonical envelope; legacy persisted events are read through a tolerant compatibility path. The tolerant reader may accept missing aggregateType/aggregateId and legacy eventName only for historical records. It must never be used to validate new writes.
 Create the smallest safe database migration needed for the outbox/event representation actually used by the codebase.
 Existing persisted events must remain readable during the transition.
 Do not fabricate aggregateType/aggregateId for historical events when the value cannot be derived safely.
@@ -207,21 +208,21 @@ No destructive migration is allowed without explicit review.
 The migration must be idempotent or safely guarded according to the migration framework used by the project.
 12. Required Tests
 All existing automated test suites must remain green.
-Event-envelope unit test validates all mandatory fields and rejects missing aggregateType/aggregateId.
+Strict event-write envelope unit test validates all mandatory fields and rejects new writes missing aggregateType/aggregateId.
 Event naming test confirms new events use eventType and not eventName as the canonical write field.
 Aggregate test confirms the correct aggregateType and aggregateId for representative Payment and Marketplace events.
 Consumer idempotency regression tests remain green.
-Outbox migration/read compatibility test covers at least one legacy event representation if legacy rows exist.
-API error contract test validates code, message, details, traceId and correlationId in the response body.
-Correlation test validates that body correlationId matches the request/response correlation context.
-Security regression test confirms no tenancy bypass or global-access behavior was introduced by removing enterprise tenancy from MVP requirements.
+Legacy-read compatibility test confirms historical persisted events remain readable when they use eventName or lack aggregateType/aggregateId, without allowing those omissions on new writes.
+API error contract test validates code, message, details, requestId and correlationId in the response body.
+Request/correlation test validates that body requestId and correlationId match the existing RequestContext and response headers.
+Ownership/authorization regression tests confirm that authenticated identity and domain resource ownership still deny unauthorized third-party access.
 No test should be added for enterprise tenant isolation in PACK-00 because enterprise tenancy is explicitly out of scope.
 13. Acceptance Criteria
 PASS — All newly emitted Domain Events follow the canonical envelope.
 PASS — aggregateType and aggregateId are present and semantically correct.
 PASS — eventType is the canonical event-name field for new writes.
 PASS — Existing persisted events remain readable through the migration/compatibility strategy.
-PASS — API error bodies contain traceId and correlationId.
+PASS — API error bodies contain requestId and correlationId.
 PASS — Existing correlation header behavior remains operational.
 PASS — No tenant_id/organization_id retrofit is introduced.
 PASS — pg-boss remains acceptable without architectural replacement if the required behavior is preserved.
@@ -237,18 +238,25 @@ No unresolved authoritative-document conflict remains.
 Kondo reviews the implementation diff and confirms no unrelated feature scope was introduced.
 Implementation commit/reference is recorded in this Pack when completed.
 15. Instructions to Claude AI
-Implement PACK-00 only.
+Implement PACK-00 v1.1 only.
 
-Do not implement future enterprise capabilities.
-Do not add tenant_id or Organization/Tenant infrastructure.
-Do not replace pg-boss merely because historical ADRs mention other brokers.
+Canonical decisions for this Pack:
+- Error body uses requestId + correlationId. Do NOT introduce OpenTelemetry or invent traceId.
+- details remains the existing optional array of {path, message}.
+- eventType naming uses two segments: Entity.Event.
+- eventVersion for current implementation uses string major.minor, e.g. "1.0".
+- New event writes are strict; historical event reads are tolerant through an isolated compatibility path.
+- Do not add tenant_id or Organization/Tenant infrastructure.
+- Do not replace pg-boss merely because historical ADRs mention other brokers.
+- Preserve current producer identifiers; do not mass-rename producers in this Pack.
+
 Do not redesign unrelated Trust modules.
-
 Preserve existing behavior unless this Pack explicitly changes it.
-Prefer the smallest safe migration and code change.
+Implement the required envelope migration across all affected producers/consumers; do not treat the 55 producers / 14 consumers as optional.
+
 Keep all existing tests green and add the PACK-00 tests.
 
-If the current code makes any requirement ambiguous or unsafe to implement,
+If the current code makes any remaining requirement ambiguous or unsafe to implement,
 STOP that affected change and report:
 1. the exact conflict,
 2. affected files/components,
@@ -280,7 +288,15 @@ ARCH-042
 	Future enterprise reference
 	Enterprise tenant isolation is deferred.
 	
+16.1 PACK-00 v1.1 Decisions after Code Review
+requestId is canonical for current API error bodies; traceId is deferred until a future tracing/OTel implementation.
+details remains the existing optional array of {path, message}.
+eventType uses two-segment Entity.Event naming.
+New writes are strict; historical reads are tolerant and isolated.
+Ownership/authorization regression replaces the invalid 'tenancy removal' regression test.
+eventVersion is standardized to string "major.minor" for the current implementation.
+Current producer IDs are preserved; no producer mass-renaming is part of PACK-00.
 17. Pack Status
 STATUS: READY FOR IMPLEMENTATION
-This Pack is complete for the foundation reconciliation described above. It may be provided to Kondo/Claude for incremental implementation. If implementation reveals a concrete code-level conflict not visible in the reviewed documentation, only the affected change is paused and reported; the remainder of the Pack may proceed where independent.
+PACK-00 v1.1 incorporates the code-review decisions reported in REVISAO-PACK-00 and is complete for the foundation reconciliation described above. It may be provided to Kondo/Claude for incremental implementation. If implementation reveals a new concrete code-level conflict not covered here, only the affected change must pause and be reported.
 END OF PACK-00

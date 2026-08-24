@@ -75,13 +75,17 @@ export class VerifyEmailUseCase {
       // Identity.Created marca a identidade ATIVADA para os demais módulos
       // (decisão INCONSISTENCIAS #11); TPS-001 consumirá este evento.
       const created = await this.outboxService.enqueue(tx, {
-        eventName: 'Identity.Created',
+        eventType: 'Identity.Created',
+        aggregateType: 'Identity',
+        aggregateId: identity.id,
         producer: IDENTITY_PRODUCER,
         correlationId,
         payload: { identityId: identity.id },
       });
       await this.outboxService.enqueue(tx, {
-        eventName: 'Identity.EmailVerified',
+        eventType: 'Identity.EmailVerified',
+        aggregateType: 'Identity',
+        aggregateId: identity.id,
         producer: IDENTITY_PRODUCER,
         correlationId,
         causationId: created.eventId,

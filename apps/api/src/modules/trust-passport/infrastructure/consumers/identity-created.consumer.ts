@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseExecutor } from '../../../../shared/database/database.module';
 import { EventConsumer } from '../../../../shared/events/event-consumer';
-import { EventEnvelope } from '../../../../shared/events/event-envelope';
+import { ConsumedEvent } from '../../../../shared/events/event-envelope';
 import { CreateTrustPassportUseCase } from '../../application/usecases/create-trust-passport.usecase';
 
 /**
@@ -11,14 +11,14 @@ import { CreateTrustPassportUseCase } from '../../application/usecases/create-tr
  */
 @Injectable()
 export class IdentityCreatedConsumer extends EventConsumer {
-  readonly eventName = 'Identity.Created';
+  readonly eventType = 'Identity.Created';
   readonly consumerName = 'tps.create-trust-passport';
 
   constructor(private readonly createTrustPassport: CreateTrustPassportUseCase) {
     super();
   }
 
-  async handle(envelope: EventEnvelope, tx: DatabaseExecutor): Promise<void> {
+  async handle(envelope: ConsumedEvent, tx: DatabaseExecutor): Promise<void> {
     const { identityId } = envelope.payload as { identityId?: string };
     if (!identityId) {
       // payload malformado é irrecuperável — não relançar para não reprocessar

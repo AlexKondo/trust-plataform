@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { v7 as uuidv7 } from 'uuid';
 import { DatabaseExecutor } from '../../../../shared/database/database.module';
-import { EventEnvelope } from '../../../../shared/events/event-envelope';
+import { ConsumedEvent } from '../../../../shared/events/event-envelope';
 import { OutboxService } from '../../../../shared/events/outbox.service';
 import {
   calculateScore,
@@ -28,7 +28,7 @@ export class RegisterTrustEventUseCase {
     this.logger.setContext(RegisterTrustEventUseCase.name);
   }
 
-  async execute(envelope: EventEnvelope, tx: DatabaseExecutor): Promise<void> {
+  async execute(envelope: ConsumedEvent, tx: DatabaseExecutor): Promise<void> {
     const payload = envelope.payload as Record<string, unknown> & { trustPassportId?: string };
     const trustPassportId = payload.trustPassportId;
     if (!trustPassportId) {
@@ -45,14 +45,14 @@ export class RegisterTrustEventUseCase {
       this.repository.listActiveScoreRules(),
       this.repository.countMatchesByRule(trustPassportId),
     ]);
-    const rule = matchRule(rules, envelope.eventName, payload, previousMatches);
+    const rule = matchRule(rules, envelope.eventType, payload, previousMatches);
 
     const registered = await this.repository.insertTrustEvent(
       {
         id: uuidv7(),
         trustPassportId,
         identityId: scoreRow.identityId,
-        eventName: envelope.eventName,
+        eventName: envelope.eventType,
         sourceEventId: envelope.eventId,
         payload,
         ruleId: rule?.id ?? null,
@@ -75,7 +75,9 @@ export class RegisterTrustEventUseCase {
     await this.repository.updateScore(scoreRow.id, score, newLevel, calculatedAt, tx);
 
     const scoreEvent = await this.outboxService.enqueue(tx, {
-      eventName: 'TrustScore.Calculated',
+      eventType: 'TrustScore.Calculated',
+      aggregateType: 'TrustScore',
+      aggregateId: scoreRow.id,
       producer: TRS_PRODUCER,
       correlationId: envelope.correlationId,
       causationId: envelope.eventId,
@@ -95,7 +97,10 @@ export class RegisterTrustEventUseCase {
         tx,
       );
       await this.outboxService.enqueue(tx, {
-        eventName: 'TrustLevel.Changed',
+        eventType: 'TrustLevel.Changed',
+        // O nível é um atributo do agregado TrustScore, não um agregado próprio.
+        aggregateType: 'TrustScore',
+        aggregateId: scoreRow.id,
         producer: TRS_PRODUCER,
         correlationId: envelope.correlationId,
         causationId: scoreEvent.eventId,
@@ -114,7 +119,7 @@ export class RegisterTrustEventUseCase {
       {
         operation: 'RegisterTrustEvent',
         trustPassportId,
-        eventName: envelope.eventName,
+        eventType: envelope.eventType,
         points: rule?.points ?? 0,
         score,
         level: newLevel,

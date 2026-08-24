@@ -103,7 +103,9 @@ export class SubmitEvidenceUseCase {
       await this.repository.save(verification, tx);
       if (complete) {
         await this.outboxService.enqueue(tx, {
-          eventName: 'Verification.EvidenceSubmitted',
+          eventType: 'Verification.EvidenceSubmitted',
+          aggregateType: 'Verification',
+          aggregateId: verification.id,
           producer: VRF_PRODUCER,
           correlationId: meta.correlationId ?? verification.id,
           payload: {

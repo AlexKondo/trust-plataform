@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { DatabaseExecutor } from '../../../../shared/database/database.module';
 import { EventConsumer } from '../../../../shared/events/event-consumer';
-import { EventEnvelope } from '../../../../shared/events/event-envelope';
+import { ConsumedEvent } from '../../../../shared/events/event-envelope';
 import { OutboxService } from '../../../../shared/events/outbox.service';
 import { LISTING_STATUS, ORDER_STATUS } from '../../domain/entities/marketplace-types';
 import { MarketplaceListingRepository } from '../../domain/repositories/marketplace-listing.repository';
@@ -17,7 +17,7 @@ const MRK_PRODUCER = 'marketplace-service';
  */
 @Injectable()
 export class ReleaseListingOnCancelConsumer extends EventConsumer {
-  readonly eventName = 'MarketplaceOrder.Cancelled';
+  readonly eventType = 'MarketplaceOrder.Cancelled';
   readonly consumerName = 'mrk.release-listing-on-cancel';
 
   constructor(
@@ -29,7 +29,7 @@ export class ReleaseListingOnCancelConsumer extends EventConsumer {
     this.logger.setContext(ReleaseListingOnCancelConsumer.name);
   }
 
-  async handle(envelope: EventEnvelope, tx: DatabaseExecutor): Promise<void> {
+  async handle(envelope: ConsumedEvent, tx: DatabaseExecutor): Promise<void> {
     const { listingId, orderId } = envelope.payload as { listingId?: string; orderId?: string };
     if (!listingId) {
       return;
@@ -42,7 +42,9 @@ export class ReleaseListingOnCancelConsumer extends EventConsumer {
     listing.release();
     await this.listingRepository.save(listing, tx);
     await this.outboxService.enqueue(tx, {
-      eventName: 'MarketplaceListing.Released',
+      eventType: 'MarketplaceListing.Released',
+      aggregateType: 'MarketplaceListing',
+      aggregateId: listingId,
       producer: MRK_PRODUCER,
       correlationId: envelope.correlationId,
       causationId: envelope.eventId,
@@ -76,7 +78,7 @@ export class ReleaseListingOnCancelConsumer extends EventConsumer {
  */
 @Injectable()
 export class CompleteOrderOnConfirmationConsumer extends EventConsumer {
-  readonly eventName = 'MarketplaceOrder.CustomerConfirmed';
+  readonly eventType = 'MarketplaceOrder.CustomerConfirmed';
   readonly consumerName = 'mrk.complete-confirmed-order';
 
   constructor(
@@ -88,7 +90,7 @@ export class CompleteOrderOnConfirmationConsumer extends EventConsumer {
     this.logger.setContext(CompleteOrderOnConfirmationConsumer.name);
   }
 
-  async handle(envelope: EventEnvelope, tx: DatabaseExecutor): Promise<void> {
+  async handle(envelope: ConsumedEvent, tx: DatabaseExecutor): Promise<void> {
     const { orderId } = envelope.payload as { orderId?: string };
     if (!orderId) {
       return;
@@ -101,7 +103,9 @@ export class CompleteOrderOnConfirmationConsumer extends EventConsumer {
     order.complete();
     await this.orderRepository.save(order, tx);
     await this.outboxService.enqueue(tx, {
-      eventName: 'MarketplaceOrder.Completed',
+      eventType: 'MarketplaceOrder.Completed',
+      aggregateType: 'MarketplaceOrder',
+      aggregateId: orderId,
       producer: MRK_PRODUCER,
       correlationId: envelope.correlationId,
       causationId: envelope.eventId,

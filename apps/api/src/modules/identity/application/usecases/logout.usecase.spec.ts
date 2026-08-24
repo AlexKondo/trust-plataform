@@ -55,7 +55,7 @@ describe('LogoutUseCase (IDN-006)', () => {
     expect(session.revokedAt).toBeInstanceOf(Date);
     expect(sessionRepository.save).toHaveBeenCalled();
     const call = vi.mocked(outboxService.enqueue).mock.calls[0]?.[1];
-    expect(call).toMatchObject({ eventName: 'Session.LoggedOut' });
+    expect(call).toMatchObject({ eventType: 'Session.LoggedOut' });
     expect(call?.payload).toMatchObject({ sessionId: session.id, identityId: 'identity-1' });
   });
 

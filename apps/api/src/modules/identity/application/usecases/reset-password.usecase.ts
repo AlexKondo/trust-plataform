@@ -73,7 +73,9 @@ export class ResetPasswordUseCase {
       await this.tokenRepository.invalidateActiveByIdentity(identity.id, tx);
       await this.sessionRepository.revokeAllByIdentity(identity.id, tx);
       await this.outboxService.enqueue(tx, {
-        eventName: 'Identity.PasswordReset',
+        eventType: 'Identity.PasswordReset',
+        aggregateType: 'Identity',
+        aggregateId: identity.id,
         producer: IDENTITY_PRODUCER,
         correlationId: metadata.correlationId ?? token.id,
         payload: { identityId: identity.id, resetAt: resetAt.toISOString() },

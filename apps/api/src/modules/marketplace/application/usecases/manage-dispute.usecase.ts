@@ -73,7 +73,9 @@ export class ManageDisputeUseCase {
       previousStatus,
       actorId: identityId,
       operation: 'OpenMarketplaceDispute',
-      eventName: 'MarketplaceDispute.Opened',
+      eventType: 'MarketplaceDispute.Opened',
+      aggregateType: 'MarketplaceDispute',
+      aggregateId: dispute.id,
       eventPayload: {
         disputeId: dispute.id,
         orderId,
@@ -147,7 +149,9 @@ export class ManageDisputeUseCase {
       previousStatus,
       actorId: adminId,
       operation: 'ResolveMarketplaceDispute',
-      eventName: 'MarketplaceDispute.Resolved',
+      eventType: 'MarketplaceDispute.Resolved',
+      aggregateType: 'MarketplaceDispute',
+      aggregateId: dispute.id,
       eventPayload: {
         disputeId,
         decisionId: decision.id,

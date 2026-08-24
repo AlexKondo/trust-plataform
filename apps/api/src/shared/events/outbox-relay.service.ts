@@ -12,7 +12,8 @@ import { AppConfigService } from '../config/app-config.service';
 import { DRIZZLE, Database } from '../database/database.module';
 import { OUTBOX_STATUS, OutboxEventRow, outboxEvents, processedEvents } from '../database/schema';
 import { EventConsumer } from './event-consumer';
-import { EventEnvelope } from './event-envelope';
+import { ConsumedEvent } from './event-envelope';
+import { readPersistedEvent } from './legacy-event-compat';
 
 /**
  * Publica eventos PENDING do outbox no pg-boss (at-least-once).
@@ -68,16 +69,18 @@ export class OutboxRelayService implements OnApplicationBootstrap, OnApplication
       // Fan-out: fila própria por consumer, inscrita no evento — cada consumer
       // recebe SUA cópia do evento (pg-boss é fila de jobs, não pub/sub por queue)
       await this.ensureQueue(consumer.consumerName);
-      await this.boss!.subscribe(consumer.eventName, consumer.consumerName);
-      await this.boss!.work(consumer.consumerName, async (jobs: PgBoss.Job<EventEnvelope>[]) => {
+      await this.boss!.subscribe(consumer.eventType, consumer.consumerName);
+      await this.boss!.work(consumer.consumerName, async (jobs: PgBoss.Job<unknown>[]) => {
         for (const job of jobs) {
-          await this.consume(consumer, job.data);
+          // Caminho tolerante (PACK-00 v1.1 §11): jobs enfileirados antes da
+          // migration 0024 carregam o envelope legado (eventName, sem agregado).
+          await this.consume(consumer, readPersistedEvent(job.data));
         }
       });
       this.logger.info(
         {
           operation: 'ConsumerRegistered',
-          eventName: consumer.eventName,
+          eventType: consumer.eventType,
           consumerName: consumer.consumerName,
         },
         'Event consumer registered.',
@@ -85,7 +88,7 @@ export class OutboxRelayService implements OnApplicationBootstrap, OnApplication
     }
   }
 
-  private async consume(consumer: EventConsumer, envelope: EventEnvelope): Promise<void> {
+  private async consume(consumer: EventConsumer, envelope: ConsumedEvent): Promise<void> {
     try {
       await this.db.transaction(async (tx) => {
         const inserted = await tx
@@ -102,7 +105,7 @@ export class OutboxRelayService implements OnApplicationBootstrap, OnApplication
       this.logger.info(
         {
           operation: 'EventConsumed',
-          eventName: envelope.eventName,
+          eventType: envelope.eventType,
           eventId: envelope.eventId,
           consumerName: consumer.consumerName,
           correlationId: envelope.correlationId,
@@ -115,7 +118,7 @@ export class OutboxRelayService implements OnApplicationBootstrap, OnApplication
         {
           err: error,
           operation: 'EventConsumed',
-          eventName: envelope.eventName,
+          eventType: envelope.eventType,
           eventId: envelope.eventId,
           consumerName: consumer.consumerName,
           correlationId: envelope.correlationId,
@@ -165,12 +168,16 @@ export class OutboxRelayService implements OnApplicationBootstrap, OnApplication
     tx: Pick<Database, 'update'>,
     row: OutboxEventRow,
   ): Promise<void> {
-    const envelope: EventEnvelope = {
+    // Linhas anteriores à migration 0024 não têm identidade de agregado; o Pack
+    // proíbe fabricá-la, então o envelope publicado a omite (PACK-00 v1.1 §11).
+    const envelope: ConsumedEvent = {
       eventId: row.eventId,
-      eventName: row.eventName,
+      eventType: row.eventType,
       eventVersion: row.eventVersion,
       occurredAt: row.occurredAt.toISOString(),
       producer: row.producer,
+      aggregateType: row.aggregateType ?? undefined,
+      aggregateId: row.aggregateId ?? undefined,
       correlationId: row.correlationId ?? row.eventId,
       causationId: row.causationId ?? undefined,
       payload: row.payload as Record<string, unknown>,
@@ -179,7 +186,7 @@ export class OutboxRelayService implements OnApplicationBootstrap, OnApplication
     try {
       // publish = fan-out para todas as filas inscritas no evento (0..N consumers);
       // singletonKey = eventId → o broker deduplica reenvios do relay por fila
-      await this.boss!.publish(row.eventName, envelope, { singletonKey: row.eventId });
+      await this.boss!.publish(row.eventType, envelope, { singletonKey: row.eventId });
       await tx
         .update(outboxEvents)
         .set({
@@ -206,7 +213,7 @@ export class OutboxRelayService implements OnApplicationBootstrap, OnApplication
           err: error,
           operation: 'OutboxPublish',
           eventId: row.eventId,
-          eventName: row.eventName,
+          eventType: row.eventType,
           correlationId: row.correlationId,
           attempts,
           result: failed ? 'FAILED_PERMANENT' : 'FAILURE',

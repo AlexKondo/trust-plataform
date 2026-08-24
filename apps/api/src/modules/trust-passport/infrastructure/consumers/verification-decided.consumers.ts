@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { DatabaseExecutor } from '../../../../shared/database/database.module';
 import { EventConsumer } from '../../../../shared/events/event-consumer';
-import { EventEnvelope } from '../../../../shared/events/event-envelope';
+import { ConsumedEvent } from '../../../../shared/events/event-envelope';
 import { OutboxService } from '../../../../shared/events/outbox.service';
 import { attributeForVerificationType } from '../../domain/entities/trust-passport';
 import { TrustPassportRepository } from '../../domain/repositories/trust-passport.repository';
@@ -34,7 +34,7 @@ abstract class VerificationProjectionConsumer extends EventConsumer {
     now: Date,
   ): boolean;
 
-  async handle(envelope: EventEnvelope, tx: DatabaseExecutor): Promise<void> {
+  async handle(envelope: ConsumedEvent, tx: DatabaseExecutor): Promise<void> {
     const { trustPassportId, type } = envelope.payload as VerificationDecisionPayload;
     if (!trustPassportId || !type) {
       return; // payload malformado: irrecuperável, não reprocessar
@@ -57,7 +57,9 @@ abstract class VerificationProjectionConsumer extends EventConsumer {
 
     await this.repository.save(passport, tx);
     await this.outboxService.enqueue(tx, {
-      eventName: 'TrustPassport.Updated',
+      eventType: 'TrustPassport.Updated',
+      aggregateType: 'TrustPassport',
+      aggregateId: passport.id,
       producer: TPS_PRODUCER,
       correlationId: envelope.correlationId,
       causationId: envelope.eventId,
@@ -85,7 +87,7 @@ abstract class VerificationProjectionConsumer extends EventConsumer {
 
 @Injectable()
 export class VerificationApprovedConsumer extends VerificationProjectionConsumer {
-  readonly eventName = 'Verification.Approved';
+  readonly eventType = 'Verification.Approved';
   readonly consumerName = 'tps.sync-verification-approved';
 
   constructor(repository: TrustPassportRepository, outbox: OutboxService, logger: PinoLogger) {
@@ -104,7 +106,7 @@ export class VerificationApprovedConsumer extends VerificationProjectionConsumer
 
 @Injectable()
 export class VerificationRejectedConsumer extends VerificationProjectionConsumer {
-  readonly eventName = 'Verification.Rejected';
+  readonly eventType = 'Verification.Rejected';
   readonly consumerName = 'tps.sync-verification-rejected';
 
   constructor(repository: TrustPassportRepository, outbox: OutboxService, logger: PinoLogger) {

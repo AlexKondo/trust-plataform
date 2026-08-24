@@ -123,9 +123,11 @@ export class AuthorizePaymentUseCase {
       await this.authorizationRepository.save(authorization, tx);
       await this.paymentRepository.save(payment, tx);
       await this.outboxService.enqueue(tx, {
-        eventName: authorization.isApproved()
+        eventType: authorization.isApproved()
           ? 'Payment.Authorized'
           : 'Payment.AuthorizationFailed',
+        aggregateType: 'Payment',
+        aggregateId: payment.id,
         producer: PAY_PRODUCER,
         correlationId: meta.correlationId ?? payment.id,
         payload: {

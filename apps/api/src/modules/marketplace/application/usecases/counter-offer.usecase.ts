@@ -50,7 +50,9 @@ export class CounterOfferUseCase {
     await this.db.transaction(async (tx) => {
       await this.offerRepository.saveAll([offer, counterOffer], tx);
       await this.outboxService.enqueue(tx, {
-        eventName: 'MarketplaceOffer.Countered',
+        eventType: 'MarketplaceOffer.Countered',
+        aggregateType: 'MarketplaceOffer',
+        aggregateId: counterOffer.id,
         producer: MRK_PRODUCER,
         correlationId: meta.correlationId ?? counterOffer.id,
         payload: {

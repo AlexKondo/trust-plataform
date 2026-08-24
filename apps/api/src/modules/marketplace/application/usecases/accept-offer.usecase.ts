@@ -70,7 +70,9 @@ export class AcceptOfferUseCase {
       await this.orderRepository.save(order, tx);
 
       await this.outboxService.enqueue(tx, {
-        eventName: 'MarketplaceOffer.Accepted',
+        eventType: 'MarketplaceOffer.Accepted',
+        aggregateType: 'MarketplaceOffer',
+        aggregateId: offer.id,
         producer: MRK_PRODUCER,
         correlationId: meta.correlationId ?? offer.id,
         payload: {
@@ -85,7 +87,9 @@ export class AcceptOfferUseCase {
         },
       });
       await this.outboxService.enqueue(tx, {
-        eventName: 'MarketplaceListing.Reserved',
+        eventType: 'MarketplaceListing.Reserved',
+        aggregateType: 'MarketplaceListing',
+        aggregateId: listing.id,
         producer: MRK_PRODUCER,
         correlationId: meta.correlationId ?? offer.id,
         payload: {
@@ -97,7 +101,9 @@ export class AcceptOfferUseCase {
         },
       });
       await this.outboxService.enqueue(tx, {
-        eventName: 'MarketplaceOrder.Created',
+        eventType: 'MarketplaceOrder.Created',
+        aggregateType: 'MarketplaceOrder',
+        aggregateId: order.id,
         producer: MRK_PRODUCER,
         correlationId: meta.correlationId ?? offer.id,
         payload: {

@@ -48,7 +48,7 @@ describe('CreateTrustPassportUseCase (TPS-001)', () => {
     expect(repository.save).toHaveBeenCalled();
     const event = vi.mocked(outbox.enqueue).mock.calls[0]?.[1];
     expect(event).toMatchObject({
-      eventName: 'TrustPassport.Created',
+      eventType: 'TrustPassport.Created',
       producer: 'trust-passport-service',
       correlationId: 'corr-1',
     });
@@ -82,7 +82,9 @@ describe('IdentityCreatedConsumer', () => {
     const tx = Symbol('tx') as never;
     const envelope: EventEnvelope = {
       eventId: 'evt-9',
-      eventName: 'Identity.Created',
+      eventType: 'Identity.Created',
+      aggregateType: 'Identity',
+      aggregateId: 'identity-9',
       eventVersion: '1.0',
       occurredAt: new Date().toISOString(),
       producer: 'identity-service',
@@ -130,7 +132,7 @@ describe('Get/UpdateTrustPassportUseCase (TPS-002/003)', () => {
 
     expect(repository.save).toHaveBeenCalled();
     const event = vi.mocked(outbox.enqueue).mock.calls[0]?.[1];
-    expect(event).toMatchObject({ eventName: 'TrustPassport.Updated' });
+    expect(event).toMatchObject({ eventType: 'TrustPassport.Updated' });
     expect((event?.payload as { updatedFields: string[] }).updatedFields).toEqual(['phone']);
     expect(response.trustPassportId).toBe(passport.id);
   });

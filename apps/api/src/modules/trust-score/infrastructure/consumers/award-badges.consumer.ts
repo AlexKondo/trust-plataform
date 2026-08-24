@@ -3,7 +3,7 @@ import { PinoLogger } from 'nestjs-pino';
 import { v7 as uuidv7 } from 'uuid';
 import { DatabaseExecutor } from '../../../../shared/database/database.module';
 import { EventConsumer } from '../../../../shared/events/event-consumer';
-import { EventEnvelope } from '../../../../shared/events/event-envelope';
+import { ConsumedEvent } from '../../../../shared/events/event-envelope';
 import { OutboxService } from '../../../../shared/events/outbox.service';
 import { RuleCondition, conditionsMatch } from '../../domain/services/trust-score-engine';
 import { TrustReputationRepository } from '../persistence/drizzle-trust-reputation.repository';
@@ -17,7 +17,7 @@ const TRS_PRODUCER = 'trust-engine';
  */
 @Injectable()
 export class AwardBadgesConsumer extends EventConsumer {
-  readonly eventName = 'TrustScore.Calculated';
+  readonly eventType = 'TrustScore.Calculated';
   readonly consumerName = 'trs.award-badges';
 
   constructor(
@@ -29,7 +29,7 @@ export class AwardBadgesConsumer extends EventConsumer {
     this.logger.setContext(AwardBadgesConsumer.name);
   }
 
-  async handle(envelope: EventEnvelope, tx: DatabaseExecutor): Promise<void> {
+  async handle(envelope: ConsumedEvent, tx: DatabaseExecutor): Promise<void> {
     const { trustPassportId, identityId, score, level } = envelope.payload as {
       trustPassportId?: string;
       identityId?: string;
@@ -52,9 +52,10 @@ export class AwardBadgesConsumer extends EventConsumer {
       const currentAward = awardedByBadgeId.get(badge.id);
 
       if (matches && !currentAward) {
+        const awardId = uuidv7();
         await this.repository.awardBadge(
           {
-            id: uuidv7(),
+            id: awardId,
             trustPassportId,
             badgeId: badge.id,
             awardedAt: now,
@@ -63,7 +64,9 @@ export class AwardBadgesConsumer extends EventConsumer {
           tx,
         );
         await this.outboxService.enqueue(tx, {
-          eventName: 'TrustBadge.Awarded',
+          eventType: 'TrustBadge.Awarded',
+          aggregateType: 'TrustBadge',
+          aggregateId: awardId,
           producer: TRS_PRODUCER,
           correlationId: envelope.correlationId,
           causationId: envelope.eventId,
@@ -76,7 +79,9 @@ export class AwardBadgesConsumer extends EventConsumer {
       } else if (!matches && currentAward && badge.badgeType === 'DYNAMIC') {
         await this.repository.revokeAward(currentAward.id, now, tx);
         await this.outboxService.enqueue(tx, {
-          eventName: 'TrustBadge.Revoked',
+          eventType: 'TrustBadge.Revoked',
+          aggregateType: 'TrustBadge',
+          aggregateId: currentAward.id,
           producer: TRS_PRODUCER,
           correlationId: envelope.correlationId,
           causationId: envelope.eventId,

@@ -4,10 +4,18 @@
  */
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
 
+/**
+ * Corpo canônico de erro da API (PACK-00 v1.1 §6). `details` é ARRAY —
+ * a tela de cadastro faz `details.map(...)` para marcar campo a campo.
+ * `requestId`/`correlationId` identificam a requisição no log da API: é o que
+ * o usuário cita quando pede suporte.
+ */
 export interface ApiErrorBody {
   code: string;
   message: string;
   details?: Array<{ path: string; message: string }>;
+  requestId?: string;
+  correlationId?: string;
 }
 
 export class ApiError extends Error {
@@ -16,6 +24,8 @@ export class ApiError extends Error {
     readonly code: string,
     message: string,
     readonly details?: Array<{ path: string; message: string }>,
+    readonly requestId?: string,
+    readonly correlationId?: string,
   ) {
     super(message);
   }
@@ -94,6 +104,8 @@ async function rawRequest<T>(path: string, options: RequestOptions): Promise<Raw
       payload.error.code,
       payload.error.message,
       payload.error.details,
+      payload.error.requestId,
+      payload.error.correlationId,
     );
   }
   return { data: payload.data, pagination: payload.pagination };

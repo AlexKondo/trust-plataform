@@ -100,7 +100,7 @@ describe.runIf(Boolean(testDatabaseUrl))('IDN-003 — Login e2e', () => {
     const [event] = await db
       .select()
       .from(outboxEvents)
-      .where(and(eq(outboxEvents.eventName, 'Identity.Authenticated')))
+      .where(and(eq(outboxEvents.eventType, 'Identity.Authenticated')))
       .then((rows) =>
         rows.filter((r) => (r.payload as { identityId?: string }).identityId === identityId),
       );
@@ -116,7 +116,9 @@ describe.runIf(Boolean(testDatabaseUrl))('IDN-003 — Login e2e', () => {
 
     for (const response of [wrongPassword, unknownEmail]) {
       expect(response.statusCode).toBe(401);
-      expect(response.json<{ error: { code: string; message: string } }>().error).toEqual({
+      // toMatchObject: o corpo também carrega requestId/correlationId (PACK-00 v1.1 §6);
+      // o que importa aqui é que os dois casos devolvem a MESMA mensagem genérica.
+      expect(response.json<{ error: { code: string; message: string } }>().error).toMatchObject({
         code: 'INVALID_CREDENTIALS',
         message: 'Invalid credentials.',
       });

@@ -74,10 +74,12 @@ export class DecideVerificationUseCase {
       );
       await this.repository.save(verification, tx);
 
-      const eventName =
+      const eventType =
         input.decision === 'APPROVED' ? 'Verification.Approved' : 'Verification.Rejected';
       const decisionEvent = await this.outboxService.enqueue(tx, {
-        eventName,
+        eventType,
+        aggregateType: 'Verification',
+        aggregateId: verification.id,
         producer: VRF_PRODUCER,
         correlationId: meta.correlationId ?? verification.id,
         payload: {
@@ -92,7 +94,9 @@ export class DecideVerificationUseCase {
         },
       });
       await this.outboxService.enqueue(tx, {
-        eventName: 'Verification.ReviewCompleted',
+        eventType: 'Verification.ReviewCompleted',
+        aggregateType: 'Verification',
+        aggregateId: verification.id,
         producer: VRF_PRODUCER,
         correlationId: meta.correlationId ?? verification.id,
         causationId: decisionEvent.eventId,

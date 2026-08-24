@@ -72,7 +72,7 @@ function makeScenario(options: {
 }
 
 const eventNames = (outbox: OutboxService) =>
-  vi.mocked(outbox.enqueue).mock.calls.map((call) => (call[1] as { eventName: string }).eventName);
+  vi.mocked(outbox.enqueue).mock.calls.map((call) => (call[1] as { eventType: string }).eventType);
 
 describe('ContactListingOwnerUseCase (MRK-006)', () => {
   it('cria a conversa e publica Created + Sent', async () => {

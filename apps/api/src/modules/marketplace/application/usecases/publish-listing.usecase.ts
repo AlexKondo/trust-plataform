@@ -102,7 +102,9 @@ export class PublishListingUseCase {
     await this.db.transaction(async (tx) => {
       await this.listingRepository.save(listing, tx);
       await this.outboxService.enqueue(tx, {
-        eventName: 'MarketplaceListing.Published',
+        eventType: 'MarketplaceListing.Published',
+        aggregateType: 'MarketplaceListing',
+        aggregateId: listing.id,
         producer: MRK_PRODUCER,
         correlationId: meta.correlationId ?? listing.id,
         payload: {

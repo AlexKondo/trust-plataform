@@ -91,12 +91,12 @@ describe('VerifyEmailUseCase (IDN-002)', () => {
     const calls = vi.mocked(outboxService.enqueue).mock.calls;
     expect(calls).toHaveLength(2);
     expect(calls[0]?.[1]).toMatchObject({
-      eventName: 'Identity.Created',
+      eventType: 'Identity.Created',
       producer: 'identity-service',
       payload: { identityId: identity?.id },
     });
     expect(calls[1]?.[1]).toMatchObject({
-      eventName: 'Identity.EmailVerified',
+      eventType: 'Identity.EmailVerified',
       causationId: 'evt-1',
     });
   });

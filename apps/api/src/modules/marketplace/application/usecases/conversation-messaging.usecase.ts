@@ -115,7 +115,9 @@ export class ConversationMessagingUseCase {
       await this.conversationRepository.saveMessage(message, tx);
       await this.conversationRepository.save(conversation, tx);
       await this.outboxService.enqueue(tx, {
-        eventName: 'MarketplaceMessage.Sent',
+        eventType: 'MarketplaceMessage.Sent',
+        aggregateType: 'MarketplaceMessage',
+        aggregateId: message.id,
         producer: MRK_PRODUCER,
         correlationId: meta.correlationId ?? conversation.id,
         payload: {
@@ -178,7 +180,9 @@ export class ConversationMessagingUseCase {
       );
       if (updated > 0) {
         await this.outboxService.enqueue(tx, {
-          eventName: 'MarketplaceConversation.Read',
+          eventType: 'MarketplaceConversation.Read',
+          aggregateType: 'MarketplaceConversation',
+          aggregateId: conversationId,
           producer: MRK_PRODUCER,
           correlationId: meta.correlationId ?? conversationId,
           payload: {

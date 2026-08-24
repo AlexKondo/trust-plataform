@@ -4,14 +4,25 @@ export interface ApiSuccessEnvelope<T> {
   pagination?: PaginationMeta;
 }
 
+/**
+ * Corpo canônico de erro — PACK-00 v1.1 §6.
+ * `details` permanece o array opcional de { path, message } (decisão v1.1).
+ * `requestId` e `correlationId` espelham o RequestContext e os headers
+ * x-request-id / x-correlation-id.
+ */
 export interface ApiErrorEnvelope {
   success: false;
   error: {
     code: string;
     message: string;
     details?: Array<{ path: string; message: string }>;
+    requestId: string;
+    correlationId: string;
   };
 }
+
+/** Erro montado pelos tradutores de exceção, antes de receber os IDs de rastreio. */
+export type ApiErrorBody = Omit<ApiErrorEnvelope['error'], 'requestId' | 'correlationId'>;
 
 export interface PaginationMeta {
   page: number;

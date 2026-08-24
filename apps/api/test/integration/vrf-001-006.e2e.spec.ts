@@ -209,7 +209,7 @@ describe.runIf(Boolean(testDatabaseUrl))('VRF-001..006 — Verification e2e', ()
             (event) =>
               (event.payload as { verificationId?: string }).verificationId === verificationId,
           )
-          .map((event) => event.eventName)
+          .map((event) => event.eventType)
           .sort(),
       );
     expect(eventNames).toEqual([

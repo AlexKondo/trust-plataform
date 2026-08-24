@@ -22,7 +22,9 @@ export class OutboxService {
     await executor.insert(outboxEvents).values({
       id: uuidv7(),
       eventId: envelope.eventId,
-      eventName: envelope.eventName,
+      eventType: envelope.eventType,
+      aggregateType: envelope.aggregateType,
+      aggregateId: envelope.aggregateId,
       eventVersion: envelope.eventVersion,
       producer: envelope.producer,
       correlationId: envelope.correlationId,

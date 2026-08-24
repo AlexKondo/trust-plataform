@@ -112,7 +112,7 @@ describe.runIf(Boolean(testDatabaseUrl))('TPS-001..003 — Trust Passport e2e', 
     const events = await db
       .select()
       .from(outboxEvents)
-      .where(eq(outboxEvents.eventName, 'TrustPassport.Created'))
+      .where(eq(outboxEvents.eventType, 'TrustPassport.Created'))
       .then((rows) =>
         rows.filter((e) => (e.payload as { identityId?: string }).identityId === identityId),
       );
@@ -162,7 +162,7 @@ describe.runIf(Boolean(testDatabaseUrl))('TPS-001..003 — Trust Passport e2e', 
     const updatedEvents = await db
       .select()
       .from(outboxEvents)
-      .where(eq(outboxEvents.eventName, 'TrustPassport.Updated'))
+      .where(eq(outboxEvents.eventType, 'TrustPassport.Updated'))
       .then((rows) =>
         rows.filter((e) => (e.payload as { identityId?: string }).identityId === identityId),
       );

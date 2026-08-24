@@ -45,7 +45,9 @@ export class LogoutUseCase {
     await this.db.transaction(async (tx) => {
       await this.sessionRepository.save(session, tx);
       await this.outboxService.enqueue(tx, {
-        eventName: 'Session.LoggedOut',
+        eventType: 'Session.LoggedOut',
+        aggregateType: 'Session',
+        aggregateId: session.id,
         producer: IDENTITY_PRODUCER,
         correlationId: metadata.correlationId ?? session.id,
         payload: {

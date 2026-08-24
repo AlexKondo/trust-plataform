@@ -90,7 +90,9 @@ export class ForgotPasswordUseCase {
       await this.tokenRepository.invalidateActiveByIdentity(identityId, tx);
       await this.tokenRepository.save(token, tx);
       await this.outboxService.enqueue(tx, {
-        eventName: 'Identity.PasswordRecoveryRequested',
+        eventType: 'Identity.PasswordRecoveryRequested',
+        aggregateType: 'Identity',
+        aggregateId: identityId,
         producer: IDENTITY_PRODUCER,
         correlationId: metadata.correlationId ?? token.id,
         payload: { identityId, requestedAt: requestedAt.toISOString() },

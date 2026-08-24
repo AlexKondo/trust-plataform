@@ -156,7 +156,7 @@ describe.runIf(Boolean(testDatabaseUrl))('IDN-005/006 — Me + Logout e2e', () =
     const events = await db
       .select()
       .from(outboxEvents)
-      .where(eq(outboxEvents.eventName, 'Session.LoggedOut'))
+      .where(eq(outboxEvents.eventType, 'Session.LoggedOut'))
       .then((r) =>
         r.filter((e) => (e.payload as { identityId?: string }).identityId === account.identityId),
       );

@@ -94,11 +94,11 @@ describe.runIf(Boolean(testDatabaseUrl))('IDN-002 — Verify Email e2e', () => {
     const events = await db
       .select()
       .from(outboxEvents)
-      .where(inArray(outboxEvents.eventName, ['Identity.Created', 'Identity.EmailVerified']));
+      .where(inArray(outboxEvents.eventType, ['Identity.Created', 'Identity.EmailVerified']));
     const mine = events.filter(
       (e) => (e.payload as { identityId?: string }).identityId === identityId,
     );
-    expect(mine.map((e) => e.eventName).sort()).toEqual([
+    expect(mine.map((e) => e.eventType).sort()).toEqual([
       'Identity.Created',
       'Identity.EmailVerified',
     ]);

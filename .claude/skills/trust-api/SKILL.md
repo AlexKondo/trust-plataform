@@ -19,8 +19,14 @@ description: Padrões de API REST da Trust Platform (envelope, status codes, pag
 // sucesso
 { "success": true, "data": { } }
 // erro
-{ "success": false, "error": { "code": "IDENTITY_NOT_FOUND", "message": "Identity not found." } }
+{ "success": false, "error": { "code": "IDENTITY_NOT_FOUND", "message": "Identity not found.", "requestId": "…", "correlationId": "…" } }
+// validação: mesmo formato + details
+{ "success": false, "error": { "code": "VALIDATION_ERROR", "message": "Request validation failed.", "details": [{ "path": "password", "message": "…" }], "requestId": "…", "correlationId": "…" } }
 ```
+- Corpo canônico de erro (PACK-00 v1.1 §6): `code`, `message`, `details?`, `requestId`, `correlationId`.
+  - `details` é **ARRAY** de `{path, message}` — o frontend faz `details.map(...)`. Nunca transformar em objeto.
+  - `requestId`/`correlationId` são os MESMOS dos headers `x-request-id`/`x-correlation-id` e do `RequestContext`. O `GlobalExceptionFilter` já os injeta — não repita isso em controller.
+  - **Não existe `traceId`** na plataforma; OpenTelemetry ficou adiado (PACK-00 v1.1 §16.1).
 - Códigos de erro estáveis em **UPPER_SNAKE_CASE** (`EMAIL_ALREADY_EXISTS`, `INVALID_CREDENTIALS`)
 - Campos JSON em **camelCase**; datas em UTC ISO 8601 (`2026-08-03T18:30:25Z`)
 - JSON UTF-8 apenas; XML proibido

@@ -19,8 +19,14 @@ export interface OrderTransitionInput {
   /** Quem provocou a mudança: identity ou processo interno (MRK-017 BR-005). */
   actorId: string | null;
   operation: string;
-  eventName: string;
+  eventType: string;
   eventPayload: Record<string, unknown>;
+  /**
+   * Agregado responsável pelo fato (PACK-00 v1.1 §5.2). O padrão é o próprio
+   * pedido; disputas passam por aqui mas o fato pertence à disputa.
+   */
+  aggregateType?: string;
+  aggregateId?: string;
   auditMetadata?: Record<string, unknown>;
   meta?: RequestMeta;
   /** Escritas extras que precisam ser atômicas com a transição. */
@@ -93,7 +99,9 @@ export class OrderLifecycleService {
       await this.orderRepository.save(order, tx);
       await input.alsoInTransaction?.(tx);
       await this.outboxService.enqueue(tx, {
-        eventName: input.eventName,
+        eventType: input.eventType,
+        aggregateType: input.aggregateType ?? 'MarketplaceOrder',
+        aggregateId: input.aggregateId ?? order.id,
         producer: MRK_PRODUCER,
         correlationId: meta.correlationId ?? order.id,
         payload: input.eventPayload,

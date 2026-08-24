@@ -162,7 +162,9 @@ export class TrustScoreController {
     const calculatedAt = new Date();
     await this.repository.updateScore(scoreRow.id, score, level, calculatedAt);
     await this.outboxService.enqueueStandalone({
-      eventName: 'TrustScore.Calculated',
+      eventType: 'TrustScore.Calculated',
+      aggregateType: 'TrustScore',
+      aggregateId: scoreRow.id,
       producer: 'trust-engine',
       correlationId: scoreRow.id,
       payload: {

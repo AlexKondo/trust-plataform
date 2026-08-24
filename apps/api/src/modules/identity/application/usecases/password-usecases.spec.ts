@@ -103,7 +103,7 @@ describe('ForgotPasswordUseCase (IDN-007)', () => {
     expect(emailCall?.resetUrl).toContain('/reset-password?token=');
     expect(emailCall?.resetUrl).not.toContain(saved.tokenHash); // link leva o token, nunca o hash
     expect(vi.mocked(outboxService.enqueue).mock.calls[0]?.[1]).toMatchObject({
-      eventName: 'Identity.PasswordRecoveryRequested',
+      eventType: 'Identity.PasswordRecoveryRequested',
     });
   });
 
@@ -183,7 +183,7 @@ describe('ResetPasswordUseCase (IDN-008)', () => {
     expect(tokenRepository.markAsUsed).toHaveBeenCalled();
     expect(tokenRepository.invalidateActiveByIdentity).toHaveBeenCalled();
     expect(vi.mocked(outboxService.enqueue).mock.calls[0]?.[1]).toMatchObject({
-      eventName: 'Identity.PasswordReset',
+      eventType: 'Identity.PasswordReset',
     });
   });
 
@@ -258,7 +258,7 @@ describe('ChangePasswordUseCase (IDN-009)', () => {
       expect.anything(),
     );
     expect(vi.mocked(outboxService.enqueue).mock.calls[0]?.[1]).toMatchObject({
-      eventName: 'Identity.PasswordChanged',
+      eventType: 'Identity.PasswordChanged',
     });
   });
 

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { DatabaseExecutor } from '../../../../shared/database/database.module';
 import { EventConsumer } from '../../../../shared/events/event-consumer';
-import { EventEnvelope } from '../../../../shared/events/event-envelope';
+import { ConsumedEvent } from '../../../../shared/events/event-envelope';
 import { TrustPassportRepository } from '../../../trust-passport/domain/repositories/trust-passport.repository';
 import { RegisterTrustEventUseCase } from '../../application/usecases/register-trust-event.usecase';
 
@@ -30,7 +30,7 @@ abstract class MarketplaceScoringConsumer extends EventConsumer {
   /** Identity que recebe os pontos (ou a penalidade) deste evento. */
   protected abstract targetIdentityId(payload: Record<string, unknown>): string | undefined;
 
-  async handle(envelope: EventEnvelope, tx: DatabaseExecutor): Promise<void> {
+  async handle(envelope: ConsumedEvent, tx: DatabaseExecutor): Promise<void> {
     const payload = envelope.payload;
     const identityId = this.targetIdentityId(payload);
     if (!identityId) {
@@ -56,7 +56,7 @@ abstract class MarketplaceScoringConsumer extends EventConsumer {
  */
 @Injectable()
 export class OrderConfirmedScoringConsumer extends MarketplaceScoringConsumer {
-  readonly eventName = 'MarketplaceOrder.CustomerConfirmed';
+  readonly eventType = 'MarketplaceOrder.CustomerConfirmed';
   readonly consumerName = 'trs.score-order-confirmed';
 
   constructor(
@@ -76,7 +76,7 @@ export class OrderConfirmedScoringConsumer extends MarketplaceScoringConsumer {
 /** `MarketplaceOrder.Cancelled` → penalidade para QUEM cancelou. */
 @Injectable()
 export class OrderCancelledScoringConsumer extends MarketplaceScoringConsumer {
-  readonly eventName = 'MarketplaceOrder.Cancelled';
+  readonly eventType = 'MarketplaceOrder.Cancelled';
   readonly consumerName = 'trs.score-order-cancelled';
 
   constructor(
@@ -100,7 +100,7 @@ export class OrderCancelledScoringConsumer extends MarketplaceScoringConsumer {
  */
 @Injectable()
 export class ReviewCreatedScoringConsumer extends MarketplaceScoringConsumer {
-  readonly eventName = 'MarketplaceReview.Created';
+  readonly eventType = 'MarketplaceReview.Created';
   readonly consumerName = 'trs.score-review-created';
 
   constructor(
@@ -124,7 +124,7 @@ export class ReviewCreatedScoringConsumer extends MarketplaceScoringConsumer {
  */
 @Injectable()
 export class DisputeResolvedScoringConsumer extends MarketplaceScoringConsumer {
-  readonly eventName = 'MarketplaceDispute.Resolved';
+  readonly eventType = 'MarketplaceDispute.Resolved';
   readonly consumerName = 'trs.score-dispute-resolved';
 
   constructor(

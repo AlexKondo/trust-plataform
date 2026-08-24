@@ -3,7 +3,7 @@ import { PinoLogger } from 'nestjs-pino';
 import { v7 as uuidv7 } from 'uuid';
 import { DatabaseExecutor } from '../../../../shared/database/database.module';
 import { EventConsumer } from '../../../../shared/events/event-consumer';
-import { EventEnvelope } from '../../../../shared/events/event-envelope';
+import { ConsumedEvent } from '../../../../shared/events/event-envelope';
 import { OutboxService } from '../../../../shared/events/outbox.service';
 import { RegisterTrustEventUseCase } from '../../application/usecases/register-trust-event.usecase';
 import { determineLevel } from '../../domain/services/trust-score-engine';
@@ -14,7 +14,7 @@ const TRS_PRODUCER = 'trust-engine';
 /** TRS-001 — TrustPassport.Created → cria o Trust Score (0, UNVERIFIED). */
 @Injectable()
 export class TrustPassportCreatedConsumer extends EventConsumer {
-  readonly eventName = 'TrustPassport.Created';
+  readonly eventType = 'TrustPassport.Created';
   readonly consumerName = 'trs.create-trust-score';
 
   constructor(
@@ -27,7 +27,7 @@ export class TrustPassportCreatedConsumer extends EventConsumer {
     this.logger.setContext(TrustPassportCreatedConsumer.name);
   }
 
-  async handle(envelope: EventEnvelope, tx: DatabaseExecutor): Promise<void> {
+  async handle(envelope: ConsumedEvent, tx: DatabaseExecutor): Promise<void> {
     const { trustPassportId, identityId } = envelope.payload as {
       trustPassportId?: string;
       identityId?: string;
@@ -37,9 +37,10 @@ export class TrustPassportCreatedConsumer extends EventConsumer {
     }
     const calculatedAt = new Date();
     const levelRules = await this.repository.listLevelRules();
+    const trustScoreId = uuidv7();
     const created = await this.repository.createScore(
       {
-        id: uuidv7(),
+        id: trustScoreId,
         trustPassportId,
         identityId,
         level: determineLevel(levelRules, 0),
@@ -51,7 +52,9 @@ export class TrustPassportCreatedConsumer extends EventConsumer {
       return; // já existe (idempotência)
     }
     await this.outboxService.enqueue(tx, {
-      eventName: 'TrustScore.Created',
+      eventType: 'TrustScore.Created',
+      aggregateType: 'TrustScore',
+      aggregateId: trustScoreId,
       producer: TRS_PRODUCER,
       correlationId: envelope.correlationId,
       causationId: envelope.eventId,
@@ -71,28 +74,28 @@ export class TrustPassportCreatedConsumer extends EventConsumer {
 /** TRS-002 — decisões de verificação viram Trust Events e recalculam o score. */
 @Injectable()
 export class VerificationApprovedScoringConsumer extends EventConsumer {
-  readonly eventName = 'Verification.Approved';
+  readonly eventType = 'Verification.Approved';
   readonly consumerName = 'trs.score-verification-approved';
 
   constructor(private readonly registerTrustEvent: RegisterTrustEventUseCase) {
     super();
   }
 
-  handle(envelope: EventEnvelope, tx: DatabaseExecutor): Promise<void> {
+  handle(envelope: ConsumedEvent, tx: DatabaseExecutor): Promise<void> {
     return this.registerTrustEvent.execute(envelope, tx);
   }
 }
 
 @Injectable()
 export class VerificationRejectedScoringConsumer extends EventConsumer {
-  readonly eventName = 'Verification.Rejected';
+  readonly eventType = 'Verification.Rejected';
   readonly consumerName = 'trs.score-verification-rejected';
 
   constructor(private readonly registerTrustEvent: RegisterTrustEventUseCase) {
     super();
   }
 
-  handle(envelope: EventEnvelope, tx: DatabaseExecutor): Promise<void> {
+  handle(envelope: ConsumedEvent, tx: DatabaseExecutor): Promise<void> {
     return this.registerTrustEvent.execute(envelope, tx);
   }
 }

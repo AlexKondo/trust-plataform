@@ -4,9 +4,15 @@ info:
   version: 0.2.0
   description: >
     API do MVP da Trust Platform (monolito modular: IDN, TPS, VRF, TRS, MRK).
-    Todas as respostas usam o envelope {success, data} / {success:false, error:{code,message}}
+    Todas as respostas usam o envelope {success, data} / {success:false, error:{...}}
     (DOC-003). Datas em UTC ISO 8601. Atualizada a cada feature — mudança de contrato
     exige atualizar este documento antes da implementação.
+
+    Corpo canônico de erro (PACK-00 v1.1 §6):
+    {success:false, error:{code, message, details?, requestId, correlationId}}.
+    `details` é um ARRAY de {path, message}, presente só em erros de validação.
+    `requestId` e `correlationId` sempre presentes e iguais aos headers
+    x-request-id / x-correlation-id — é o identificador a citar em suporte.
 servers:
   - url: http://localhost:3001/api/v1
     description: Desenvolvimento local
@@ -99,6 +105,8 @@ paths:
                   details:
                     - path: password
                       message: password must have at least 12 characters
+                  requestId: 01a03509-6f57-75da-a827-fbb0b6e21f1b
+                  correlationId: 01a03509-6f57-75da-a827-fbb0b6e21f1b
         '409':
           description: E-mail já cadastrado (BR-001/006)
           content:

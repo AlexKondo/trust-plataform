@@ -67,7 +67,9 @@ export class UpdateListingUseCase {
           await this.listingRepository.replaceImages(listing.id, body.images ?? [], tx);
         }
         await this.outboxService.enqueue(tx, {
-          eventName: 'MarketplaceListing.Updated',
+          eventType: 'MarketplaceListing.Updated',
+          aggregateType: 'MarketplaceListing',
+          aggregateId: listing.id,
           producer: MRK_PRODUCER,
           correlationId: meta.correlationId ?? listing.id,
           payload: {

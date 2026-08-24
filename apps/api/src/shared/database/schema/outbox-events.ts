@@ -20,9 +20,12 @@ export const outboxEvents = pgTable(
   {
     id: uuid('id').primaryKey(),
     eventId: uuid('event_id').notNull(),
-    eventName: varchar('event_name', { length: 120 }).notNull(),
+    eventType: varchar('event_type', { length: 120 }).notNull(),
     eventVersion: varchar('event_version', { length: 10 }).notNull().default('1.0'),
     producer: varchar('producer', { length: 60 }).notNull(),
+    /** PACK-00 v1.1 §5.2. Nulos APENAS em linhas anteriores à migration 0024. */
+    aggregateType: varchar('aggregate_type', { length: 60 }),
+    aggregateId: varchar('aggregate_id', { length: 64 }),
     correlationId: uuid('correlation_id'),
     causationId: uuid('causation_id'),
     payload: jsonb('payload').notNull(),
@@ -41,7 +44,8 @@ export const outboxEvents = pgTable(
   (table) => [
     uniqueIndex('idx_outbox_event_event_id').on(table.eventId),
     index('idx_outbox_event_pending').on(table.status, table.createdAt),
-    index('idx_outbox_event_name').on(table.eventName, table.occurredAt),
+    index('idx_outbox_event_type').on(table.eventType, table.occurredAt),
+    index('idx_outbox_event_aggregate').on(table.aggregateType, table.aggregateId),
   ],
 );
 

@@ -107,7 +107,7 @@ describe('PublishListingUseCase (MRK-003)', () => {
     expect(response.status).toBe(LISTING_STATUS.PUBLISHED);
     expect(response.publishedAt).not.toBeNull();
     const event = vi.mocked(outbox.enqueue).mock.calls[0]?.[1];
-    expect(event).toMatchObject({ eventName: 'MarketplaceListing.Published' });
+    expect(event).toMatchObject({ eventType: 'MarketplaceListing.Published' });
   });
 
   it('não publica anúncio de terceiro (BR-001)', async () => {

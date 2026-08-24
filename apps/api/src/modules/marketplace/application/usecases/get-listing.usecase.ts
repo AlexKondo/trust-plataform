@@ -124,7 +124,9 @@ export class GetListingUseCase {
       await this.db.transaction(async (tx) => {
         await this.listingRepository.incrementViewCount(listing.id, viewedAt, tx);
         await this.outboxService.enqueue(tx, {
-          eventName: 'MarketplaceListing.Viewed',
+          eventType: 'MarketplaceListing.Viewed',
+          aggregateType: 'MarketplaceListing',
+          aggregateId: listing.id,
           producer: MRK_PRODUCER,
           correlationId: meta.correlationId ?? listing.id,
           payload: {

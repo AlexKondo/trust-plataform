@@ -41,7 +41,9 @@ export class WithdrawOfferUseCase {
     await this.db.transaction(async (tx) => {
       await this.offerRepository.save(offer, tx);
       await this.outboxService.enqueue(tx, {
-        eventName: 'MarketplaceOffer.Withdrawn',
+        eventType: 'MarketplaceOffer.Withdrawn',
+        aggregateType: 'MarketplaceOffer',
+        aggregateId: offer.id,
         producer: MRK_PRODUCER,
         correlationId: meta.correlationId ?? offer.id,
         payload: {
@@ -121,7 +123,9 @@ export class RejectOfferUseCase {
     await this.db.transaction(async (tx) => {
       await this.offerRepository.save(offer, tx);
       await this.outboxService.enqueue(tx, {
-        eventName: 'MarketplaceOffer.Rejected',
+        eventType: 'MarketplaceOffer.Rejected',
+        aggregateType: 'MarketplaceOffer',
+        aggregateId: offer.id,
         producer: MRK_PRODUCER,
         correlationId: meta.correlationId ?? offer.id,
         payload: {

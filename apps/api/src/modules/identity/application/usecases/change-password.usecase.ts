@@ -96,7 +96,9 @@ export class ChangePasswordUseCase {
         await this.sessionRepository.revokeAllByIdentity(identity.id, tx);
       }
       await this.outboxService.enqueue(tx, {
-        eventName: 'Identity.PasswordChanged',
+        eventType: 'Identity.PasswordChanged',
+        aggregateType: 'Identity',
+        aggregateId: identity.id,
         producer: IDENTITY_PRODUCER,
         correlationId: metadata.correlationId ?? identity.id,
         payload: { identityId: identity.id, changedAt: changedAt.toISOString() },

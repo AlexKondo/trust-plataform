@@ -37,7 +37,9 @@ function award(badgeId: string): AwardedBadgeRow {
 function envelope(score: number, level: string): EventEnvelope {
   return {
     eventId: 'evt-1',
-    eventName: 'TrustScore.Calculated',
+    eventType: 'TrustScore.Calculated',
+    aggregateType: 'TrustScore',
+    aggregateId: 'score-1',
     eventVersion: '1.0',
     occurredAt: new Date().toISOString(),
     producer: 'trust-engine',
@@ -72,7 +74,7 @@ describe('AwardBadgesConsumer (TRS-013)', () => {
 
     expect(repository.awardBadge).toHaveBeenCalledTimes(1); // só o TRUSTED_MEMBER
     const event = vi.mocked(outbox.enqueue).mock.calls[0]?.[1];
-    expect(event).toMatchObject({ eventName: 'TrustBadge.Awarded' });
+    expect(event).toMatchObject({ eventType: 'TrustBadge.Awarded' });
     expect((event?.payload as { badgeCode: string }).badgeCode).toBe('TRUSTED_MEMBER');
   });
 
@@ -102,6 +104,6 @@ describe('AwardBadgesConsumer (TRS-013)', () => {
     expect(repository.revokeAward).toHaveBeenCalledTimes(1);
     expect(repository.revokeAward).toHaveBeenCalledWith('award-b-dyn', expect.any(Date), tx);
     const event = vi.mocked(outbox.enqueue).mock.calls[0]?.[1];
-    expect(event).toMatchObject({ eventName: 'TrustBadge.Revoked' });
+    expect(event).toMatchObject({ eventType: 'TrustBadge.Revoked' });
   });
 });

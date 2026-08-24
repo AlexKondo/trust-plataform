@@ -55,7 +55,9 @@ export class UpdateTrustPassportUseCase {
       await this.db.transaction(async (tx) => {
         await this.repository.save(passport, tx);
         await this.outboxService.enqueue(tx, {
-          eventName: 'TrustPassport.Updated',
+          eventType: 'TrustPassport.Updated',
+          aggregateType: 'TrustPassport',
+          aggregateId: passport.id,
           producer: TPS_PRODUCER,
           correlationId: context.correlationId ?? passport.id,
           payload: {

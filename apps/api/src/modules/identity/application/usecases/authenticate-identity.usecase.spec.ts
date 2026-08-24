@@ -141,7 +141,7 @@ describe('AuthenticateIdentityUseCase (IDN-003)', () => {
     await useCase.execute(request);
 
     const call = vi.mocked(outboxService.enqueue).mock.calls[0]?.[1];
-    expect(call).toMatchObject({ eventName: 'Identity.Authenticated' });
+    expect(call).toMatchObject({ eventType: 'Identity.Authenticated' });
     expect((call?.payload as { identityId: string }).identityId).toBe(identity?.id);
     expect((call?.payload as { sessionId?: string }).sessionId).toBeTruthy();
   });

@@ -8,24 +8,37 @@ description: Padrões de eventos da Trust Platform (naming Entity.Action, envelo
 ## Naming
 
 - Formato **`<Entity>.<Action>`**, PascalCase, verbo no **passado** (fato ocorrido): `Identity.Created`, `Verification.Approved`, `TrustScore.Calculated`, `MarketplaceOffer.Accepted`
+- **Dois segmentos, sempre.** O contexto delimitado é representado pelo `producer`, não por um terceiro segmento (PACK-00 v1.1 §5.1).
 - Nome é **imutável após publicação**. Correção/mudança = novo evento ou nova versão.
+- O campo canônico do nome é **`eventType`**. `eventName` é legado e só existe no caminho de leitura tolerante.
 
 ## Envelope obrigatório
 
 ```json
 {
   "eventId": "uuid",
-  "eventName": "Identity.Created",
+  "eventType": "Identity.Created",
   "eventVersion": "1.0",
   "occurredAt": "2026-08-03T18:30:25Z",
   "producer": "identity-service",
+  "aggregateType": "Identity",
+  "aggregateId": "uuid",
   "correlationId": "uuid",
   "causationId": "uuid",
   "payload": { }
 }
 ```
-- `occurredAt` sempre UTC ISO 8601
+- `occurredAt` sempre UTC ISO 8601; `eventVersion` é string `"major.minor"`
+- `aggregateType`/`aggregateId` são **obrigatórios** e identificam o agregado responsável pelo fato (PACK-00 v1.1 §5.2). `createEventEnvelope` lança se faltarem.
+- **Não deduza o agregado do produtor.** Um mesmo use case pode gravar eventos de agregados diferentes na mesma transação — o aceite de proposta grava `MarketplaceOffer.Accepted` (agregado Offer), `MarketplaceListing.Reserved` (Listing) e `MarketplaceOrder.Created` (Order).
+- Quando o evento nomeia um valor e não um agregado, use o agregado dono: `TrustLevel.Changed` → `aggregateType: TrustScore`.
 - Payload: mínimo necessário, estável, autoexplicativo. **Nunca** senhas, hashes, tokens, segredos ou PII desnecessária.
+
+## Escrita estrita, leitura tolerante (PACK-00 v1.1 §11)
+
+- Escrita: sempre `createEventEnvelope` / `eventEnvelopeSchema` — estritos.
+- Leitura de evento histórico: só `shared/events/legacy-event-compat.ts`. Ele aceita `eventName` legado e agregado ausente; **nunca** use para validar escrita.
+- O consumer recebe `ConsumedEvent`: `aggregateType`/`aggregateId` podem vir `undefined` em eventos antigos. Não dependa deles para a lógica de negócio.
 
 ## Regras de publicação
 

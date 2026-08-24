@@ -46,6 +46,20 @@ Dois payloads ganharam campo (adição retrocompatível) para o consumidor não 
 - **Testes**: Vitest + Testcontainers + Supertest + Playwright
 - **Interfaces sem prefixo "I"** (convenção TypeScript, conforme DOC-001 "escolher um padrão")
 
+## PACK-00 v1.1 — baseline canônico (2026-08-24)
+
+O PACK-00 v1.1 substitui integralmente a v1.0 e é a **especificação vigente** da fundação.
+Implementado por inteiro: envelope canônico de evento (`eventType` + agregado obrigatório
+nos 55 pontos de publicação e 14 consumers), migration 0024 não destrutiva do outbox,
+caminho de leitura tolerante isolado para eventos históricos, e corpo de erro com
+`requestId`/`correlationId`. **52 suítes / 320 testes verdes.** Detalhes e decisões em
+[docs/PACK-00-IMPLEMENTACAO.md](docs/PACK-00-IMPLEMENTACAO.md); a revisão que originou a
+v1.1 está em [docs/REVISAO-PACK-00.md](docs/REVISAO-PACK-00.md).
+
+**Precedência de documentação (PACK-00 §9)**: Pack vigente > Packs já implementados >
+código + testes > documentos ARCH/TP históricos (referência, nunca requisito). Contradição
+entre fontes autoritativas **não se resolve por suposição** — parar o item e reportar.
+
 ## Documentos-guia (ler nesta ordem)
 
 1. [PLANO-DE-MODULOS.md](PLANO-DE-MODULOS.md) — quebra em módulos, ordem de desenvolvimento, grafo de dependências
@@ -62,9 +76,9 @@ Dois payloads ganharam campo (adição retrocompatível) para o consumidor não 
 - **Ordem de desenvolvimento**: IDN → TPS → VRF → TRS núcleo → TRS reputação → MRK. Nenhuma feature usa módulo ainda não implementado. Os campos "Depends On/Blocks" das specs contêm erros de renumeração — a ordem oficial é a do PLANO-DE-MODULOS.
 - **Só o Trust Engine (TRS) altera Score/Level/Badges**; módulos de negócio apenas publicam eventos.
 - Clean Architecture em 4 camadas; entidades em inglês; enums em UPPER_SNAKE_CASE.
-- API: envelope `{success, data}` / `{success: false, error: {code, message}}`, rotas `/api/v1/<recurso-plural-kebab>`.
+- API: envelope `{success, data}` / `{success: false, error: {code, message, details?, requestId, correlationId}}`, rotas `/api/v1/<recurso-plural-kebab>`. `details` é ARRAY de `{path, message}`; não existe `traceId`.
 - Banco: PostgreSQL 16+, tabelas snake_case plural, `id UUID` (v7), soft delete, tudo via migration.
-- Eventos: `<Entity>.<Action>` no passado, envelope com eventId/correlationId, Transactional Outbox, consumers idempotentes.
+- Eventos: `<Entity>.<Action>` no passado (dois segmentos), envelope canônico do **PACK-00 v1.1** — `eventType` + `aggregateType`/`aggregateId` obrigatórios, Transactional Outbox, consumers idempotentes. Ver [docs/PACK-00-IMPLEMENTACAO.md](docs/PACK-00-IMPLEMENTACAO.md).
 - Senha: mínimo 12 caracteres (DOC-002 vence specs antigas que dizem 8).
 
 ## Skills do projeto (`.claude/skills/`)

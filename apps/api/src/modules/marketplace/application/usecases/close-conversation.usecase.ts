@@ -45,7 +45,9 @@ export class CloseConversationUseCase {
     await this.db.transaction(async (tx) => {
       await this.conversationRepository.save(conversation, tx);
       await this.outboxService.enqueue(tx, {
-        eventName: 'MarketplaceConversation.Closed',
+        eventType: 'MarketplaceConversation.Closed',
+        aggregateType: 'MarketplaceConversation',
+        aggregateId: conversation.id,
         producer: MRK_PRODUCER,
         correlationId: meta.correlationId ?? conversation.id,
         payload: {

@@ -77,7 +77,9 @@ describe.runIf(Boolean(testDatabaseUrl))('Módulo 0 — e2e', () => {
     const db = app.get<Database>(DRIZZLE);
 
     const envelope = await outbox.enqueueStandalone({
-      eventName: 'ModuleZero.Bootstrapped',
+      eventType: 'ModuleZero.Bootstrapped',
+      aggregateType: 'ModuleZero',
+      aggregateId: uuidv7(),
       payload: { note: 'integration-test' },
       producer: 'trust-api',
       correlationId: uuidv7(),

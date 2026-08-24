@@ -1,8 +1,33 @@
 # Catálogo de Eventos — Trust Platform
 
 > Regra (DOC-005 / skill trust-events): **nenhum evento existe sem entrada aqui.**
-> Formato do nome: `<Entity>.<Action>` em PascalCase, verbo no passado.
+> Formato do nome: `<Entity>.<Action>` em PascalCase, verbo no passado — **dois segmentos**
+> (PACK-00 v1.1 §5.1; o contexto delimitado vive no `producer`, não num terceiro segmento).
 > Envelope canônico: ver `apps/api/src/shared/events/event-envelope.ts`.
+
+## Envelope canônico (PACK-00 v1.1 §5)
+
+| campo | obrigatório | regra |
+|---|---|---|
+| `eventId` | sim | UUID v7; chave de deduplicação do consumer |
+| `eventType` | sim | `<Entity>.<Action>` — **campo canônico de nome** (substitui `eventName`) |
+| `eventVersion` | sim | string `"major.minor"` (ex.: `"1.0"`) |
+| `occurredAt` | sim | UTC ISO 8601 |
+| `producer` | sim | serviço publicador, kebab-case (ex.: `payment-service`) |
+| `aggregateType` | sim | agregado responsável pelo fato (ex.: `Payment`) |
+| `aggregateId` | sim | identificador desse agregado |
+| `correlationId` | sim | correlação do fluxo de negócio |
+| `causationId` | não | `eventId` do evento que causou este |
+| `payload` | sim | mínimo estável exigido pelos consumidores |
+
+**O agregado não se deduz do produtor.** O aceite de proposta grava três eventos
+na mesma transação com três agregados diferentes (`MarketplaceOffer`,
+`MarketplaceListing`, `MarketplaceOrder`) — por isso cada produtor informa o seu.
+
+**Escrita estrita, leitura tolerante.** Toda escrita nova passa por
+`createEventEnvelope`, que recusa envelope sem `aggregateType`/`aggregateId`.
+Eventos gravados antes do PACK-00 (com `eventName` e sem agregado) são lidos só
+por `shared/events/legacy-event-compat.ts`, isolado e removível — nunca valida escrita.
 
 ## Decisões já registradas (antes de qualquer implementação)
 
@@ -23,7 +48,7 @@
   |---|---|---|
 - **Exemplo**:
   ```json
-  { "eventId": "…", "eventName": "…", "eventVersion": "1.0", "occurredAt": "…", "producer": "…", "correlationId": "…", "payload": { } }
+  { "eventId": "…", "eventType": "…", "eventVersion": "1.0", "occurredAt": "…", "producer": "…", "aggregateType": "…", "aggregateId": "…", "correlationId": "…", "payload": { } }
   ```
 ```
 
