@@ -176,6 +176,13 @@
       "when": 1786400000000,
       "tag": "0024_pack00_canonical_event_envelope",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1787000000000,
+      "tag": "0025_pack01_trust_custody",
+      "breakpoints": true
     }
   ]
 }

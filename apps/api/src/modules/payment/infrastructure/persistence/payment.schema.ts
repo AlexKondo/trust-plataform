@@ -91,3 +91,48 @@ export const paymentAuthorizations = pgTable(
 
 export type PaymentRow = typeof payments.$inferSelect;
 export type PaymentAuthorizationRow = typeof paymentAuthorizations.$inferSelect;
+
+/**
+ * Custódia (PAY-003/PAY-004, PACK-01 §13.1).
+ *
+ * `UNIQUE(payment_id)` é a garantia final de "uma custódia por pagamento"
+ * (§6.2) — o consumer é idempotente, mas quem manda é o banco.
+ *
+ * `amount`/`currency` repetem o tipo de `payments` de propósito: o Pack proíbe
+ * um segundo modelo de dinheiro. Domínio em centavos, banco em reais, conversão
+ * só no repositório.
+ */
+export const trustCustodies = pgTable(
+  'trust_custodies',
+  {
+    id: uuid('id').primaryKey(),
+    paymentId: uuid('payment_id')
+      .notNull()
+      .references(() => payments.id, { onUpdate: 'restrict', onDelete: 'restrict' }),
+    orderId: uuid('order_id')
+      .notNull()
+      .references(() => marketplaceOrders.id, { onUpdate: 'restrict', onDelete: 'restrict' }),
+    buyerId: uuid('buyer_id')
+      .notNull()
+      .references(() => identities.id, { onUpdate: 'restrict', onDelete: 'restrict' }),
+    sellerId: uuid('seller_id')
+      .notNull()
+      .references(() => identities.id, { onUpdate: 'restrict', onDelete: 'restrict' }),
+    amount: numeric('amount', { precision: 18, scale: 2 }).notNull(),
+    currency: char('currency', { length: 3 }).notNull(),
+    /** IN_CUSTODY | READY_FOR_RELEASE | RELEASED */
+    status: varchar('status', { length: 30 }).notNull(),
+    startedAt: timestamp('started_at', { withTimezone: true, mode: 'date' }).notNull(),
+    /** Só preenchido quando o gateway CONFIRMA a liberação (§6.2). */
+    releasedAt: timestamp('released_at', { withTimezone: true, mode: 'date' }),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('idx_trust_custody_payment').on(table.paymentId),
+    index('idx_trust_custody_order').on(table.orderId),
+    index('idx_trust_custody_status').on(table.status),
+  ],
+);
+
+export type TrustCustodyRow = typeof trustCustodies.$inferSelect;

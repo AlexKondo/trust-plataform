@@ -59,3 +59,34 @@ export class PaymentGatewayException extends DomainException {
     super(message);
   }
 }
+
+/** Salto de estado na custódia → 409 (PACK-01 §7.2). */
+export class TrustCustodyTransitionException extends StateConflictException {
+  readonly code = 'TRUST_CUSTODY_INVALID_TRANSITION';
+
+  constructor(from: string, to: string) {
+    super(`Trust custody cannot move from ${from} to ${to}.`);
+  }
+}
+
+/** Um Payment tem no máximo uma custódia (PACK-01 §6.2) → 409. */
+export class TrustCustodyAlreadyExistsException extends StateConflictException {
+  readonly code = 'TRUST_CUSTODY_ALREADY_EXISTS';
+
+  constructor() {
+    super('This payment already has a trust custody.');
+  }
+}
+
+/**
+ * Snapshot da custódia divergiu do Payment (PACK-01 §18). Não é erro do
+ * usuário: é inconsistência financeira que exige investigação, e por isso a
+ * liberação para em vez de "corrigir" o valor.
+ */
+export class TrustCustodyInconsistentException extends StateConflictException {
+  readonly code = 'TRUST_CUSTODY_INCONSISTENT';
+
+  constructor(message: string) {
+    super(message);
+  }
+}

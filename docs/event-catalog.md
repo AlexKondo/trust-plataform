@@ -65,6 +65,34 @@ Para isso, dois payloads foram enriquecidos (adição retrocompatível): `Verifi
 
 ## Eventos ativos
 
+### TrustCustody.Created (v1.0)
+
+- **Descrição**: a custódia nasceu para um pagamento autorizado (PAY-003, PACK-01 §8.3). Fato de CRIAÇÃO do agregado — o fato financeiro é o `Funds.Held`.
+- **Produtor**: payment-service · **Agregado**: `TrustCustody` / id da custódia
+- **Consumidores**: nenhum hoje.
+- **Payload**: `trustCustodyId`, `paymentId`, `orderId`, `buyerId`, `sellerId`, `amount`, `currency`, `status`, `startedAt`
+
+### Funds.Held (v1.0)
+
+- **Descrição**: o dinheiro do cliente está retido pela plataforma (PAY-003). É o fato que dá sentido à Trust Layer: o prestador ainda não recebeu nada.
+- **Produtor**: payment-service · **Agregado**: `TrustCustody` / id da custódia
+- **Consumidores**: nenhum hoje; o Ledger (PAY-008) consumirá.
+- **Payload**: o mesmo de `TrustCustody.Created` + `paymentStatus`, `heldAt`
+
+### Funds.ReadyForRelease (v1.0)
+
+- **Descrição**: a política de liberação aprovou (PAY-004, PACK-01 §11.1). A decisão está comitada; a execução no provedor ainda não aconteceu.
+- **Produtor**: payment-service · **Agregado**: `TrustCustody` / id da custódia
+- **Consumidores**: `pay.finalize-release` — executa a liberação no gateway FORA de transação (§17).
+- **Payload**: `trustCustodyId`, `paymentId`, `orderId`, `buyerId`, `sellerId`, `amount`, `currency`, `status`
+
+### Funds.Released (v1.0)
+
+- **Descrição**: o provedor CONFIRMOU a liberação (PAY-004). Só é publicado depois da confirmação externa — nunca por aprovação de política.
+- **Produtor**: payment-service · **Agregado**: `TrustCustody` / id da custódia
+- **Consumidores**: nenhum hoje; a Liquidação (PAY-005) e o Ledger (PAY-008) consumirão.
+- **Payload**: o de `Funds.ReadyForRelease` + `paymentStatus`, `providerTransactionId`, `releasedAt`
+
 ### Payment.Created (v1.0)
 
 - **Descrição**: pagamento aberto para um pedido (PAY-001). Nasce do aceite da proposta, não da confirmação do serviço — ver INCONSISTENCIAS P1: o cliente paga ao fechar negócio e o dinheiro fica em custódia até a confirmação.

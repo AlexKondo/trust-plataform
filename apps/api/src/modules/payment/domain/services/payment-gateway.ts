@@ -18,6 +18,12 @@ export abstract class PaymentGateway {
   abstract capture(request: CaptureRequest): Promise<CaptureResult>;
   abstract refund(request: RefundRequest): Promise<RefundResult>;
   abstract cancel(request: CancelRequest): Promise<CancelResult>;
+  /**
+   * PACK-01 §12 — solta para o prestador o valor que estava em custódia.
+   * Um provedor real pode mapear isto para capture/split/escrow no adapter;
+   * o domínio conhece só o conceito de liberar.
+   */
+  abstract release(request: ReleaseRequest): Promise<ReleaseResult>;
   abstract getStatus(providerTransactionId: string): Promise<PaymentStatusResult>;
 }
 
@@ -53,6 +59,15 @@ export interface CancelRequest extends GatewayOperationContext {
   providerTransactionId: string;
 }
 
+export interface ReleaseRequest extends GatewayOperationContext {
+  paymentId: string;
+  custodyId: string;
+  amountCents: Cents;
+  currency: string;
+  /** Transação da autorização, quando conhecida — o provedor precisa dela. */
+  providerTransactionId: string | null;
+}
+
 export type GatewayOutcome = 'APPROVED' | 'DECLINED' | 'ERROR';
 
 interface BaseResult {
@@ -73,6 +88,12 @@ export interface AuthorizationResult extends BaseResult {
 
 export type CaptureResult = BaseResult;
 export type CancelResult = BaseResult;
+
+export interface ReleaseResult extends BaseResult {
+  releasedAmountCents: Cents;
+  /** Momento em que o provedor confirmou — vira `released_at` na custódia. */
+  releasedAt: Date | null;
+}
 
 export interface RefundResult extends BaseResult {
   refundedAmountCents: Cents;

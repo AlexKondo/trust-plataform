@@ -60,6 +60,24 @@ v1.1 está em [docs/REVISAO-PACK-00.md](docs/REVISAO-PACK-00.md).
 código + testes > documentos ARCH/TP históricos (referência, nunca requisito). Contradição
 entre fontes autoritativas **não se resolve por suposição** — parar o item e reportar.
 
+## PACK-01 — Custodia e liberacao (2026-08-31)
+
+PAY-003 + PAY-004 implementados. O dinheiro entra em custódia na CONTRATAÇÃO
+(`Payment.Authorized` → `TrustCustody` IN_CUSTODY) e só sai quando o cliente
+confirma o serviço concluído **e** a política aprova. Liberação em DUAS FASES: a
+decisão é persistida (`READY_FOR_RELEASE`) antes de qualquer efeito externo, e
+só depois de o gateway CONFIRMAR é que vira `RELEASED` + `FUNDS_RELEASED`.
+Disputa ativa bloqueia. 4 eventos novos no agregado `TrustCustody`.
+**54 suítes / 342 testes verdes.** Detalhes, desvios e critérios de aceite em
+[docs/PACK-01-COMPLETION-REPORT.md](docs/PACK-01-COMPLETION-REPORT.md).
+
+O shared kernel ganhou `EventConsumer.managesOwnTransaction`: consumers que
+chamam dependência externa rodam FORA da transação do relay (PACK-01 §17).
+Use **apenas** com handler comprovadamente idempotente.
+
+Provedor real definido pelo founder: **Asaas** (pagamento e split dentro dele).
+Não entra no PACK-01 — será um adapter novo do port `PaymentGateway`.
+
 ## Documentos-guia (ler nesta ordem)
 
 1. [PLANO-DE-MODULOS.md](PLANO-DE-MODULOS.md) — quebra em módulos, ordem de desenvolvimento, grafo de dependências

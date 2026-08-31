@@ -5,7 +5,7 @@ import {
   OnApplicationShutdown,
 } from '@nestjs/common';
 import { DiscoveryService } from '@nestjs/core';
-import { asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import { PinoLogger } from 'nestjs-pino';
 import PgBoss from 'pg-boss';
 import { AppConfigService } from '../config/app-config.service';
@@ -90,18 +90,22 @@ export class OutboxRelayService implements OnApplicationBootstrap, OnApplication
 
   private async consume(consumer: EventConsumer, envelope: ConsumedEvent): Promise<void> {
     try {
-      await this.db.transaction(async (tx) => {
-        const inserted = await tx
-          .insert(processedEvents)
-          .values({ consumerName: consumer.consumerName, eventId: envelope.eventId })
-          .onConflictDoNothing()
-          .returning({ eventId: processedEvents.eventId });
-        if (inserted.length === 0) {
-          // já processado (at-least-once) — idempotência garantida
-          return;
-        }
-        await consumer.handle(envelope, tx);
-      });
+      if (consumer.managesOwnTransaction) {
+        await this.consumeOutsideTransaction(consumer, envelope);
+      } else {
+        await this.db.transaction(async (tx) => {
+          const inserted = await tx
+            .insert(processedEvents)
+            .values({ consumerName: consumer.consumerName, eventId: envelope.eventId })
+            .onConflictDoNothing()
+            .returning({ eventId: processedEvents.eventId });
+          if (inserted.length === 0) {
+            // já processado (at-least-once) — idempotência garantida
+            return;
+          }
+          await consumer.handle(envelope, tx);
+        });
+      }
       this.logger.info(
         {
           operation: 'EventConsumed',
@@ -128,6 +132,38 @@ export class OutboxRelayService implements OnApplicationBootstrap, OnApplication
       );
       throw error;
     }
+  }
+
+  /**
+   * PACK-01 §17 — caminho para consumers que falam com dependência externa.
+   * Nada de transação aberta durante a chamada: verifica o dedupe, executa, e
+   * só então registra o processamento. Se o processo morrer no meio, o evento
+   * é reentregue e o handler idempotente absorve a repetição.
+   */
+  private async consumeOutsideTransaction(
+    consumer: EventConsumer,
+    envelope: ConsumedEvent,
+  ): Promise<void> {
+    const [already] = await this.db
+      .select({ eventId: processedEvents.eventId })
+      .from(processedEvents)
+      .where(
+        and(
+          eq(processedEvents.consumerName, consumer.consumerName),
+          eq(processedEvents.eventId, envelope.eventId),
+        ),
+      )
+      .limit(1);
+    if (already) {
+      return;
+    }
+
+    await consumer.handle(envelope, this.db);
+
+    await this.db
+      .insert(processedEvents)
+      .values({ consumerName: consumer.consumerName, eventId: envelope.eventId })
+      .onConflictDoNothing();
   }
 
   async onApplicationShutdown(): Promise<void> {

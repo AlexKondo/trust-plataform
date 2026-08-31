@@ -20,5 +20,20 @@ export abstract class EventConsumer {
   /** Identificador estável do consumer — ex.: `tps.create-trust-passport`. */
   abstract readonly consumerName: string;
 
+  /**
+   * PACK-01 §17 — consumers que chamam dependência EXTERNA (um gateway de
+   * pagamento, por exemplo) não podem rodar com transação aberta: seria uma
+   * conexão de banco presa esperando HTTP e, pior, uma transação passível de
+   * rollback DEPOIS de o provedor já ter movido dinheiro.
+   *
+   * Quando `true`, o relay chama `handle` FORA de transação e grava o registro
+   * de dedupe só após o sucesso. A garantia passa de "exatamente uma vez pelo
+   * dedupe" para "ao menos uma vez + handler idempotente" — que é o que o
+   * PACK-00 §5.3 já exige de todo consumer.
+   *
+   * Use apenas quando o handler for comprovadamente idempotente.
+   */
+  readonly managesOwnTransaction: boolean = false;
+
   abstract handle(envelope: ConsumedEvent, tx: DatabaseExecutor): Promise<void>;
 }

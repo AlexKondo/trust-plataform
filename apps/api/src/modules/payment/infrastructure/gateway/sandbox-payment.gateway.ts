@@ -12,6 +12,8 @@ import {
   PaymentStatusResult,
   RefundRequest,
   RefundResult,
+  ReleaseRequest,
+  ReleaseResult,
 } from '../../domain/services/payment-gateway';
 
 /**
@@ -97,6 +99,33 @@ export class SandboxPaymentGateway extends PaymentGateway {
       providerCode: 'cancelled',
       message: 'Cancelamento confirmado pelo provedor de teste.',
       rawResponse: { provider: this.providerId, simulated: true, operation: 'cancel' },
+    });
+  }
+
+  /**
+   * PACK-01 §12 — liberação da custódia. Determinística pela chave, como as
+   * demais operações: retentar com a MESMA chave devolve a MESMA transação,
+   * que é o que torna honesto o teste de retry do §20.1.
+   *
+   * A convenção de valor vale aqui também: final `.99` simula falha técnica do
+   * provedor, para exercitar o caminho em que a custódia fica presa em
+   * READY_FOR_RELEASE e o dinheiro NÃO é dado como liberado.
+   */
+  release(request: ReleaseRequest): Promise<ReleaseResult> {
+    const outcome = this.outcomeFor(request.amountCents);
+    this.log('release', request.custodyId, request.idempotencyKey, outcome);
+
+    const approved = outcome === 'APPROVED';
+    return Promise.resolve({
+      outcome,
+      providerTransactionId: approved ? this.transactionId(request.idempotencyKey) : null,
+      providerCode: approved ? 'released' : this.declineCode(outcome),
+      message: approved
+        ? 'Liberação confirmada pelo provedor de teste.'
+        : 'Falha ao liberar os valores no provedor (simulada).',
+      releasedAmountCents: approved ? request.amountCents : 0,
+      releasedAt: approved ? new Date() : null,
+      rawResponse: { provider: this.providerId, simulated: true, operation: 'release', outcome },
     });
   }
 
