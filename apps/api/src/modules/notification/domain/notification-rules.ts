@@ -317,6 +317,44 @@ export const NOTIFICATION_RULES: NotificationRule[] = [
       });
     },
   },
+  // ── Mudança comercial (PACK-03) ───────────────────────────────────────────
+  {
+    eventType: 'TrustChangeOrder.Submitted',
+    consumerName: 'ntf.change-order-submitted',
+    build: (payload) =>
+      to(str(payload, 'buyerId'), {
+        type: 'CHANGE_ORDER_SUBMITTED',
+        title: 'Mudança no serviço aguarda sua aprovação',
+        body: `O prestador pediu ${formatMoney(num(payload, 'changeGrossAmount'), str(payload, 'currency'))} a mais. Nada é cobrado enquanto você não aprovar.`,
+        resourceType: 'TrustChangeOrder',
+        resourceId: str(payload, 'changeOrderId'),
+      }),
+  },
+  {
+    eventType: 'TrustChangeOrder.Approved',
+    consumerName: 'ntf.change-order-approved',
+    // Quem aprovou é o cliente; avisamos o prestador (regra: nunca o próprio ator).
+    build: (payload) =>
+      to(str(payload, 'sellerId'), {
+        type: 'CHANGE_ORDER_APPROVED',
+        title: 'Mudança aprovada pelo cliente',
+        body: `O cliente aprovou ${formatMoney(num(payload, 'changeGrossAmount'), str(payload, 'currency'))} a mais neste serviço.`,
+        resourceType: 'TrustChangeOrder',
+        resourceId: str(payload, 'changeOrderId'),
+      }),
+  },
+  {
+    eventType: 'TrustChangeOrder.Rejected',
+    consumerName: 'ntf.change-order-rejected',
+    build: (payload) =>
+      to(str(payload, 'sellerId'), {
+        type: 'CHANGE_ORDER_REJECTED',
+        title: 'Mudança recusada pelo cliente',
+        body: 'O cliente não aprovou a mudança. O valor do contrato continua o mesmo.',
+        resourceType: 'TrustChangeOrder',
+        resourceId: str(payload, 'changeOrderId'),
+      }),
+  },
 ];
 
 const LEVEL_RANK: Record<string, number> = {

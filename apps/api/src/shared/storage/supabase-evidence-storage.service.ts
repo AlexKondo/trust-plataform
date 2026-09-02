@@ -1,14 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
-import { AppConfigService } from '../../../../shared/config/app-config.service';
+import { AppConfigService } from '../config/app-config.service';
 import {
   EvidenceStorageService,
   StoredEvidence,
-} from '../../domain/services/evidence-storage.service';
+  UploadEvidenceInput,
+} from './evidence-storage.service';
 
-const BUCKET = 'verification-evidences';
-
-/** Upload para o bucket privado do Supabase Storage via service role. */
+/** Upload para um bucket privado do Supabase Storage via service role. */
 @Injectable()
 export class SupabaseEvidenceStorageService extends EvidenceStorageService {
   constructor(
@@ -19,13 +18,9 @@ export class SupabaseEvidenceStorageService extends EvidenceStorageService {
     this.logger.setContext(SupabaseEvidenceStorageService.name);
   }
 
-  async upload(input: {
-    storageKey: string;
-    content: Buffer;
-    mimeType: string;
-  }): Promise<StoredEvidence> {
+  async upload(input: UploadEvidenceInput): Promise<StoredEvidence> {
     const response = await fetch(
-      `${this.config.supabaseUrl}/storage/v1/object/${BUCKET}/${input.storageKey}`,
+      `${this.config.supabaseUrl}/storage/v1/object/${input.bucket}/${input.storageKey}`,
       {
         method: 'POST',
         headers: {
@@ -41,6 +36,7 @@ export class SupabaseEvidenceStorageService extends EvidenceStorageService {
       this.logger.error(
         {
           operation: 'EvidenceUpload',
+          bucket: input.bucket,
           statusCode: response.status,
           providerResponse: body.slice(0, 200),
           result: 'FAILURE',
@@ -58,8 +54,8 @@ export class SupabaseEvidenceStorageService extends EvidenceStorageService {
 export class InMemoryEvidenceStorageService extends EvidenceStorageService {
   readonly uploaded: string[] = [];
 
-  upload(input: { storageKey: string }): Promise<StoredEvidence> {
-    this.uploaded.push(input.storageKey);
+  upload(input: UploadEvidenceInput): Promise<StoredEvidence> {
+    this.uploaded.push(`${input.bucket}/${input.storageKey}`);
     return Promise.resolve({ storageKey: input.storageKey });
   }
 }

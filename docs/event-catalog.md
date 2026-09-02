@@ -54,7 +54,7 @@ por `shared/events/legacy-event-compat.ts`, isolado e removível — nunca valid
 
 ## Consumidor transversal: notificações (NTF-001)
 
-O módulo `notification` consome **17 eventos** (verificações, Trust Layer, mensagens, propostas, pedidos, disputas e avaliações) e os projeta em avisos in-app. Consumers `ntf.*`, um por evento, declarados na tabela `NOTIFICATION_RULES`. Regras do desenho:
+O módulo `notification` consome **20 eventos** (verificações, Trust Layer, mensagens, propostas, pedidos, disputas, avaliações e mudanças comerciais) e os projeta em avisos in-app. Consumers `ntf.*`, um por evento, declarados na tabela `NOTIFICATION_RULES`. Regras do desenho:
 
 - nenhum módulo de negócio conhece notificação — todos apenas publicam fatos;
 - o **autor da ação nunca é notificado** do próprio ato (quem aceita não recebe "proposta aceita");
@@ -133,7 +133,25 @@ Para isso, dois payloads foram enriquecidos (adição retrocompatível): `Verifi
 - **Descrição**: marcos da execução (MRK-019/020/021). `ExecutionCompleted` é o **check-out do prestador**, que leva o pedido a `AWAITING_CUSTOMER_CONFIRMATION` — não é a conclusão do pedido (INCONSISTENCIAS #24).
 - **Produtor**: marketplace-service
 - **Consumidores**: nenhum no MVP (agenda, notificações e SLA são pós-MVP).
-- **Payloads**: `Scheduled {orderId, listingId, buyerId, sellerId, schedulingId, scheduledStart, scheduledEnd, status}`; `Started {orderId, listingId, buyerId, sellerId, startedBy, startedAt, status}`; `ExecutionCompleted {orderId, listingId, buyerId, sellerId, completedBy, completedAt, actualDuration, status}`
+- **Payloads**: `Scheduled {orderId, listingId, buyerId, sellerId, schedulingId, scheduledStart, scheduledEnd, status}`; `Started {orderId, listingId, buyerId, sellerId, startedBy, startedAt, sessionId, status}`; `ExecutionCompleted {orderId, listingId, buyerId, sellerId, completedBy, completedAt, actualDuration, sessionId, elapsedMinutes, pausedMinutes, billableMinutes, authorizedMinutes, status}`
+- **Nota (PACK-03 §22)**: `sessionId` e os campos de tempo são **adições retrocompatíveis**. `actualDuration` continua sendo o tempo DECORRIDO do check-in ao check-out — não foi redefinido; quem quer tempo faturável usa `billableMinutes`.
+
+### TrustChangeOrder.Submitted (v1.0) · TrustChangeOrder.Approved (v1.0) · TrustChangeOrder.Rejected (v1.0)
+
+- **Descrição**: mudança comercial proposta pelo Trust Partner e decidida pelo Trust Member (PACK-03 §6/§22). O fato que importa é a **decisão**: só `Approved` altera o valor autorizado do contrato.
+- **Produtor**: marketplace-service · **Agregado**: `TrustChangeOrder`
+- **Consumidores**: ✅ `ntf.change-order-submitted` (avisa o cliente que há mudança aguardando aprovação) · ✅ `ntf.change-order-approved` / ✅ `ntf.change-order-rejected` (avisam o prestador da decisão). Nenhum consumidor financeiro — ver a nota do §9 abaixo.
+- **Payloads**: `Submitted {changeOrderId, orderId, buyerId, sellerId, proposedBy, type, additionalMinutes, changeGrossAmount, currency, reason, submittedAt, status}`; `Approved {changeOrderId, orderId, buyerId, sellerId, approvedBy, type, additionalMinutes, changeGrossAmount, changeTrustFeeAmount, currency, currentAuthorizedGrossAmount, amountAuthorizedNotInCustody, approvedAt, status}`; `Rejected {changeOrderId, orderId, buyerId, sellerId, rejectedBy, type, changeGrossAmount, currency, reason, rejectedAt, status}`
+- **Nota (PACK-03 §9 — item parado)**: `amountAuthorizedNotInCustody` existe porque o `Payment`/`TrustCustody` do PACK-01 congela o valor da contratação e não admite autorização incremental. O delta aprovado é **comercialmente autorizado, mas não custodiado** — quem for cobrá-lo (PACK-05/Asaas) recebe esse número no próprio fato.
+- **Sem evento**: `DRAFT` e `CANCELLED` não publicam nada — rascunho e retirada não mudam valor autorizado nenhum (§22: nada de evento por escrita de banco).
+
+### ServiceExecution.Paused (v1.0) · ServiceExecution.Resumed (v1.0)
+
+- **Descrição**: interrupção não faturável durante a execução e sua retomada (PACK-03 §10.2/§10.3). Check-in e check-out **não** ganharam evento novo: continuam em `MarketplaceOrder.Started`/`MarketplaceOrder.ExecutionCompleted` (§22 — não duplicar evento que já existe).
+- **Produtor**: marketplace-service · **Agregado**: `ServiceExecutionSession`
+- **Consumidores**: nenhum no MVP. São Trust Signals brutos (§17): ficam auditáveis para a Trust Intelligence futura, sem punição automática de Trust Score.
+- **Payloads**: `Paused {sessionId, orderId, buyerId, sellerId, pauseId, reasonCode, pausedAt, status}`; `Resumed {sessionId, orderId, buyerId, sellerId, pauseId, reasonCode, pausedMinutes, totalPausedMinutes, resumedAt, status}`
+
 
 ### MarketplaceOrder.CustomerConfirmed (v1.0)
 

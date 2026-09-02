@@ -78,6 +78,49 @@ Use **apenas** com handler comprovadamente idempotente.
 Provedor real definido pelo founder: **Asaas** (pagamento e split dentro dele).
 Não entra no PACK-01 — será um adapter novo do port `PaymentGateway`.
 
+## PACK-02 — Fundacao comercial: modelo de preco e Trust Fee (2026-09-01)
+
+Proposta e pedido ganharam `pricingModel` (`FIXED_PRICE` | `HOURLY`, com taxa/hora,
+duração mínima e incremento de faturamento). No aceite nasce o
+**snapshot econômico imutável** do Trust Contract
+(`marketplace_order_commercial_snapshots`, 1 por pedido): valor bruto, serviço,
+material (custo e markup separados), **Trust Fee congelada em basis points** e
+líquido do prestador. Mudar a `commercial_policies` depois NÃO retroage sobre
+contrato já fechado. Detalhes em
+[docs/2026090101/PACK-02-COMPLETION-REPORT.md](docs/2026090101/PACK-02-COMPLETION-REPORT.md).
+
+## PACK-03 — Trust Change Order e cobranca por tempo (2026-09-02)
+
+A regra do Pack: **o Trust Partner nunca aumenta sozinho a conta do Trust Member.**
+Todo acréscimo (tempo, escopo, material) vira um **Trust Change Order** que o
+prestador propõe e só o cliente aprova — e apenas `APPROVED` mexe no valor
+autorizado. O total corrente é **derivado** (snapshot imutável do PACK-02 + soma
+dos aprovados), sem campo acumulador: é assim que "aplicar o delta exatamente uma
+vez" fica garantido por construção. A Trust Fee do delta usa a **taxa congelada no
+contrato**, nunca a política global vigente; `MATERIAL_COST` é pass-through com 0%
+de fee e `MATERIAL_MARKUP` é fee-eligible, sempre separados.
+
+O tempo passou a ter três leituras distintas: **decorrido**, **pausado** e
+**faturável** — `presença ≠ tempo faturável`. O check-in/check-out do MRK-020/021
+**não foi reimplementado**: a `service_execution_sessions` é uma camada aditiva por
+cima dele (com Trust Pause/Resume), e a máquina de 13 estados do pedido não mudou
+nem ganhou `PAUSED`. O faturável tem teto no autorizado e piso no mínimo
+contratado. 5 eventos novos, 10 rotas, migration 0027 aditiva.
+**61 suítes / 441 testes verdes.**
+
+**Item PARADO e reportado (PACK-03 §9)**: o `Payment`/`TrustCustody` do PACK-01
+congela o valor da contratação e não admite autorização incremental, então o delta
+aprovado fica **autorizado e NÃO custodiado** — exposto explicitamente em
+`amountAuthorizedNotInCustody`. Cobrar esse saldo depende do PACK-05 (Asaas).
+Desvios, decisões e critérios de aceite em
+[docs/2026090202/PACK-03-COMPLETION-REPORT.md](docs/2026090202/PACK-03-COMPLETION-REPORT.md).
+
+O shared kernel ganhou `shared/storage/` (port `EvidenceStorageService` + adapters):
+evidência com arquivo deixou de ser exclusividade do VRF. Cada domínio mantém a
+própria tabela de metadados e o próprio bucket — o Change Order usa
+`change-order-evidences`, **que precisa ser criado no Supabase Storage** (privado).
+
+
 ## Documentos-guia (ler nesta ordem)
 
 1. [PLANO-DE-MODULOS.md](PLANO-DE-MODULOS.md) — quebra em módulos, ordem de desenvolvimento, grafo de dependências

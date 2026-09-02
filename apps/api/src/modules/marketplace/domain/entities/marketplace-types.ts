@@ -170,3 +170,134 @@ export const SEARCH_SORTS = [
   SEARCH_SORT.PRICE_DESC,
   SEARCH_SORT.TRUST_SCORE,
 ] as const;
+
+// ── PACK-03 — Trust Change Order & Time Billing ─────────────────────────────
+
+/**
+ * PACK-03 §7 — tipos de mudança comercial suportados. MATERIAL sempre carrega
+ * custo e markup SEPARADOS (§7.3): colapsar os dois num valor opaco esconderia
+ * exatamente a informação que decide se há Trust Fee.
+ */
+export const CHANGE_ORDER_TYPE = {
+  ADDITIONAL_TIME: 'ADDITIONAL_TIME',
+  SCOPE_CHANGE: 'SCOPE_CHANGE',
+  MATERIAL: 'MATERIAL',
+  MIXED: 'MIXED',
+} as const;
+
+export type ChangeOrderType = (typeof CHANGE_ORDER_TYPE)[keyof typeof CHANGE_ORDER_TYPE];
+
+export const CHANGE_ORDER_TYPES = [
+  CHANGE_ORDER_TYPE.ADDITIONAL_TIME,
+  CHANGE_ORDER_TYPE.SCOPE_CHANGE,
+  CHANGE_ORDER_TYPE.MATERIAL,
+  CHANGE_ORDER_TYPE.MIXED,
+] as const;
+
+/** PACK-03 §6 — ciclo de vida do Change Order. APPROVED e REJECTED são terminais. */
+export const CHANGE_ORDER_STATUS = {
+  DRAFT: 'DRAFT',
+  PENDING_MEMBER_APPROVAL: 'PENDING_MEMBER_APPROVAL',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+  CANCELLED: 'CANCELLED',
+  EXPIRED: 'EXPIRED',
+} as const;
+
+export type ChangeOrderStatus = (typeof CHANGE_ORDER_STATUS)[keyof typeof CHANGE_ORDER_STATUS];
+
+/**
+ * §6.1 — `APPROVED` é terminal e IMUTÁVEL: correção exige Change Order novo,
+ * nunca reescrita do histórico. `CANCELLED` só antes da decisão.
+ */
+export const CHANGE_ORDER_TRANSITIONS: Readonly<
+  Record<ChangeOrderStatus, readonly ChangeOrderStatus[]>
+> = {
+  DRAFT: [
+    CHANGE_ORDER_STATUS.PENDING_MEMBER_APPROVAL,
+    CHANGE_ORDER_STATUS.CANCELLED,
+    CHANGE_ORDER_STATUS.EXPIRED,
+  ],
+  PENDING_MEMBER_APPROVAL: [
+    CHANGE_ORDER_STATUS.APPROVED,
+    CHANGE_ORDER_STATUS.REJECTED,
+    CHANGE_ORDER_STATUS.CANCELLED,
+    CHANGE_ORDER_STATUS.EXPIRED,
+  ],
+  APPROVED: [],
+  REJECTED: [],
+  CANCELLED: [],
+  EXPIRED: [],
+};
+
+/**
+ * §24 — estados do pedido em que uma mudança comercial ainda faz sentido: o
+ * serviço está contratado e ainda não foi confirmado pelo cliente. Depois da
+ * confirmação a conta está fechada; antes do agendamento, o caminho é
+ * renegociar a proposta, não emendar o contrato.
+ */
+export const CHANGE_ORDER_ELIGIBLE_ORDER_STATUSES: readonly OrderStatus[] = [
+  ORDER_STATUS.SCHEDULED,
+  ORDER_STATUS.AWAITING_EXECUTION,
+  ORDER_STATUS.IN_PROGRESS,
+  ORDER_STATUS.AWAITING_CUSTOMER_CONFIRMATION,
+];
+
+/** §13 — natureza da evidência anexada a um Change Order. */
+export const CHANGE_ORDER_EVIDENCE_TYPE = {
+  PHOTO: 'PHOTO',
+  RECEIPT: 'RECEIPT',
+  QUOTE: 'QUOTE',
+  DOCUMENT: 'DOCUMENT',
+  OTHER: 'OTHER',
+} as const;
+
+export type ChangeOrderEvidenceType =
+  (typeof CHANGE_ORDER_EVIDENCE_TYPE)[keyof typeof CHANGE_ORDER_EVIDENCE_TYPE];
+
+export const CHANGE_ORDER_EVIDENCE_TYPES = [
+  CHANGE_ORDER_EVIDENCE_TYPE.PHOTO,
+  CHANGE_ORDER_EVIDENCE_TYPE.RECEIPT,
+  CHANGE_ORDER_EVIDENCE_TYPE.QUOTE,
+  CHANGE_ORDER_EVIDENCE_TYPE.DOCUMENT,
+  CHANGE_ORDER_EVIDENCE_TYPE.OTHER,
+] as const;
+
+/** PACK-03 §10 — ciclo da sessão de execução (não é status do pedido). */
+export const EXECUTION_SESSION_STATUS = {
+  NOT_STARTED: 'NOT_STARTED',
+  ACTIVE: 'ACTIVE',
+  PAUSED: 'PAUSED',
+  COMPLETED: 'COMPLETED',
+} as const;
+
+export type ExecutionSessionStatus =
+  (typeof EXECUTION_SESSION_STATUS)[keyof typeof EXECUTION_SESSION_STATUS];
+
+export const EXECUTION_SESSION_TRANSITIONS: Readonly<
+  Record<ExecutionSessionStatus, readonly ExecutionSessionStatus[]>
+> = {
+  NOT_STARTED: [EXECUTION_SESSION_STATUS.ACTIVE],
+  ACTIVE: [EXECUTION_SESSION_STATUS.PAUSED, EXECUTION_SESSION_STATUS.COMPLETED],
+  // §10.4: check-out com pausa aberta é permitido — a pausa é fechada no
+  // próprio check-out. Recusar deixaria o prestador preso numa sessão viva.
+  PAUSED: [EXECUTION_SESSION_STATUS.ACTIVE, EXECUTION_SESSION_STATUS.COMPLETED],
+  COMPLETED: [],
+};
+
+/** §10.2 — motivos de pausa. Nada aqui é inferido automaticamente do aparelho. */
+export const PAUSE_REASON_CODE = {
+  PERSONAL_BREAK: 'PERSONAL_BREAK',
+  PERSONAL_CALL: 'PERSONAL_CALL',
+  MEAL: 'MEAL',
+  OTHER_NON_BILLABLE: 'OTHER_NON_BILLABLE',
+} as const;
+
+export type PauseReasonCode = (typeof PAUSE_REASON_CODE)[keyof typeof PAUSE_REASON_CODE];
+
+export const PAUSE_REASON_CODES = [
+  PAUSE_REASON_CODE.PERSONAL_BREAK,
+  PAUSE_REASON_CODE.PERSONAL_CALL,
+  PAUSE_REASON_CODE.MEAL,
+  PAUSE_REASON_CODE.OTHER_NON_BILLABLE,
+] as const;

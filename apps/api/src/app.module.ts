@@ -8,6 +8,7 @@ import { SecurityModule } from './shared/security/security.module';
 import { JwtAuthGuard } from './shared/security/jwt-auth.guard';
 import { EventsModule } from './shared/events/events.module';
 import { AuditModule } from './shared/audit/audit.module';
+import { StorageModule } from './shared/storage/storage.module';
 import { ResponseEnvelopeInterceptor } from './shared/api/response-envelope.interceptor';
 import { GlobalExceptionFilter } from './shared/api/global-exception.filter';
 import { HealthModule } from './modules/health/health.module';
@@ -27,6 +28,7 @@ import { VerificationModule } from './modules/verification/verification.module';
     SecurityModule,
     EventsModule,
     AuditModule,
+    StorageModule,
     HealthModule,
     IdentityModule,
     TrustPassportModule,

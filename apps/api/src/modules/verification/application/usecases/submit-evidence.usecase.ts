@@ -14,10 +14,13 @@ import {
   VerificationNotFoundException,
 } from '../../domain/exceptions/verification.exceptions';
 import { VerificationRepository } from '../../domain/repositories/verification.repository';
-import { EvidenceStorageService } from '../../domain/services/evidence-storage.service';
+import { EvidenceStorageService } from '../../../../shared/storage/evidence-storage.service';
 import { ALLOWED_EVIDENCE_MIME_TYPES, RequestMeta } from '../dto/verification.dtos';
 
 const VRF_PRODUCER = 'verification-service';
+
+/** Bucket privado das evidências de verificação (VRF-002 BR-004). */
+const VERIFICATION_EVIDENCE_BUCKET = 'verification-evidences';
 
 export interface SubmitEvidenceInput {
   verificationId: string;
@@ -73,6 +76,7 @@ export class SubmitEvidenceUseCase {
 
     // Upload antes da transação: se falhar, nada é persistido
     await this.storage.upload({
+      bucket: VERIFICATION_EVIDENCE_BUCKET,
       storageKey,
       content: input.content,
       mimeType: input.mimeType,

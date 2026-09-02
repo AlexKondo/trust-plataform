@@ -8,7 +8,9 @@ import { CounterOfferUseCase } from './application/usecases/counter-offer.usecas
 import { CreateOfferUseCase } from './application/usecases/create-offer.usecase';
 import { GetOffersUseCase } from './application/usecases/get-offers.usecase';
 import { ManageDisputeUseCase } from './application/usecases/manage-dispute.usecase';
+import { ManageChangeOrderUseCase } from './application/usecases/manage-change-order.usecase';
 import { ManageOrderUseCase } from './application/usecases/manage-order.usecase';
+import { ServiceExecutionUseCase } from './application/usecases/service-execution.usecase';
 import { ReviewTransactionUseCase } from './application/usecases/review-transaction.usecase';
 import { MarketplaceOfferService } from './application/usecases/marketplace-offer.service';
 import { OrderLifecycleService } from './application/usecases/order-lifecycle.service';
@@ -30,10 +32,13 @@ import { MarketplaceConversationRepository } from './domain/repositories/marketp
 import { MarketplaceListingRepository } from './domain/repositories/marketplace-listing.repository';
 import { MarketplaceOfferRepository } from './domain/repositories/marketplace-offer.repository';
 import { MarketplaceOrderRepository } from './domain/repositories/marketplace-order.repository';
+import { ServiceExecutionRepository } from './domain/repositories/service-execution.repository';
+import { TrustChangeOrderRepository } from './domain/repositories/trust-change-order.repository';
 import { MarketplaceReviewRepository } from './domain/repositories/marketplace-review.repository';
 import { MarketplaceConversationController } from './infrastructure/api/marketplace-conversation.controller';
 import { MarketplaceListingController } from './infrastructure/api/marketplace-listing.controller';
 import { MarketplaceOfferController } from './infrastructure/api/marketplace-offer.controller';
+import { MarketplaceChangeOrderController } from './infrastructure/api/marketplace-change-order.controller';
 import { MarketplaceOrderController } from './infrastructure/api/marketplace-order.controller';
 import {
   MarketplaceDisputeAdminController,
@@ -50,6 +55,8 @@ import { DrizzleMarketplaceListingRepository } from './infrastructure/persistenc
 import { DrizzleMarketplaceOfferRepository } from './infrastructure/persistence/drizzle-marketplace-offer.repository';
 import { DrizzleMarketplaceOrderRepository } from './infrastructure/persistence/drizzle-marketplace-order.repository';
 import { DrizzleMarketplaceReviewRepository } from './infrastructure/persistence/drizzle-marketplace-review.repository';
+import { DrizzleServiceExecutionRepository } from './infrastructure/persistence/drizzle-service-execution.repository';
+import { DrizzleTrustChangeOrderRepository } from './infrastructure/persistence/drizzle-trust-change-order.repository';
 
 /**
  * Marketplace — Módulos 6 a 9, o ciclo completo da transação:
@@ -69,6 +76,7 @@ import { DrizzleMarketplaceReviewRepository } from './infrastructure/persistence
     MarketplaceConversationController,
     MarketplaceOfferController,
     MarketplaceOrderController,
+    MarketplaceChangeOrderController,
     MarketplaceReviewController,
     MarketplaceDisputeAdminController,
   ],
@@ -91,6 +99,8 @@ import { DrizzleMarketplaceReviewRepository } from './infrastructure/persistence
     GetOffersUseCase,
     OrderLifecycleService,
     ManageOrderUseCase,
+    ManageChangeOrderUseCase,
+    ServiceExecutionUseCase,
     ManageDisputeUseCase,
     ReviewTransactionUseCase,
     ReleaseListingOnCancelConsumer,
@@ -100,6 +110,8 @@ import { DrizzleMarketplaceReviewRepository } from './infrastructure/persistence
     { provide: MarketplaceOfferRepository, useClass: DrizzleMarketplaceOfferRepository },
     { provide: MarketplaceOrderRepository, useClass: DrizzleMarketplaceOrderRepository },
     { provide: MarketplaceReviewRepository, useClass: DrizzleMarketplaceReviewRepository },
+    { provide: TrustChangeOrderRepository, useClass: DrizzleTrustChangeOrderRepository },
+    { provide: ServiceExecutionRepository, useClass: DrizzleServiceExecutionRepository },
     { provide: CommercialPolicyRepository, useClass: DrizzleCommercialPolicyRepository },
     {
       provide: MarketplaceCommercialSnapshotRepository,
@@ -108,6 +120,8 @@ import { DrizzleMarketplaceReviewRepository } from './infrastructure/persistence
   ],
   exports: [
     MarketplaceListingRepository,
+    TrustChangeOrderRepository,
+    ServiceExecutionRepository,
     MarketplaceConversationRepository,
     MarketplaceOfferRepository,
     MarketplaceOrderRepository,

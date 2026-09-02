@@ -1399,6 +1399,204 @@ paths:
         '403': { description: Não é participante }
         '409': { description: 'Estado não admite cancelamento (MARKETPLACE_ORDER_CANCELLATION_NOT_ALLOWED)' }
 
+  # ── PACK-03 — Trust Change Order & Time Billing ──────────────────────────
+  /marketplace/orders/{orderId}/change-orders:
+    post:
+      tags: [Marketplace]
+      summary: PACK-03 §7 — Cria um Trust Change Order (rascunho)
+      description: >
+        Só o **prestador** (Trust Partner) propõe aumento; o rascunho não altera
+        valor autorizado nenhum. Em `ADDITIONAL_TIME` o valor do serviço é
+        **derivado** da taxa/hora congelada no contrato — enviar
+        `serviceDeltaAmount` nesse tipo é 422. Minutos precisam ser múltiplo
+        exato do `billingIncrementMinutes` congelado no contrato (§7.1).
+      operationId: createTrustChangeOrder
+      parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, reason]
+              properties:
+                type: { type: string, enum: [ADDITIONAL_TIME, SCOPE_CHANGE, MATERIAL, MIXED] }
+                additionalMinutes: { type: integer, description: Só em ADDITIONAL_TIME; múltiplo do incremento congelado }
+                serviceDeltaAmount: { type: number, description: Não aceito em ADDITIONAL_TIME (é derivado) }
+                materialCostDeltaAmount: { type: number, description: Pass-through — 0% de Trust Fee }
+                materialMarkupDeltaAmount: { type: number, description: Fee-eligible }
+                reason: { type: string }
+                description: { type: string }
+                expiresAt: { type: string, format: date-time }
+            example: { type: ADDITIONAL_TIME, additionalMinutes: 30, reason: A fiação estava mais danificada do que o previsto. }
+      responses:
+        '201': { description: Change Order em DRAFT }
+        '403': { description: Não é o prestador do contrato }
+        '409': { description: Pedido em estado que não aceita mudança comercial }
+        '422': { description: Minutos fora do incremento, delta zero/negativo ou tipo inconsistente }
+    get:
+      tags: [Marketplace]
+      summary: PACK-03 §21 — Lista as mudanças comerciais do contrato
+      description: >
+        Comprador e vendedor. A economia interna do prestador (base da fee, taxa
+        e líquido) só aparece para o prestador (§15).
+      operationId: listTrustChangeOrders
+      parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Lista de Change Orders }
+        '403': { description: Não é participante do pedido }
+
+  /marketplace/change-orders/{changeOrderId}:
+    get:
+      tags: [Marketplace]
+      summary: PACK-03 §21 — Detalhe de um Trust Change Order
+      operationId: getTrustChangeOrder
+      parameters: [{ name: changeOrderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Change Order }
+        '403': { description: Não é participante do pedido }
+        '404': { description: Change Order inexistente }
+
+  /marketplace/change-orders/{changeOrderId}/submit:
+    post:
+      tags: [Marketplace]
+      summary: PACK-03 §6.1 — Submete a mudança à aprovação do cliente
+      description: Status → `PENDING_MEMBER_APPROVAL`. Publica `TrustChangeOrder.Submitted`.
+      operationId: submitTrustChangeOrder
+      parameters: [{ name: changeOrderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: PENDING_MEMBER_APPROVAL }
+        '403': { description: Não é quem propôs }
+        '409': { description: Já submetida, decidida ou vencida }
+
+  /marketplace/change-orders/{changeOrderId}/approve:
+    post:
+      tags: [Marketplace]
+      summary: PACK-03 §6.1/§12 — Cliente aprova a mudança
+      description: >
+        **Só o cliente** (Trust Member). É o único ponto em que o valor
+        autorizado do contrato sobe. Terminal e imutável: aprovar duas vezes
+        devolve 409 e o delta entra uma única vez (§19). A custódia do PACK-01
+        **não** é alterada — o delta fica autorizado e fora da custódia (§9).
+      operationId: approveTrustChangeOrder
+      parameters: [{ name: changeOrderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: APPROVED }
+        '403': { description: Não é o cliente do contrato }
+        '409': { description: Já decidida ou vencida }
+
+  /marketplace/change-orders/{changeOrderId}/reject:
+    post:
+      tags: [Marketplace]
+      summary: PACK-03 §6.1 — Cliente rejeita a mudança
+      description: Terminal. Nada muda no valor nem no tempo autorizado.
+      operationId: rejectTrustChangeOrder
+      parameters: [{ name: changeOrderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        content:
+          application/json:
+            example: { reason: Não autorizo esse valor adicional. }
+      responses:
+        '200': { description: REJECTED }
+        '403': { description: Não é o cliente do contrato }
+        '409': { description: Já decidida ou vencida }
+
+  /marketplace/change-orders/{changeOrderId}/cancel:
+    post:
+      tags: [Marketplace]
+      summary: PACK-03 §6.1 — Prestador retira a mudança antes da decisão
+      operationId: cancelTrustChangeOrder
+      parameters: [{ name: changeOrderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: CANCELLED }
+        '403': { description: Não é quem propôs }
+        '409': { description: Já decidida }
+
+  /marketplace/change-orders/{changeOrderId}/evidences:
+    post:
+      tags: [Marketplace]
+      summary: PACK-03 §13 — Anexa evidência à mudança (multipart)
+      description: >
+        Campos `type` (PHOTO/RECEIPT/QUOTE/DOCUMENT/OTHER) e arquivo `file`.
+        Só o proponente, e só antes da decisão. Reaproveita a abstração de
+        storage do shared kernel, com bucket e tabela próprios — a evidência de
+        Change Order **não** vai para `verification_evidences` (§13).
+      operationId: submitTrustChangeOrderEvidence
+      parameters: [{ name: changeOrderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [type, file]
+              properties:
+                type: { type: string, enum: [PHOTO, RECEIPT, QUOTE, DOCUMENT, OTHER] }
+                file: { type: string, format: binary }
+      responses:
+        '201': { description: Evidência anexada }
+        '403': { description: Não é quem propôs }
+        '409': { description: Change Order já decidida }
+        '413': { description: Arquivo acima do limite }
+        '415': { description: Tipo de arquivo não permitido }
+
+  /marketplace/orders/{orderId}/pause:
+    post:
+      tags: [Marketplace]
+      summary: PACK-03 §10.2 — Trust Pause (interrupção não faturável)
+      description: >
+        Só o prestador, e só com a sessão ACTIVE. Uma pausa aberta por vez —
+        garantido por índice parcial no banco (§19). Publica
+        `ServiceExecution.Paused`.
+      operationId: pauseServiceExecution
+      parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reasonCode]
+              properties:
+                reasonCode: { type: string, enum: [PERSONAL_BREAK, PERSONAL_CALL, MEAL, OTHER_NON_BILLABLE] }
+                note: { type: string }
+            example: { reasonCode: MEAL, note: Parada para almoço }
+      responses:
+        '200': { description: Sessão PAUSED }
+        '403': { description: Não é o prestador }
+        '409': { description: Sessão inexistente ou fora de ACTIVE }
+
+  /marketplace/orders/{orderId}/resume:
+    post:
+      tags: [Marketplace]
+      summary: PACK-03 §10.3 — Trust Resume
+      description: Fecha a pausa aberta e devolve a sessão para ACTIVE. Publica `ServiceExecution.Resumed`.
+      operationId: resumeServiceExecution
+      parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Sessão ACTIVE }
+        '403': { description: Não é o prestador }
+        '409': { description: Nenhuma pausa aberta }
+
+  /marketplace/orders/{orderId}/service-summary:
+    get:
+      tags: [Marketplace]
+      summary: PACK-03 §15 — Service Summary (o que contratei + o que aprovei = total)
+      description: >
+        Reconcilia o snapshot inicial imutável do PACK-02 com os Change Orders
+        aprovados, e separa tempo decorrido, pausado, ativo e **faturável**.
+        `amountInCustody` / `amountAuthorizedNotInCustody` explicitam o recorte
+        do §9: a custódia segura o valor da contratação, e o que foi aprovado
+        depois está autorizado mas não custodiado. Trust Fee e líquido do
+        prestador só aparecem na visão do prestador.
+      operationId: getServiceSummary
+      parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Resumo do serviço }
+        '403': { description: Não é participante do pedido }
+        '422': { description: Pedido sem snapshot comercial (anterior ao PACK-02) }
+
+
   # ── Disputas e avaliações (Módulo 9 — MRK-023..025) ───────────────────────
   /marketplace/review-catalog:
     get:

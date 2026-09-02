@@ -1,5 +1,6 @@
 import {
   BusinessRuleViolationException,
+  DomainException,
   EntityNotFoundException,
   ForbiddenOperationException,
   StateConflictException,
@@ -341,5 +342,110 @@ export class CommercialPolicyNotConfiguredException extends BusinessRuleViolatio
 
   constructor() {
     super('No active commercial policy (Trust Fee configuration) is configured.');
+  }
+}
+
+// ── Trust Change Order e execução por tempo (PACK-03) ───────────────────────
+
+export class TrustChangeOrderNotFoundException extends EntityNotFoundException {
+  readonly code = 'TRUST_CHANGE_ORDER_NOT_FOUND';
+
+  constructor() {
+    super('Trust Change Order not found.');
+  }
+}
+
+/** PACK-03 §18: só o Partner do contrato propõe; só o Member decide → 403. */
+export class TrustChangeOrderAccessDeniedException extends ForbiddenOperationException {
+  readonly code = 'TRUST_CHANGE_ORDER_FORBIDDEN';
+
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+/** PACK-03 §6: salto de estado (aprovar duas vezes, editar aprovado...) → 409. */
+export class TrustChangeOrderTransitionException extends StateConflictException {
+  readonly code = 'TRUST_CHANGE_ORDER_INVALID_TRANSITION';
+
+  constructor(from: string, to: string) {
+    super(`Trust Change Order cannot move from ${from} to ${to}.`);
+  }
+}
+
+/** PACK-03 §6/§24: dados do Change Order violam a regra comercial → 422. */
+export class TrustChangeOrderValidationException extends BusinessRuleViolationException {
+  readonly code = 'TRUST_CHANGE_ORDER_INVALID';
+
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+/**
+ * PACK-03 §24: o pedido não está num estado que aceite mudança comercial →
+ * 409. Depois da confirmação do cliente a conta está fechada.
+ */
+export class TrustChangeOrderNotAllowedForOrderException extends StateConflictException {
+  readonly code = 'TRUST_CHANGE_ORDER_NOT_ALLOWED';
+
+  constructor(status: string) {
+    super(`An order in ${status} cannot receive commercial change orders.`);
+  }
+}
+
+/** PACK-03 §6.1: vencida não produz mais efeito (derivada de expires_at) → 409. */
+export class TrustChangeOrderExpiredException extends StateConflictException {
+  readonly code = 'TRUST_CHANGE_ORDER_EXPIRED';
+
+  constructor() {
+    super('This Trust Change Order has expired.');
+  }
+}
+
+/** PACK-03 §10: operação de tempo sem sessão de execução aberta → 409. */
+export class ServiceExecutionSessionNotFoundException extends StateConflictException {
+  readonly code = 'SERVICE_EXECUTION_SESSION_NOT_FOUND';
+
+  constructor() {
+    super('This order has no service execution session; check in first.');
+  }
+}
+
+/** PACK-03 §10/§24: pausar fora de ACTIVE, retomar fora de PAUSED... → 409. */
+export class ServiceExecutionTransitionException extends StateConflictException {
+  readonly code = 'SERVICE_EXECUTION_INVALID_TRANSITION';
+
+  constructor(from: string, to: string) {
+    super(`Service execution session cannot move from ${from} to ${to}.`);
+  }
+}
+
+/** PACK-03 §13: tipo de arquivo não aceito como evidência → 415. */
+export class ChangeOrderEvidenceMediaTypeException extends DomainException {
+  readonly code = 'UNSUPPORTED_MEDIA_TYPE';
+  override readonly httpStatus = 415;
+
+  constructor(mimeType: string) {
+    super(`Media type "${mimeType}" is not allowed for change order evidence.`);
+  }
+}
+
+/** PACK-03 §13: arquivo acima do limite configurado → 413. */
+export class ChangeOrderEvidenceTooLargeException extends DomainException {
+  readonly code = 'FILE_TOO_LARGE';
+  override readonly httpStatus = 413;
+
+  constructor(maxBytes: number) {
+    super(`Change order evidence exceeds the maximum allowed size of ${maxBytes} bytes.`);
+  }
+}
+
+/** PACK-03 §15: sem snapshot comercial não há resumo econômico a apresentar → 422. */
+export class ServiceSummaryUnavailableException extends BusinessRuleViolationException {
+  readonly code = 'SERVICE_SUMMARY_UNAVAILABLE';
+
+  constructor() {
+    super('This order has no frozen commercial snapshot; no service summary is available.');
   }
 }

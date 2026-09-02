@@ -17,5 +17,7 @@ export * from '../../../modules/marketplace/infrastructure/persistence/marketpla
 export * from '../../../modules/marketplace/infrastructure/persistence/marketplace-review.schema';
 export * from '../../../modules/marketplace/infrastructure/persistence/commercial-policy.schema';
 export * from '../../../modules/marketplace/infrastructure/persistence/marketplace-commercial-snapshot.schema';
+export * from '../../../modules/marketplace/infrastructure/persistence/trust-change-order.schema';
+export * from '../../../modules/marketplace/infrastructure/persistence/service-execution.schema';
 export * from '../../../modules/notification/infrastructure/persistence/notifications.schema';
 export * from '../../../modules/payment/infrastructure/persistence/payment.schema';

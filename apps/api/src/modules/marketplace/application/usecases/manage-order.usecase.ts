@@ -6,6 +6,7 @@ import { ORDER_STATUS } from '../../domain/entities/marketplace-types';
 import { SchedulingConflictException } from '../../domain/exceptions/marketplace.exceptions';
 import { MarketplaceListingRepository } from '../../domain/repositories/marketplace-listing.repository';
 import { MarketplaceOrderRepository } from '../../domain/repositories/marketplace-order.repository';
+import { ServiceExecutionRepository } from '../../domain/repositories/service-execution.repository';
 import {
   CancelOrderRequest,
   ConfirmOrderRequest,
@@ -22,6 +23,7 @@ import {
   MarketplaceConfirmation,
 } from '../../domain/entities/marketplace-order-execution';
 import { OrderLifecycleService } from './order-lifecycle.service';
+import { ServiceExecutionUseCase } from './service-execution.usecase';
 
 /**
  * Ciclo de vida do pedido (MRK-016..022). Cada operação valida a transição no
@@ -33,7 +35,9 @@ export class ManageOrderUseCase {
   constructor(
     private readonly orderRepository: MarketplaceOrderRepository,
     private readonly listingRepository: MarketplaceListingRepository,
+    private readonly executionRepository: ServiceExecutionRepository,
     private readonly lifecycle: OrderLifecycleService,
+    private readonly serviceExecution: ServiceExecutionUseCase,
     private readonly auditLogService: AuditLogService,
   ) {}
 
@@ -201,6 +205,9 @@ export class ManageOrderUseCase {
     const startedAt = new Date();
     order.start(identityId, startedAt); // valida SCHEDULED/AWAITING_EXECUTION (BR-001)
     const checkIn = ExecutionEvent.checkIn(orderId, identityId, body, startedAt);
+    // PACK-03 §10.1: a sessão de tempo nasce junto do check-in, na MESMA
+    // transação — não existe execução em andamento sem sessão para medi-la.
+    const session = this.serviceExecution.buildSessionForCheckIn(orderId, identityId, startedAt);
 
     await this.lifecycle.commit({
       order,
@@ -215,11 +222,17 @@ export class ManageOrderUseCase {
         sellerId: order.sellerId,
         startedBy: identityId,
         startedAt: startedAt.toISOString(),
+        // Adição retrocompatível (PACK-03 §22): quem já consumia este evento
+        // ignora o campo novo.
+        sessionId: session.id,
         status: order.status,
       },
-      auditMetadata: { hasLocation: checkIn.hasLocation() },
+      auditMetadata: { hasLocation: checkIn.hasLocation(), sessionId: session.id },
       meta,
-      alsoInTransaction: (tx) => this.orderRepository.saveExecutionEvent(checkIn, tx),
+      alsoInTransaction: async (tx) => {
+        await this.orderRepository.saveExecutionEvent(checkIn, tx);
+        await this.executionRepository.saveSession(session, tx);
+      },
     });
 
     return this.get(identityId, orderId, meta);
@@ -238,6 +251,14 @@ export class ManageOrderUseCase {
     const completedAt = new Date();
     order.completeExecution(identityId, completedAt); // exige IN_PROGRESS (BR-001)
     const checkOut = ExecutionEvent.checkOut(orderId, identityId, body, completedAt);
+    // PACK-03 §10.4/§11: fecha a sessão em memória para o evento já sair com o
+    // tempo decorrido, pausado e FATURÁVEL separados. `actualDuration` continua
+    // significando o que sempre significou (decorrido) — não foi redefinido.
+    const execution = await this.serviceExecution.prepareCheckOut(
+      orderId,
+      identityId,
+      completedAt,
+    );
 
     await this.lifecycle.commit({
       order,
@@ -253,11 +274,25 @@ export class ManageOrderUseCase {
         completedBy: identityId,
         completedAt: completedAt.toISOString(),
         actualDuration: order.actualDuration,
+        // Adições retrocompatíveis (PACK-03 §22).
+        sessionId: execution?.session.id ?? null,
+        elapsedMinutes: execution?.elapsedMinutes ?? null,
+        pausedMinutes: execution?.pausedMinutes ?? null,
+        billableMinutes: execution?.billableMinutes ?? null,
+        authorizedMinutes: execution?.authorizedMinutes ?? null,
         status: order.status,
       },
-      auditMetadata: { actualDuration: order.actualDuration },
+      auditMetadata: {
+        actualDuration: order.actualDuration,
+        elapsedMinutes: execution?.elapsedMinutes ?? null,
+        pausedMinutes: execution?.pausedMinutes ?? null,
+        billableMinutes: execution?.billableMinutes ?? null,
+      },
       meta,
-      alsoInTransaction: (tx) => this.orderRepository.saveExecutionEvent(checkOut, tx),
+      alsoInTransaction: async (tx) => {
+        await this.orderRepository.saveExecutionEvent(checkOut, tx);
+        await execution?.persist(tx);
+      },
     });
 
     return this.get(identityId, orderId, meta);
