@@ -1,0 +1,231 @@
+================================================================================
+                         PACK-01 — REVIEW STATUS
+================================================================================
+
+TÍTULO:     Trust Custody & Release (PAY-003 + PAY-004)
+DATA:       2026-08-31
+ESCOPO:     Custódia de fundos em duas fases + Liberação segura via gateway
+
+================================================================================
+STATUS ATUAL
+================================================================================
+
+✅ IMPLEMENTADO
+
+  • PAY-003 (Hold Funds): Payment.Authorized cria TrustCustody em IN_CUSTODY
+  • PAY-004 (Release Funds): Fase 1 = persistência de decisão, Fase 2 = confirmação
+  • Migration 0025: Aditiva, não destrutiva, reexecutável
+  • 54 suítes de teste / 342 testes verdes
+  • 13 critérios de aceite: 13/13 PASS
+
+⏳ AGUARDANDO REVISÃO DO DIFF (Kondo)
+
+  Próximo passo: revisão técnica do diff completo
+  Referência: docs/PACK-01-COMPLETION-REPORT.md (§22)
+
+
+================================================================================
+RESUMO TÉCNICO
+================================================================================
+
+CUSTODIA (PAY-003)
+─────────────────
+Transição atômica:
+  1. Payment.Authorized → TrustCustody criada em IN_CUSTODY
+  2. Payment → FUNDS_IN_CUSTODY
+  3. Publica: TrustCustody.Created + Funds.Held
+  4. Snapshot financeiro copiado do Payment
+
+LIBERAÇÃO EM DUAS FASES (PAY-004)
+───────────────────────────────
+Fase 1 (em transação):
+  • MarketplaceOrder.CustomerConfirmed dispara
+  • Política verifica 6 regras (sem disputa ativa, fundos em custódia, etc)
+  • Status → READY_FOR_RELEASE
+  • Publica: Funds.ReadyForRelease
+  • COMMIT aqui
+
+Fase 2 (fora de transação):
+  • Gateway.release() chamado de forma idempotente
+  • Se SUCESSO: TrustCustody → RELEASED, Payment → FUNDS_RELEASED
+  • Se FALHA: Fica em READY_FOR_RELEASE, retentável
+
+SEGURANÇA CENTRAL:
+  "A plataforma nunca marca dinheiro como liberado sem confirmação do gateway"
+
+
+================================================================================
+ARQUIVOS ALTERADOS
+================================================================================
+
+NOVOS (14 arquivos)
+──────────────────
+✓ trust-custody.ts               (agregado)
+✓ trust-release-policy.service.ts  (política ALLOW/DENY)
+✓ order-dispute.query.ts         (port de leitura)
+✓ trust-custody.repository.ts    (port)
+✓ hold-funds.usecase.ts          (aplicação)
+✓ release-funds.usecase.ts       (aplicação)
+✓ hold-funds.consumer.ts         (reativo)
+✓ release-funds.consumer.ts      (reativo)
+✓ finalize-release.consumer.ts   (reativo)
+✓ drizzle-trust-custody.repository.ts  (adapter)
+✓ marketplace-dispute.query.ts   (adapter)
+✓ custody-release.usecase.spec.ts  (21 testes)
+✓ pack-01.e2e.spec.ts            (3 testes)
+✓ 0025_pack01_trust_custody.sql  (migration)
+
+MODIFICADOS (6 arquivos)
+────────────────────────
+• payment-gateway.ts             (+ operação release)
+• sandbox-payment.gateway.ts     (+ release determinístico)
+• payment.schema.ts              (+ trust_custodies)
+• payment.exceptions.ts          (+ 3 exceções)
+• payment.module.ts              (wiring)
+• event-consumer.ts              (+ managesOwnTransaction)
+• outbox-relay.service.ts        (+ caminho sem transação)
+• event-catalog.md               (+ 4 eventos)
+
+
+================================================================================
+EVENTOS (Envelope canônico PACK-00 v1.1)
+================================================================================
+
+1. TrustCustody.Created       → payment-service
+2. Funds.Held                 → payment-service
+3. Funds.ReadyForRelease      → payment-service
+4. Funds.Released             → payment-service
+
+Todos com: eventType, aggregateType, aggregateId, createdAt
+
+
+================================================================================
+DECISÕES TÉCNICAS CONFIRMADAS
+================================================================================
+
+D1: managesOwnTransaction
+   Problema: consumers que chamam gateway não podem estar em transação
+   Solução: opt-in no shared kernel; finalize é idempotente
+   ✓ Confirmado com Kondo (provedor real = Asaas, 0.5-2s)
+
+D2: Nível de log
+   ERROR: quando Payment diz FUNDS_IN_CUSTODY mas custódia não existe
+   WARN: quando não há Payment para um pedido confirmado (rotina)
+
+D3: Representação de dinheiro
+   trust_custodies.amount = numeric(18,2) (espelha payments.amount)
+   Sem segundo modelo
+
+D4: Leitura Payments → Marketplace
+   Port OrderDisputeQuery em vez de importar entidades
+   Direção: Marketplace → Payments (só por evento), nunca reverso
+
+
+================================================================================
+TESTES & VALIDAÇÃO
+================================================================================
+
+Cobertura:
+  • Unitários PACK-01:      21 testes
+  • E2E PACK-01:            3 testes
+  • Suíte completa:         54 suítes / 342 testes verdes
+
+Casos críticos cobertos:
+  ✓ Gateway falha não libera
+  ✓ Retry usa mesma chave (idempotência)
+  ✓ CustomerConfirmed duplicado não duplica liberação
+  ✓ Disputa ativa bloqueia sem chamar gateway
+  ✓ Custódia existe antes de serviço concluído (ciclo completo)
+
+
+================================================================================
+MIGRATION
+================================================================================
+
+0025_pack01_trust_custody.sql
+  • Aditiva e não destrutiva
+  • Cria: trust_custodies, 4 FKs, UNIQUE(payment_id), índices
+  • Reexecutável com segurança
+  • Aplicada: 26 migrations totais
+
+payments NÃO foi alterada:
+  • FUNDS_IN_CUSTODY e FUNDS_RELEASED já existiam desde 0022
+  • Transições já mapeadas
+
+
+================================================================================
+FORA DE ESCOPO (Confirmado)
+================================================================================
+
+Não incluso neste Pack:
+  ✗ Liquidação bancária real
+  ✗ Taxa / Split (feito dentro do Asaas depois)
+  ✗ Reembolso
+  ✗ Ledger imutável
+  ✗ Conciliação
+  ✗ Provedor real (Asaas)
+  ✗ PCI / KYC
+  ✗ Frontend de pagamento
+  ✗ Liberação automática por tempo
+
+
+================================================================================
+PRÓXIMOS PASSOS
+================================================================================
+
+1. ⏳ Revisão do diff (Kondo)
+   → Validação técnica do código completo
+   → Aprovação para merge
+
+2. 📋 PACK-02 (Preparação)
+   → Impacto do split no Asaas (PAY-005/007)
+   → Decidir escopo antes de codificar
+
+3. 🌐 Produção
+   → API retorna online (Render)
+   → Validação em ambiente publicado
+
+
+================================================================================
+DOCUMENTAÇÃO
+================================================================================
+
+Relatório completo:  docs/PACK-01-COMPLETION-REPORT.md
+Especificação:      docs-extracted/Arquitetura-ARCH/TRUST_PACK-01_v1.0.docx
+Código:             apps/api/src/modules/payment/
+
+Referências cruzadas:
+  • PACK-00 v1.1      (envelope canônico)
+  • PLANO-DE-MODULOS  (dependências)
+  • INCONSISTENCIAS   (desvios)
+
+
+================================================================================
+REVISÃO ANTERIOR (PACK-00 v1.1)
+================================================================================
+
+Status: ✅ APROVADO (revisão 498a67a)
+Diff: docs/REVISAO-PACK-00.md
+
+Este Pack segue o mesmo fluxo:
+  1. Implementação completa ✅
+  2. Testes verdes ✅
+  3. Documentação ✅
+  4. Aguardando revisão do Kondo ⏳
+
+
+================================================================================
+AUTOR & COMMIT
+================================================================================
+
+Implementado por: Alexandre (deskdanger@gmail.com)
+Commit:           2c9ec73
+Branch:           main
+Data:             2026-08-31
+
+Última atualização: 2026-09-01
+
+
+================================================================================
+FIM DO RELATÓRIO
+================================================================================
