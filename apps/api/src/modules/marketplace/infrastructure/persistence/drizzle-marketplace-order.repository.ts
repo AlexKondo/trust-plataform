@@ -10,6 +10,7 @@ import { MarketplaceOrder } from '../../domain/entities/marketplace-order';
 import {
   ExecutionEventType,
   OrderStatus,
+  PricingModel,
   SCHEDULING_STATUS,
   SchedulingStatus,
 } from '../../domain/entities/marketplace-types';
@@ -38,6 +39,8 @@ export class DrizzleMarketplaceOrderRepository extends MarketplaceOrderRepositor
       ...props,
       amount: props.amount.toFixed(2),
       quantity: props.quantity.toFixed(4),
+      hourlyRateAmount:
+        props.hourlyRateAmount === null ? null : props.hourlyRateAmount.toFixed(2),
     };
     await target
       .insert(marketplaceOrders)
@@ -204,6 +207,10 @@ function toOrder(row: MarketplaceOrderRow): MarketplaceOrder {
     // `char(3)` volta com padding do Postgres — o domínio guarda só o código.
     currency: row.currency.trim(),
     quantity: Number(row.quantity),
+    pricingModel: row.pricingModel as PricingModel,
+    hourlyRateAmount: row.hourlyRateAmount === null ? null : Number(row.hourlyRateAmount),
+    minimumMinutes: row.minimumMinutes,
+    billingIncrementMinutes: row.billingIncrementMinutes,
     status: row.status as OrderStatus,
     startedAt: row.startedAt,
     startedBy: row.startedBy,

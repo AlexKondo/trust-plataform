@@ -6,7 +6,7 @@ import {
 } from '../exceptions/marketplace.exceptions';
 import { MarketplaceOffer } from './marketplace-offer';
 import { MarketplaceOrder } from './marketplace-order';
-import { ORDER_STATUS, ORDER_TRANSITIONS, OrderStatus } from './marketplace-types';
+import { ORDER_STATUS, ORDER_TRANSITIONS, OrderStatus, PRICING_MODEL } from './marketplace-types';
 
 const BUYER = '019fe8f0-0000-7000-8000-000000000001';
 const SELLER = '019fe8f0-0000-7000-8000-000000000002';
@@ -24,6 +24,10 @@ function newOrder(): MarketplaceOrder {
       currency: 'BRL',
       quantity: 1,
       expiresAt: new Date(Date.now() + 86400000),
+      pricingModel: PRICING_MODEL.FIXED_PRICE,
+      hourlyRateAmount: null,
+      minimumMinutes: null,
+      billingIncrementMinutes: null,
     },
   });
   return MarketplaceOrder.createFromOffer(offer);
@@ -60,6 +64,35 @@ describe('MarketplaceOrder — criação (MRK-015)', () => {
     expect(order.isParticipant(BUYER)).toBe(true);
     expect(order.isParticipant(SELLER)).toBe(true);
     expect(() => order.assertParticipant(STRANGER)).toThrow(MarketplaceOrderAccessDeniedException);
+  });
+
+  it('PACK-02 §4 — copia o modelo comercial e os termos hourly do offer aceito', () => {
+    const hourlyOffer = MarketplaceOffer.create({
+      conversationId: '019fe8f0-0000-7000-8000-0000000000f1',
+      listingId: '019fe8f0-0000-7000-8000-0000000000a1',
+      buyerId: BUYER,
+      sellerId: SELLER,
+      createdBy: BUYER,
+      terms: {
+        amount: 150,
+        currency: 'BRL',
+        quantity: 1,
+        expiresAt: new Date(Date.now() + 86400000),
+        pricingModel: 'HOURLY',
+        hourlyRateAmount: 150,
+        minimumMinutes: 60,
+        billingIncrementMinutes: 30,
+      },
+    });
+    const order = MarketplaceOrder.createFromOffer(hourlyOffer);
+    expect(order.pricingModel).toBe('HOURLY');
+    expect(order.hourlyRateAmount).toBe(150);
+    expect(order.minimumMinutes).toBe(60);
+    expect(order.billingIncrementMinutes).toBe(30);
+
+    const fixedOrder = newOrder();
+    expect(fixedOrder.pricingModel).toBe('FIXED_PRICE');
+    expect(fixedOrder.hourlyRateAmount).toBeNull();
   });
 });
 

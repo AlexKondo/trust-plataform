@@ -48,6 +48,11 @@ export interface OrderResponse {
   amount: number;
   currency: string;
   quantity: number;
+  /** PACK-02 §4 — copiado do offer aceito; imutável. */
+  pricingModel: string;
+  hourlyRateAmount: number | null;
+  minimumMinutes: number | null;
+  billingIncrementMinutes: number | null;
   status: string;
   /** O que a plataforma espera agora (MRK-016 BR-004). */
   nextAction: string;

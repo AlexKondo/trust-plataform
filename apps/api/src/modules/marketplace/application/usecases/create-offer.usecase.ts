@@ -3,8 +3,14 @@ import { PinoLogger } from 'nestjs-pino';
 import { AuditLogService } from '../../../../shared/audit/audit-log.service';
 import { DRIZZLE, Database } from '../../../../shared/database/database.module';
 import { OutboxService } from '../../../../shared/events/outbox.service';
-import { MarketplaceOffer } from '../../domain/entities/marketplace-offer';
-import { MarketplaceOfferNotRecipientException } from '../../domain/exceptions/marketplace.exceptions';
+import { MarketplaceOffer, OfferTerms } from '../../domain/entities/marketplace-offer';
+import { PRICING_MODEL } from '../../domain/entities/marketplace-types';
+import {
+  CommercialPolicyNotConfiguredException,
+  MarketplaceOfferNotRecipientException,
+} from '../../domain/exceptions/marketplace.exceptions';
+import { calculateInitialHourlyAmount } from '../../domain/services/hourly-pricing.service';
+import { CommercialPolicyRepository } from '../../domain/repositories/commercial-policy.repository';
 import { MarketplaceOfferRepository } from '../../domain/repositories/marketplace-offer.repository';
 import {
   CreateOfferRequest,
@@ -19,12 +25,19 @@ import { MarketplaceOfferService } from './marketplace-offer.service';
  * MRK-009 — o comprador formaliza a proposta dentro de uma conversa aberta.
  * INCONSISTENCIAS #25: no MVP só o comprador ABRE a negociação; o vendedor
  * participa contrapondo (MRK-012).
+ *
+ * PACK-02 §9 — resolve o modelo comercial da proposta: FIXED_PRICE preserva o
+ * comportamento legado; HOURLY deriva o valor inicial contratado a partir de
+ * `hourlyRateAmount`/`minimumMinutes` (nunca aceita `amount` livre) e resolve
+ * `billingIncrementMinutes` da `CommercialPolicy` vigente quando o cliente não
+ * o informa (default MVP = 30min, configurável — nunca hard-coded aqui).
  */
 @Injectable()
 export class CreateOfferUseCase {
   constructor(
     private readonly offerRepository: MarketplaceOfferRepository,
     private readonly offerService: MarketplaceOfferService,
+    private readonly commercialPolicyRepository: CommercialPolicyRepository,
     private readonly outboxService: OutboxService,
     private readonly auditLogService: AuditLogService,
     @Inject(DRIZZLE) private readonly db: Database,
@@ -50,19 +63,42 @@ export class CreateOfferUseCase {
     }
     await this.offerService.assertNoLiveOffer(conversationId);
 
+    const currency = body.currency ?? listing.currency;
+    const terms: OfferTerms =
+      body.pricingModel === PRICING_MODEL.HOURLY
+        ? {
+            // §4.2/§9 — valor inicial contratado é sempre DERIVADO; o cliente
+            // nunca propõe `amount` livre para HOURLY.
+            amount: calculateInitialHourlyAmount(body.hourlyRateAmount!, body.minimumMinutes!),
+            currency,
+            quantity: body.quantity,
+            expiresAt: body.expiresAt,
+            notes: body.notes ?? null,
+            pricingModel: PRICING_MODEL.HOURLY,
+            hourlyRateAmount: body.hourlyRateAmount!,
+            minimumMinutes: body.minimumMinutes!,
+            billingIncrementMinutes:
+              body.billingIncrementMinutes ?? (await this.resolveDefaultBillingIncrement()),
+          }
+        : {
+            amount: body.amount!,
+            currency,
+            quantity: body.quantity,
+            expiresAt: body.expiresAt,
+            notes: body.notes ?? null,
+            pricingModel: PRICING_MODEL.FIXED_PRICE,
+            hourlyRateAmount: null,
+            minimumMinutes: null,
+            billingIncrementMinutes: null,
+          };
+
     const offer = MarketplaceOffer.create({
       conversationId,
       listingId: listing.id,
       buyerId: conversation.buyerId,
       sellerId: conversation.sellerId,
       createdBy: identityId,
-      terms: {
-        amount: body.amount,
-        currency: body.currency ?? listing.currency,
-        quantity: body.quantity,
-        expiresAt: body.expiresAt,
-        notes: body.notes ?? null,
-      },
+      terms,
     });
 
     await this.db.transaction(async (tx) => {
@@ -82,6 +118,11 @@ export class CreateOfferUseCase {
           amount: offer.amount,
           currency: offer.currency,
           status: offer.status,
+          // PACK-02 §17 — adição retrocompatível: campos novos, evento existente.
+          pricingModel: offer.pricingModel,
+          hourlyRateAmount: offer.hourlyRateAmount,
+          minimumMinutes: offer.minimumMinutes,
+          billingIncrementMinutes: offer.billingIncrementMinutes,
           createdAt: offer.createdAt.toISOString(),
         },
       });
@@ -96,7 +137,12 @@ export class CreateOfferUseCase {
           userAgent: meta.userAgent,
           correlationId: meta.correlationId,
           requestId: meta.requestId,
-          metadata: { conversationId, listingId: listing.id, amount: offer.amount },
+          metadata: {
+            conversationId,
+            listingId: listing.id,
+            amount: offer.amount,
+            pricingModel: offer.pricingModel,
+          },
         },
         tx,
       );
@@ -119,5 +165,14 @@ export class CreateOfferUseCase {
     );
 
     return toOfferResponse(offer);
+  }
+
+  /** PACK-02 §9 — resolve o default de `billingIncrementMinutes` (MVP: 30min, configurável). */
+  private async resolveDefaultBillingIncrement(): Promise<number> {
+    const policy = await this.commercialPolicyRepository.findActive();
+    if (!policy) {
+      throw new CommercialPolicyNotConfiguredException();
+    }
+    return policy.defaultBillingIncrementMinutes;
   }
 }

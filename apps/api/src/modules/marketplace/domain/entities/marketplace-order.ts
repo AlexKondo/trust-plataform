@@ -10,6 +10,7 @@ import {
   ORDER_STATUS,
   ORDER_TRANSITIONS,
   OrderStatus,
+  PricingModel,
 } from './marketplace-types';
 
 export interface MarketplaceOrderProps {
@@ -22,6 +23,11 @@ export interface MarketplaceOrderProps {
   amount: number;
   currency: string;
   quantity: number;
+  /** PACK-02 §4 — copiado do offer aceito; imutável (MRK-017 BR-001). */
+  pricingModel: PricingModel;
+  hourlyRateAmount: number | null;
+  minimumMinutes: number | null;
+  billingIncrementMinutes: number | null;
   status: OrderStatus;
   startedAt: Date | null;
   startedBy: string | null;
@@ -76,6 +82,10 @@ export class MarketplaceOrder {
       amount: offer.amount,
       currency: offer.currency,
       quantity: offer.quantity,
+      pricingModel: offer.pricingModel,
+      hourlyRateAmount: offer.hourlyRateAmount,
+      minimumMinutes: offer.minimumMinutes,
+      billingIncrementMinutes: offer.billingIncrementMinutes,
       status: ORDER_STATUS.CREATED,
       startedAt: null,
       startedBy: null,
@@ -131,6 +141,22 @@ export class MarketplaceOrder {
 
   get quantity(): number {
     return this.props.quantity;
+  }
+
+  get pricingModel(): PricingModel {
+    return this.props.pricingModel;
+  }
+
+  get hourlyRateAmount(): number | null {
+    return this.props.hourlyRateAmount;
+  }
+
+  get minimumMinutes(): number | null {
+    return this.props.minimumMinutes;
+  }
+
+  get billingIncrementMinutes(): number | null {
+    return this.props.billingIncrementMinutes;
   }
 
   get status(): OrderStatus {

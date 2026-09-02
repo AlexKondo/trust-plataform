@@ -183,6 +183,13 @@
       "when": 1787000000000,
       "tag": "0025_pack01_trust_custody",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1788000000000,
+      "tag": "0026_pack02_commercial_amount_and_fee",
+      "breakpoints": true
     }
   ]
 }

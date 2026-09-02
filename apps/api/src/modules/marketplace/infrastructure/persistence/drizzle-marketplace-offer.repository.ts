@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, eq } from 'drizzle-orm';
 import { DRIZZLE, Database, DatabaseExecutor } from '../../../../shared/database/database.module';
 import { MarketplaceOffer } from '../../domain/entities/marketplace-offer';
-import { OFFER_STATUS, OfferStatus } from '../../domain/entities/marketplace-types';
+import { OFFER_STATUS, OfferStatus, PricingModel } from '../../domain/entities/marketplace-types';
 import { MarketplaceOfferRepository } from '../../domain/repositories/marketplace-offer.repository';
 import { MarketplaceOfferRow, marketplaceOffers } from './marketplace-offer.schema';
 
@@ -27,6 +27,8 @@ export class DrizzleMarketplaceOfferRepository extends MarketplaceOfferRepositor
         ...props,
         amount: props.amount.toFixed(2),
         quantity: props.quantity.toFixed(4),
+        hourlyRateAmount:
+          props.hourlyRateAmount === null ? null : props.hourlyRateAmount.toFixed(2),
       };
       await target
         .insert(marketplaceOffers)
@@ -116,6 +118,10 @@ function toOffer(row: MarketplaceOfferRow): MarketplaceOffer {
     status: row.status as OfferStatus,
     expiresAt: row.expiresAt,
     notes: row.notes,
+    pricingModel: row.pricingModel as PricingModel,
+    hourlyRateAmount: row.hourlyRateAmount === null ? null : Number(row.hourlyRateAmount),
+    minimumMinutes: row.minimumMinutes,
+    billingIncrementMinutes: row.billingIncrementMinutes,
     withdrewAt: row.withdrewAt,
     withdrewBy: row.withdrewBy,
     withdrawReason: row.withdrawReason,

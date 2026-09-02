@@ -6,8 +6,8 @@ import {
   MarketplaceOfferOwnershipException,
   MarketplaceOfferValidationException,
 } from '../exceptions/marketplace.exceptions';
-import { MarketplaceOffer } from './marketplace-offer';
-import { OFFER_STATUS } from './marketplace-types';
+import { MarketplaceOffer, OfferTerms } from './marketplace-offer';
+import { OFFER_STATUS, PRICING_MODEL } from './marketplace-types';
 
 const CONVERSATION = '019fe8f0-0000-7000-8000-0000000000f1';
 const LISTING = '019fe8f0-0000-7000-8000-0000000000a1';
@@ -17,7 +17,10 @@ const STRANGER = '019fe8f0-0000-7000-8000-000000000003';
 
 const inDays = (days: number) => new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 
-function buyerOffer(overrides: { amount?: number; expiresAt?: Date } = {}): MarketplaceOffer {
+/** Termos FIXED_PRICE por default; passe overrides para customizar (inclusive HOURLY). */
+function buyerOffer(
+  overrides: { amount?: number; expiresAt?: Date } & Partial<OfferTerms> = {},
+): MarketplaceOffer {
   return MarketplaceOffer.create({
     conversationId: CONVERSATION,
     listingId: LISTING,
@@ -30,6 +33,35 @@ function buyerOffer(overrides: { amount?: number; expiresAt?: Date } = {}): Mark
       quantity: 1,
       expiresAt: overrides.expiresAt ?? inDays(7),
       notes: '  Posso pagar à vista.  ',
+      pricingModel: PRICING_MODEL.FIXED_PRICE,
+      hourlyRateAmount: null,
+      minimumMinutes: null,
+      billingIncrementMinutes: null,
+      ...overrides,
+    },
+  });
+}
+
+function hourlyOffer(
+  overrides: Partial<OfferTerms> & { expiresAt?: Date } = {},
+): MarketplaceOffer {
+  return MarketplaceOffer.create({
+    conversationId: CONVERSATION,
+    listingId: LISTING,
+    buyerId: BUYER,
+    sellerId: SELLER,
+    createdBy: BUYER,
+    terms: {
+      amount: 150,
+      currency: 'BRL',
+      quantity: 1,
+      expiresAt: overrides.expiresAt ?? inDays(7),
+      notes: null,
+      pricingModel: PRICING_MODEL.HOURLY,
+      hourlyRateAmount: 150,
+      minimumMinutes: 60,
+      billingIncrementMinutes: 30,
+      ...overrides,
     },
   });
 }
@@ -213,5 +245,113 @@ describe('MarketplaceOffer — expiração derivada (MRK-009 BR-007)', () => {
     offer.accept(SELLER);
     const later = new Date(offer.expiresAt.getTime() + 1000);
     expect(offer.effectiveStatus(later)).toBe(OFFER_STATUS.ACCEPTED);
+  });
+});
+
+describe('MarketplaceOffer — modelo comercial (PACK-02 §4/§9)', () => {
+  it('FIXED_PRICE nasce sem termos hourly', () => {
+    const offer = buyerOffer();
+    expect(offer.pricingModel).toBe(PRICING_MODEL.FIXED_PRICE);
+    expect(offer.hourlyRateAmount).toBeNull();
+    expect(offer.minimumMinutes).toBeNull();
+    expect(offer.billingIncrementMinutes).toBeNull();
+  });
+
+  it('HOURLY nasce com os termos hourly preservados', () => {
+    const offer = hourlyOffer();
+    expect(offer.pricingModel).toBe(PRICING_MODEL.HOURLY);
+    expect(offer.hourlyRateAmount).toBe(150);
+    expect(offer.minimumMinutes).toBe(60);
+    expect(offer.billingIncrementMinutes).toBe(30);
+  });
+
+  it('HOURLY exige hourlyRateAmount > 0 (§15)', () => {
+    expect(() => hourlyOffer({ hourlyRateAmount: 0 })).toThrow(MarketplaceOfferValidationException);
+    expect(() => hourlyOffer({ hourlyRateAmount: null })).toThrow(MarketplaceOfferValidationException);
+  });
+
+  it('HOURLY exige minimumMinutes inteiro > 0 (§15)', () => {
+    expect(() => hourlyOffer({ minimumMinutes: 0 })).toThrow(MarketplaceOfferValidationException);
+    expect(() => hourlyOffer({ minimumMinutes: null })).toThrow(MarketplaceOfferValidationException);
+    expect(() => hourlyOffer({ minimumMinutes: 1.5 })).toThrow(MarketplaceOfferValidationException);
+  });
+
+  it('billingIncrementMinutes <= 0 é rejeitado (§15)', () => {
+    expect(() => hourlyOffer({ billingIncrementMinutes: 0 })).toThrow(
+      MarketplaceOfferValidationException,
+    );
+    expect(() => hourlyOffer({ billingIncrementMinutes: -30 })).toThrow(
+      MarketplaceOfferValidationException,
+    );
+  });
+
+  it('FIXED_PRICE rejeita campos hourly preenchidos (ambiguidade — §15)', () => {
+    expect(() => buyerOffer({ hourlyRateAmount: 100 })).toThrow(MarketplaceOfferValidationException);
+    expect(() => buyerOffer({ minimumMinutes: 30 })).toThrow(MarketplaceOfferValidationException);
+    expect(() => buyerOffer({ billingIncrementMinutes: 30 })).toThrow(
+      MarketplaceOfferValidationException,
+    );
+  });
+
+  it('pricingModel fora do enum é rejeitado ("Unsupported pricingModel" — §15)', () => {
+    expect(() =>
+      MarketplaceOffer.create({
+        conversationId: CONVERSATION,
+        listingId: LISTING,
+        buyerId: BUYER,
+        sellerId: SELLER,
+        createdBy: BUYER,
+        terms: {
+          amount: 100,
+          currency: 'BRL',
+          quantity: 1,
+          expiresAt: inDays(7),
+          // @ts-expect-error — valor deliberadamente inválido para o teste
+          pricingModel: 'SUBSCRIPTION',
+          hourlyRateAmount: null,
+          minimumMinutes: null,
+          billingIncrementMinutes: null,
+        },
+      }),
+    ).toThrow(MarketplaceOfferValidationException);
+  });
+
+  it('update() rejeita mudança de amount em offer HOURLY (o valor é derivado)', () => {
+    const offer = hourlyOffer();
+    expect(() => offer.update(BUYER, { amount: 999 })).toThrow(MarketplaceOfferValidationException);
+    // quantity/expiresAt/notes continuam editáveis normalmente
+    const changed = offer.update(BUYER, { quantity: 2 });
+    expect(changed).toEqual(['quantity']);
+    expect(offer.amount).toBe(150); // amount não mudou
+  });
+
+  it('counter() de uma oferta HOURLY herda os termos hourly do pai e ignora amount recebido', () => {
+    const original = hourlyOffer();
+    const counter = original.counter(SELLER, {
+      amount: 999999, // deve ser ignorado — HOURLY deriva o valor
+      currency: 'USD', // ignorado — herda a moeda da negociação
+      quantity: 1,
+      expiresAt: inDays(3),
+    });
+
+    expect(counter.pricingModel).toBe(PRICING_MODEL.HOURLY);
+    expect(counter.hourlyRateAmount).toBe(150);
+    expect(counter.minimumMinutes).toBe(60);
+    expect(counter.billingIncrementMinutes).toBe(30);
+    expect(counter.amount).toBe(150); // herdado do pai, não os 999999 propostos
+    expect(counter.currency).toBe('BRL');
+  });
+
+  it('counter() de uma oferta FIXED_PRICE continua honrando o amount contraposto', () => {
+    const original = buyerOffer({ amount: 200 });
+    const counter = original.counter(SELLER, {
+      amount: 250,
+      currency: 'BRL',
+      quantity: 1,
+      expiresAt: inDays(3),
+    });
+    expect(counter.pricingModel).toBe(PRICING_MODEL.FIXED_PRICE);
+    expect(counter.amount).toBe(250);
+    expect(counter.hourlyRateAmount).toBeNull();
   });
 });

@@ -3,14 +3,22 @@ import { describe, expect, it, vi } from 'vitest';
 import { AuditLogService } from '../../../../shared/audit/audit-log.service';
 import { Database } from '../../../../shared/database/database.module';
 import { OutboxService } from '../../../../shared/events/outbox.service';
+import { CommercialPolicy } from '../../domain/entities/commercial-policy';
 import { MarketplaceConversation } from '../../domain/entities/marketplace-conversation';
 import { MarketplaceListing } from '../../domain/entities/marketplace-listing';
 import { MarketplaceOffer } from '../../domain/entities/marketplace-offer';
-import { LISTING_STATUS, LISTING_TYPE, OFFER_STATUS } from '../../domain/entities/marketplace-types';
+import {
+  LISTING_STATUS,
+  LISTING_TYPE,
+  OFFER_STATUS,
+  PRICING_MODEL,
+} from '../../domain/entities/marketplace-types';
 import {
   MarketplaceListingNotAvailableForOrderException,
   MarketplaceOfferNotRecipientException,
 } from '../../domain/exceptions/marketplace.exceptions';
+import { CommercialPolicyRepository } from '../../domain/repositories/commercial-policy.repository';
+import { MarketplaceCommercialSnapshotRepository } from '../../domain/repositories/marketplace-commercial-snapshot.repository';
 import { MarketplaceListingRepository } from '../../domain/repositories/marketplace-listing.repository';
 import { MarketplaceOfferRepository } from '../../domain/repositories/marketplace-offer.repository';
 import { MarketplaceOrderRepository } from '../../domain/repositories/marketplace-order.repository';
@@ -39,7 +47,13 @@ function publishedListing(): MarketplaceListing {
   return listing;
 }
 
-function scenario(options: { competitors?: MarketplaceOffer[]; listing?: MarketplaceListing } = {}) {
+function scenario(
+  options: {
+    competitors?: MarketplaceOffer[];
+    listing?: MarketplaceListing;
+    commercialPolicy?: CommercialPolicy;
+  } = {},
+) {
   const listing = options.listing ?? publishedListing();
   const conversation = MarketplaceConversation.open({
     listingId: listing.id,
@@ -52,7 +66,16 @@ function scenario(options: { competitors?: MarketplaceOffer[]; listing?: Marketp
     buyerId: BUYER,
     sellerId: SELLER,
     createdBy: BUYER,
-    terms: { amount: 550, currency: 'BRL', quantity: 1, expiresAt: inDays(5) },
+    terms: {
+      amount: 550,
+      currency: 'BRL',
+      quantity: 1,
+      expiresAt: inDays(5),
+      pricingModel: PRICING_MODEL.FIXED_PRICE,
+      hourlyRateAmount: null,
+      minimumMinutes: null,
+      billingIncrementMinutes: null,
+    },
   });
 
   const offerRepository = {
@@ -78,6 +101,21 @@ function scenario(options: { competitors?: MarketplaceOffer[]; listing?: Marketp
     transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(Symbol('tx'))),
   } as unknown as Database;
 
+  // PACK-02 §10 — política ativa (seed técnico de 1000 bps = 10%, ver migration 0026).
+  const commercialPolicy = CommercialPolicy.restore({
+    id: 'policy-1',
+    trustFeeRateBps: 1000,
+    defaultBillingIncrementMinutes: 30,
+    createdAt: new Date(),
+  });
+  const commercialPolicyRepository = {
+    findActive: vi.fn().mockResolvedValue(options.commercialPolicy ?? commercialPolicy),
+  } as unknown as CommercialPolicyRepository;
+  const commercialSnapshotRepository = {
+    save: vi.fn().mockResolvedValue(undefined),
+    findByOrderId: vi.fn().mockResolvedValue(null),
+  } as unknown as MarketplaceCommercialSnapshotRepository;
+
   const offerService = new MarketplaceOfferService(
     offerRepository,
     conversationRepository,
@@ -91,11 +129,15 @@ function scenario(options: { competitors?: MarketplaceOffer[]; listing?: Marketp
     orderRepository,
     listingRepository,
     outbox,
+    commercialPolicyRepository,
+    commercialSnapshotRepository,
     useCase: new AcceptOfferUseCase(
       offerRepository,
       orderRepository,
       listingRepository,
       offerService,
+      commercialPolicyRepository,
+      commercialSnapshotRepository,
       outbox,
       audit,
       db,
@@ -171,7 +213,16 @@ describe('AcceptOfferUseCase (MRK-013) — o pivô da negociação', () => {
       buyerId: BUYER,
       sellerId: SELLER,
       createdBy: BUYER,
-      terms: { amount: 500, currency: 'BRL', quantity: 1, expiresAt: inDays(2) },
+      terms: {
+        amount: 500,
+        currency: 'BRL',
+        quantity: 1,
+        expiresAt: inDays(2),
+        pricingModel: PRICING_MODEL.FIXED_PRICE,
+        hourlyRateAmount: null,
+        minimumMinutes: null,
+        billingIncrementMinutes: null,
+      },
     });
     const { useCase, offer } = scenario({ listing, competitors: [competitor] });
 
@@ -202,5 +253,42 @@ describe('AcceptOfferUseCase (MRK-013) — o pivô da negociação', () => {
     const listing = publishedListing();
     listing.reserve();
     expect(() => listing.reserve()).toThrow(MarketplaceListingNotAvailableForOrderException);
+  });
+});
+
+describe('AcceptOfferUseCase — snapshot econômico (PACK-02 §10)', () => {
+  it('resolve a política vigente e congela o snapshot com grossAmount === order.amount', async () => {
+    const { useCase, offer, commercialPolicyRepository, commercialSnapshotRepository } = scenario();
+
+    const result = await useCase.execute(SELLER, offer.id);
+
+    expect(commercialPolicyRepository.findActive).toHaveBeenCalled();
+    expect(commercialSnapshotRepository.save).toHaveBeenCalledTimes(1);
+
+    const [savedSnapshot] = vi.mocked(commercialSnapshotRepository.save).mock.calls[0]!;
+    expect(savedSnapshot.orderId).toBe(result.order.orderId);
+    expect(savedSnapshot.grossAmount).toBe(result.order.amount);
+    expect(savedSnapshot.trustFeeRateBps).toBe(1000);
+    // 10% de 550 = 55.00
+    expect(savedSnapshot.trustFeeAmount).toBe(55);
+    expect(savedSnapshot.providerNetBeforePspFees).toBe(495);
+  });
+
+  it('taxa diferente na política produz um snapshot diferente (prova que a taxa é lida, não hard-coded)', async () => {
+    const higherFeePolicy = CommercialPolicy.restore({
+      id: 'policy-2',
+      trustFeeRateBps: 2000,
+      defaultBillingIncrementMinutes: 30,
+      createdAt: new Date(),
+    });
+    const { useCase, offer, commercialSnapshotRepository } = scenario({
+      commercialPolicy: higherFeePolicy,
+    });
+
+    await useCase.execute(SELLER, offer.id);
+
+    const [savedSnapshot] = vi.mocked(commercialSnapshotRepository.save).mock.calls[0]!;
+    expect(savedSnapshot.trustFeeRateBps).toBe(2000);
+    expect(savedSnapshot.trustFeeAmount).toBe(110); // 20% de 550
   });
 });

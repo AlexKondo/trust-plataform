@@ -3,7 +3,11 @@ import { PinoLogger } from 'nestjs-pino';
 import { AuditLogService } from '../../../../shared/audit/audit-log.service';
 import { DRIZZLE, Database } from '../../../../shared/database/database.module';
 import { OutboxService } from '../../../../shared/events/outbox.service';
+import { MarketplaceCommercialSnapshot } from '../../domain/entities/marketplace-commercial-snapshot';
 import { MarketplaceOrder } from '../../domain/entities/marketplace-order';
+import { CommercialPolicyNotConfiguredException } from '../../domain/exceptions/marketplace.exceptions';
+import { CommercialPolicyRepository } from '../../domain/repositories/commercial-policy.repository';
+import { MarketplaceCommercialSnapshotRepository } from '../../domain/repositories/marketplace-commercial-snapshot.repository';
 import { MarketplaceListingRepository } from '../../domain/repositories/marketplace-listing.repository';
 import { MarketplaceOfferRepository } from '../../domain/repositories/marketplace-offer.repository';
 import { MarketplaceOrderRepository } from '../../domain/repositories/marketplace-order.repository';
@@ -21,6 +25,16 @@ import { MarketplaceOfferService } from './marketplace-offer.service';
  * o anúncio é reservado (BR-005) e o MarketplaceOrder nasce (BR-006 + MRK-015
  * BR-007). Os três eventos publicados no mesmo outbox mantêm Orders,
  * Notifications, Trust Score e Analytics desacoplados (BR-009).
+ *
+ * PACK-02 §10 — este é também o ponto de "Contract Formation": na mesma
+ * transação, a política comercial vigente é resolvida e o snapshot econômico
+ * (`MarketplaceCommercialSnapshot`) é calculado e CONGELADO — a taxa de Trust
+ * Fee usada aqui nunca muda depois, mesmo que a `CommercialPolicy` global
+ * mude. `order.amount` já é o `grossAmount` no MVP (materialCost/markup
+ * sempre 0 — PACK-02 não captura esses componentes ainda), então o Payment
+ * criado pelo consumer `pay.create-payment-on-order` (que consome
+ * `MarketplaceOrder.Created`, inalterado por este Pack) já nasce com o
+ * grossAmount correto sem nenhuma mudança no módulo payment (§11).
  */
 @Injectable()
 export class AcceptOfferUseCase {
@@ -29,6 +43,8 @@ export class AcceptOfferUseCase {
     private readonly orderRepository: MarketplaceOrderRepository,
     private readonly listingRepository: MarketplaceListingRepository,
     private readonly offerService: MarketplaceOfferService,
+    private readonly commercialPolicyRepository: CommercialPolicyRepository,
+    private readonly commercialSnapshotRepository: MarketplaceCommercialSnapshotRepository,
     private readonly outboxService: OutboxService,
     private readonly auditLogService: AuditLogService,
     @Inject(DRIZZLE) private readonly db: Database,
@@ -68,6 +84,31 @@ export class AcceptOfferUseCase {
       await this.offerRepository.saveAll([offer, ...superseded], tx);
       await this.listingRepository.save(listing, tx);
       await this.orderRepository.save(order, tx);
+
+      // PACK-02 §10 — resolve a política vigente DENTRO da transação: o rate
+      // usado fica congelado no snapshot, mesmo que a policy mude depois.
+      const policy = await this.commercialPolicyRepository.findActive(tx);
+      if (!policy) {
+        throw new CommercialPolicyNotConfiguredException();
+      }
+
+      // §5/§8: materialCost/materialMarkup são sempre 0 no MVP — PACK-02 não
+      // captura esses componentes ainda (não existe evidência/compra de
+      // material implementada). serviceAmount = order.amount inteiro.
+      const snapshot = MarketplaceCommercialSnapshot.create({
+        orderId: order.id,
+        pricingModel: order.pricingModel,
+        currency: order.currency,
+        serviceAmount: order.amount,
+        materialCostAmount: 0,
+        materialMarkupAmount: 0,
+        trustFeeRateBps: policy.trustFeeRateBps,
+        hourlyRateAmount: order.hourlyRateAmount,
+        minimumMinutes: order.minimumMinutes,
+        billingIncrementMinutes: order.billingIncrementMinutes,
+        now: acceptedAt,
+      });
+      await this.commercialSnapshotRepository.save(snapshot, tx);
 
       await this.outboxService.enqueue(tx, {
         eventType: 'MarketplaceOffer.Accepted',
@@ -135,6 +176,11 @@ export class AcceptOfferUseCase {
             listingId: listing.id,
             amount: offer.amount,
             closedOfferIds,
+            // PACK-02 §16 — auditoria da taxa efetiva e dos totais congelados.
+            trustFeeRateBps: snapshot.trustFeeRateBps,
+            grossAmount: snapshot.grossAmount,
+            trustFeeAmount: snapshot.trustFeeAmount,
+            providerNetBeforePspFees: snapshot.providerNetBeforePspFees,
           },
         },
         tx,

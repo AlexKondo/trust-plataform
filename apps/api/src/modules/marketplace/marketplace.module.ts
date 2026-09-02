@@ -24,6 +24,8 @@ import { GetListingUseCase } from './application/usecases/get-listing.usecase';
 import { PublishListingUseCase } from './application/usecases/publish-listing.usecase';
 import { SearchListingsUseCase } from './application/usecases/search-listings.usecase';
 import { UpdateListingUseCase } from './application/usecases/update-listing.usecase';
+import { CommercialPolicyRepository } from './domain/repositories/commercial-policy.repository';
+import { MarketplaceCommercialSnapshotRepository } from './domain/repositories/marketplace-commercial-snapshot.repository';
 import { MarketplaceConversationRepository } from './domain/repositories/marketplace-conversation.repository';
 import { MarketplaceListingRepository } from './domain/repositories/marketplace-listing.repository';
 import { MarketplaceOfferRepository } from './domain/repositories/marketplace-offer.repository';
@@ -41,6 +43,8 @@ import {
   CompleteOrderOnConfirmationConsumer,
   ReleaseListingOnCancelConsumer,
 } from './infrastructure/consumers/order-lifecycle.consumers';
+import { DrizzleCommercialPolicyRepository } from './infrastructure/persistence/drizzle-commercial-policy.repository';
+import { DrizzleMarketplaceCommercialSnapshotRepository } from './infrastructure/persistence/drizzle-marketplace-commercial-snapshot.repository';
 import { DrizzleMarketplaceConversationRepository } from './infrastructure/persistence/drizzle-marketplace-conversation.repository';
 import { DrizzleMarketplaceListingRepository } from './infrastructure/persistence/drizzle-marketplace-listing.repository';
 import { DrizzleMarketplaceOfferRepository } from './infrastructure/persistence/drizzle-marketplace-offer.repository';
@@ -96,6 +100,11 @@ import { DrizzleMarketplaceReviewRepository } from './infrastructure/persistence
     { provide: MarketplaceOfferRepository, useClass: DrizzleMarketplaceOfferRepository },
     { provide: MarketplaceOrderRepository, useClass: DrizzleMarketplaceOrderRepository },
     { provide: MarketplaceReviewRepository, useClass: DrizzleMarketplaceReviewRepository },
+    { provide: CommercialPolicyRepository, useClass: DrizzleCommercialPolicyRepository },
+    {
+      provide: MarketplaceCommercialSnapshotRepository,
+      useClass: DrizzleMarketplaceCommercialSnapshotRepository,
+    },
   ],
   exports: [
     MarketplaceListingRepository,
@@ -103,6 +112,8 @@ import { DrizzleMarketplaceReviewRepository } from './infrastructure/persistence
     MarketplaceOfferRepository,
     MarketplaceOrderRepository,
     MarketplaceReviewRepository,
+    CommercialPolicyRepository,
+    MarketplaceCommercialSnapshotRepository,
   ],
 })
 export class MarketplaceModule {}

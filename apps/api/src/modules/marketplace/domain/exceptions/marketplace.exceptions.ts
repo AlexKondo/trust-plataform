@@ -319,3 +319,27 @@ export class MarketplaceOfferValidationException extends BusinessRuleViolationEx
     super(message);
   }
 }
+
+// ── Comercial e Trust Fee (PACK-02) ─────────────────────────────────────────
+
+/** PACK-02 §15: totais do snapshot comercial inconsistentes → 422. */
+export class MarketplaceCommercialSnapshotValidationException extends BusinessRuleViolationException {
+  readonly code = 'MARKETPLACE_COMMERCIAL_SNAPSHOT_INVALID';
+
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+/**
+ * PACK-02 §6/§10: não há política comercial (Trust Fee) configurada. Não
+ * deveria acontecer em runtime real — a migration 0026 semeia uma linha —
+ * mas é um erro de configuração explícito, não uma adivinhação de negócio.
+ */
+export class CommercialPolicyNotConfiguredException extends BusinessRuleViolationException {
+  readonly code = 'COMMERCIAL_POLICY_NOT_CONFIGURED';
+
+  constructor() {
+    super('No active commercial policy (Trust Fee configuration) is configured.');
+  }
+}

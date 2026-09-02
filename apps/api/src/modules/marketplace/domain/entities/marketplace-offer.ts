@@ -6,7 +6,7 @@ import {
   MarketplaceOfferOwnershipException,
   MarketplaceOfferValidationException,
 } from '../exceptions/marketplace.exceptions';
-import { OFFER_STATUS, OfferStatus } from './marketplace-types';
+import { OFFER_STATUS, OfferStatus, PRICING_MODEL, PricingModel } from './marketplace-types';
 
 export interface MarketplaceOfferProps {
   id: string;
@@ -23,6 +23,12 @@ export interface MarketplaceOfferProps {
   status: OfferStatus;
   expiresAt: Date;
   notes: string | null;
+  /** PACK-02 §4 — FIXED_PRICE ou HOURLY; imutável depois de criada. */
+  pricingModel: PricingModel;
+  /** PACK-02 §4.2 — só preenchidos quando `pricingModel === HOURLY`. */
+  hourlyRateAmount: number | null;
+  minimumMinutes: number | null;
+  billingIncrementMinutes: number | null;
   withdrewAt: Date | null;
   withdrewBy: string | null;
   withdrawReason: string | null;
@@ -41,7 +47,18 @@ export interface OfferTerms {
   quantity: number;
   expiresAt: Date;
   notes?: string | null;
+  /**
+   * PACK-02 §4 — obrigatório, sem default aqui: o usecase (CreateOfferUseCase)
+   * é quem resolve o default FIXED_PRICE do DTO antes de chamar `create`.
+   */
+  pricingModel: PricingModel;
+  hourlyRateAmount: number | null;
+  minimumMinutes: number | null;
+  billingIncrementMinutes: number | null;
 }
+
+/** Subconjunto de `OfferTerms` que uma contraoferta pode propor (MRK-012). */
+export type CounterOfferTerms = Pick<OfferTerms, 'amount' | 'currency' | 'quantity' | 'expiresAt' | 'notes'>;
 
 /**
  * Aggregate root da proposta (MRK-009..014).
@@ -83,6 +100,10 @@ export class MarketplaceOffer {
       status: OFFER_STATUS.PENDING,
       expiresAt: input.terms.expiresAt,
       notes: input.terms.notes?.trim() || null,
+      pricingModel: input.terms.pricingModel,
+      hourlyRateAmount: input.terms.hourlyRateAmount,
+      minimumMinutes: input.terms.minimumMinutes,
+      billingIncrementMinutes: input.terms.billingIncrementMinutes,
       withdrewAt: null,
       withdrewBy: null,
       withdrawReason: null,
@@ -152,6 +173,22 @@ export class MarketplaceOffer {
     return this.props.notes;
   }
 
+  get pricingModel(): PricingModel {
+    return this.props.pricingModel;
+  }
+
+  get hourlyRateAmount(): number | null {
+    return this.props.hourlyRateAmount;
+  }
+
+  get minimumMinutes(): number | null {
+    return this.props.minimumMinutes;
+  }
+
+  get billingIncrementMinutes(): number | null {
+    return this.props.billingIncrementMinutes;
+  }
+
   get withdrewAt(): Date | null {
     return this.props.withdrewAt;
   }
@@ -214,12 +251,27 @@ export class MarketplaceOffer {
     this.assertOwner(actorId);
     this.assertPending(now);
 
+    // PACK-02 §4.2 — o amount de uma oferta HOURLY é sempre DERIVADO
+    // (hourlyRateAmount × minimumMinutes); mudá-lo diretamente quebraria o
+    // invariante. Quem quiser outro valor retira e cria uma proposta nova.
+    if (this.props.pricingModel === PRICING_MODEL.HOURLY && changes.amount !== undefined) {
+      throw new MarketplaceOfferValidationException(
+        'Amount of an HOURLY offer is derived and cannot be changed directly; withdraw and create a new offer instead.',
+      );
+    }
+
     const terms: OfferTerms = {
       amount: changes.amount ?? this.props.amount,
       currency: this.props.currency, // moeda não muda: é a do anúncio (MRK-012 BR-009)
       quantity: changes.quantity ?? this.props.quantity,
       expiresAt: changes.expiresAt ?? this.props.expiresAt,
       notes: changes.notes === undefined ? this.props.notes : changes.notes,
+      // pricingModel e termos hourly não são editáveis por update() (fora de
+      // escopo do PACK-02 — ver PACK-02-COMPLETION-REPORT.md).
+      pricingModel: this.props.pricingModel,
+      hourlyRateAmount: this.props.hourlyRateAmount,
+      minimumMinutes: this.props.minimumMinutes,
+      billingIncrementMinutes: this.props.billingIncrementMinutes,
     };
     assertTerms(terms, now);
 
@@ -283,10 +335,20 @@ export class MarketplaceOffer {
   /**
    * MRK-012 — quem recebeu responde com novos termos: esta proposta vira
    * COUNTERED (BR-003) e nasce a próxima rodada apontando para ela (BR-004).
+   *
+   * PACK-02: `pricingModel`/`hourlyRateAmount`/`minimumMinutes`/
+   * `billingIncrementMinutes` são sempre HERDADOS do offer pai — igual ao que
+   * já acontece com `currency` (BR-009). `CounterOfferRequest` nem expõe esses
+   * campos (só FIXED_PRICE/HOURLY nascem no MRK-009, nunca mudam de modelo
+   * numa contraoferta). Se o pai é HOURLY, `terms.amount` recebido é
+   * IGNORADO: o valor continua sendo o derivado do offer pai, porque não faz
+   * sentido "contrapropor" um valor livre quando ele é calculado.
    */
-  counter(actorId: string, terms: OfferTerms, now = new Date()): MarketplaceOffer {
+  counter(actorId: string, terms: CounterOfferTerms, now = new Date()): MarketplaceOffer {
     this.assertRecipient(actorId);
     this.assertPending(now);
+
+    const isHourly = this.props.pricingModel === PRICING_MODEL.HOURLY;
 
     const counterOffer = MarketplaceOffer.create({
       conversationId: this.props.conversationId,
@@ -295,8 +357,18 @@ export class MarketplaceOffer {
       sellerId: this.props.sellerId,
       createdBy: actorId,
       parentOfferId: this.props.id,
-      // BR-009: a contraoferta herda a moeda da negociação
-      terms: { ...terms, currency: this.props.currency },
+      terms: {
+        ...terms,
+        // BR-009: a contraoferta herda a moeda da negociação
+        currency: this.props.currency,
+        // PACK-02: modelo comercial e termos hourly herdados do pai
+        pricingModel: this.props.pricingModel,
+        hourlyRateAmount: this.props.hourlyRateAmount,
+        minimumMinutes: this.props.minimumMinutes,
+        billingIncrementMinutes: this.props.billingIncrementMinutes,
+        // HOURLY: amount é sempre derivado, nunca contraproposto livremente.
+        amount: isHourly ? this.props.amount : terms.amount,
+      },
       now,
     });
 
@@ -340,8 +412,53 @@ export class MarketplaceOffer {
   }
 }
 
-/** MRK-009 BR-005 / MRK-010 BR-005/006 — invariantes dos termos da proposta. */
+/**
+ * MRK-009 BR-005 / MRK-010 BR-005/006 — invariantes dos termos da proposta.
+ * PACK-02 §15 — validação por modelo comercial:
+ * - HOURLY exige hourlyRateAmount > 0, minimumMinutes e billingIncrementMinutes
+ *   inteiros > 0 (o default de billingIncrementMinutes já deve ter sido
+ *   resolvido pelo usecase antes de chegar aqui — o domínio só valida).
+ * - FIXED_PRICE rejeita qualquer um dos três campos hourly preenchido, para
+ *   não deixar ambiguidade sobre qual modelo está em vigor.
+ * - Qualquer outro valor de pricingModel é rejeitado ("Unsupported pricingModel").
+ */
 function assertTerms(terms: OfferTerms, now: Date): void {
+  if (terms.pricingModel === PRICING_MODEL.HOURLY) {
+    if (!(terms.hourlyRateAmount !== null && terms.hourlyRateAmount > 0)) {
+      throw new MarketplaceOfferValidationException(
+        'HOURLY offers require hourlyRateAmount greater than zero.',
+      );
+    }
+    if (!(terms.minimumMinutes !== null && Number.isInteger(terms.minimumMinutes) && terms.minimumMinutes > 0)) {
+      throw new MarketplaceOfferValidationException(
+        'HOURLY offers require an integer minimumMinutes greater than zero.',
+      );
+    }
+    if (
+      !(
+        terms.billingIncrementMinutes !== null &&
+        Number.isInteger(terms.billingIncrementMinutes) &&
+        terms.billingIncrementMinutes > 0
+      )
+    ) {
+      throw new MarketplaceOfferValidationException(
+        'HOURLY offers require an integer billingIncrementMinutes greater than zero.',
+      );
+    }
+  } else if (terms.pricingModel === PRICING_MODEL.FIXED_PRICE) {
+    if (
+      terms.hourlyRateAmount !== null ||
+      terms.minimumMinutes !== null ||
+      terms.billingIncrementMinutes !== null
+    ) {
+      throw new MarketplaceOfferValidationException(
+        'FIXED_PRICE offers cannot carry hourlyRateAmount, minimumMinutes or billingIncrementMinutes.',
+      );
+    }
+  } else {
+    throw new MarketplaceOfferValidationException(`Unsupported pricingModel: ${String(terms.pricingModel)}.`);
+  }
+
   if (!(terms.amount > 0)) {
     throw new MarketplaceOfferValidationException('Offer amount must be greater than zero.');
   }

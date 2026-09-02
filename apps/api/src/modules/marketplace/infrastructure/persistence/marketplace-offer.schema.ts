@@ -1,5 +1,15 @@
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
-import { char, index, numeric, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import {
+  char,
+  index,
+  integer,
+  numeric,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
 import { identities } from '../../../identity/infrastructure/persistence/identities.schema';
 import { marketplaceConversations, marketplaceListings } from './marketplace.schema';
 
@@ -40,6 +50,11 @@ export const marketplaceOffers = pgTable(
     status: varchar('status', { length: 30 }).notNull(),
     expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }).notNull(),
     notes: text('notes'),
+    /** PACK-02 §4 — FIXED_PRICE | HOURLY, imutável depois de criada. */
+    pricingModel: varchar('pricing_model', { length: 20 }).notNull().default('FIXED_PRICE'),
+    hourlyRateAmount: numeric('hourly_rate_amount', { precision: 18, scale: 2 }),
+    minimumMinutes: integer('minimum_minutes'),
+    billingIncrementMinutes: integer('billing_increment_minutes'),
     // Desfecho: só um dos três blocos abaixo é preenchido, conforme o estado final
     withdrewAt: timestamp('withdrew_at', { withTimezone: true, mode: 'date' }),
     withdrewBy: uuid('withdrew_by'),

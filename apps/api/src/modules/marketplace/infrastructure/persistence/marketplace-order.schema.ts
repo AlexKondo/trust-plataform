@@ -44,6 +44,11 @@ export const marketplaceOrders = pgTable(
     amount: numeric('amount', { precision: 18, scale: 2 }).notNull(),
     currency: char('currency', { length: 3 }).notNull(),
     quantity: numeric('quantity', { precision: 18, scale: 4 }).notNull(),
+    /** PACK-02 §4 — copiado do offer aceito; imutável (MRK-017 BR-001). */
+    pricingModel: varchar('pricing_model', { length: 20 }).notNull().default('FIXED_PRICE'),
+    hourlyRateAmount: numeric('hourly_rate_amount', { precision: 18, scale: 2 }),
+    minimumMinutes: integer('minimum_minutes'),
+    billingIncrementMinutes: integer('billing_increment_minutes'),
     status: varchar('status', { length: 40 }).notNull(),
     // Marcos do ciclo de vida (MRK-018/020/021/022) — nenhum é apagável
     startedAt: timestamp('started_at', { withTimezone: true, mode: 'date' }),

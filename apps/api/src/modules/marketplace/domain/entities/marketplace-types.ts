@@ -1,5 +1,19 @@
 /** Tipos canônicos do Marketplace (MRK-001..008). Enums em UPPER_SNAKE_CASE (DOC-001). */
 
+/**
+ * PACK-02 §4 — modelos comerciais da proposta. FIXED_PRICE é o comportamento
+ * legado (valor fechado); HOURLY adiciona taxa/hora + duração mínima, com o
+ * valor inicial derivado (nunca proposto diretamente — ver hourly-pricing.service.ts).
+ */
+export const PRICING_MODEL = {
+  FIXED_PRICE: 'FIXED_PRICE',
+  HOURLY: 'HOURLY',
+} as const;
+
+export type PricingModel = (typeof PRICING_MODEL)[keyof typeof PRICING_MODEL];
+
+export const PRICING_MODELS = [PRICING_MODEL.FIXED_PRICE, PRICING_MODEL.HOURLY] as const;
+
 export const LISTING_TYPE = {
   PRODUCT: 'PRODUCT',
   SERVICE: 'SERVICE',

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { PRICING_MODEL, PRICING_MODELS } from '../../domain/entities/marketplace-types';
 import { OrderResponse } from './marketplace-order.dtos';
 
 const amountSchema = z
@@ -17,19 +18,61 @@ const expiresAtSchema = z.coerce.date().refine((value) => value.getTime() > Date
 
 const notesSchema = z.string().trim().max(2000);
 
-/** MRK-009 — proposta do comprador. A moeda vem do anúncio quando omitida. */
-export const createOfferRequestSchema = z.object({
-  amount: amountSchema,
-  currency: z
-    .string()
-    .trim()
-    .length(3)
-    .transform((value) => value.toUpperCase())
-    .optional(),
-  quantity: quantitySchema.default(1),
-  expiresAt: expiresAtSchema,
-  notes: notesSchema.optional(),
-});
+/** PACK-02 §9 — teto de sanidade: 30 dias. */
+const minimumMinutesSchema = z.number().int().positive().max(43_200);
+/** PACK-02 §4.2 — teto de sanidade: 24h. */
+const billingIncrementMinutesSchema = z.number().int().positive().max(1440);
+
+/**
+ * MRK-009 / PACK-02 §9 — proposta do comprador. A moeda vem do anúncio quando
+ * omitida. `pricingModel` decide quais campos são obrigatórios:
+ * - FIXED_PRICE (default, comportamento legado): `amount` obrigatório.
+ * - HOURLY: `hourlyRateAmount` e `minimumMinutes` obrigatórios; o valor
+ *   inicial contratado é DERIVADO (ver hourly-pricing.service.ts) — o cliente
+ *   nunca envia `amount` para HOURLY.
+ */
+export const createOfferRequestSchema = z
+  .object({
+    amount: amountSchema.optional(),
+    currency: z
+      .string()
+      .trim()
+      .length(3)
+      .transform((value) => value.toUpperCase())
+      .optional(),
+    quantity: quantitySchema.default(1),
+    expiresAt: expiresAtSchema,
+    notes: notesSchema.optional(),
+    pricingModel: z.enum(PRICING_MODELS).default(PRICING_MODEL.FIXED_PRICE),
+    hourlyRateAmount: amountSchema.optional(),
+    minimumMinutes: minimumMinutesSchema.optional(),
+    billingIncrementMinutes: billingIncrementMinutesSchema.optional(),
+  })
+  .superRefine((body, ctx) => {
+    if (body.pricingModel === PRICING_MODEL.FIXED_PRICE && body.amount === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['amount'],
+        message: 'amount is required for FIXED_PRICE offers',
+      });
+    }
+    if (body.pricingModel === PRICING_MODEL.HOURLY) {
+      if (body.hourlyRateAmount === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['hourlyRateAmount'],
+          message: 'hourlyRateAmount is required for HOURLY offers',
+        });
+      }
+      if (body.minimumMinutes === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['minimumMinutes'],
+          message: 'minimumMinutes is required for HOURLY offers',
+        });
+      }
+    }
+  });
 export type CreateOfferRequest = z.infer<typeof createOfferRequestSchema>;
 
 /** MRK-010 BR-004 — só valor, quantidade, validade e observações mudam. */
@@ -75,6 +118,11 @@ export interface OfferResponse {
   amount: number;
   currency: string;
   quantity: number;
+  /** PACK-02 §4 — FIXED_PRICE ou HOURLY. */
+  pricingModel: string;
+  hourlyRateAmount: number | null;
+  minimumMinutes: number | null;
+  billingIncrementMinutes: number | null;
   /** Status efetivo: PENDING vencido é apresentado como EXPIRED. */
   status: string;
   expiresAt: string;
