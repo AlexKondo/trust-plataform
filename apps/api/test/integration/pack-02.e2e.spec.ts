@@ -28,6 +28,7 @@ import {
   marketplaceOrderCommercialSnapshots,
   payments,
   trustCustodies,
+  trustScores,
 } from '../../src/shared/database/schema';
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
@@ -85,7 +86,31 @@ describe.runIf(Boolean(testDatabaseUrl))('PACK-02 — Commercial Amount & Fee Fo
     throw new Error(`Timeout esperando: ${what}`);
   }
 
+  /**
+   * HOME_REPAIRS exige nível mínimo BRONZE para publicar (MRK-003 BR-002).
+   * Uma identidade recém-criada começa em score 0 — espera o pipeline
+   * assíncrono do Trust Score (Identity.Created → TrustPassport.Created →
+   * cálculo do score) alcançar BRONZE (>=25), mesmo padrão de
+   * mrk-001-008.e2e.spec.ts.
+   */
+  async function waitForBronze(identityId: string): Promise<void> {
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < 40000) {
+      await relay.tick();
+      const [score] = await db
+        .select()
+        .from(trustScores)
+        .where(eq(trustScores.identityId, identityId));
+      if (score && score.score >= 25) {
+        return;
+      }
+      await new Promise((sleep) => setTimeout(sleep, 500));
+    }
+    throw new Error('Trust Score inicial não calculado dentro do timeout');
+  }
+
   async function publishListing(seller: TestUser, price: number): Promise<string> {
+    await waitForBronze(seller.identityId);
     const created = await app.inject({
       method: 'POST',
       url: '/api/v1/marketplace/listings',
@@ -99,12 +124,17 @@ describe.runIf(Boolean(testDatabaseUrl))('PACK-02 — Commercial Amount & Fee Fo
         currency: 'BRL',
       },
     });
+    expect(created.statusCode).toBe(201);
     const listingId = created.json<{ data: { listingId: string } }>().data.listingId;
-    await app.inject({
+    const published = await app.inject({
       method: 'POST',
       url: `/api/v1/marketplace/listings/${listingId}/publish`,
       headers: seller.auth,
     });
+    // Falha silenciosa aqui deixaria o anúncio em DRAFT e só quebraria mais
+    // tarde, de forma opaca, no /contact — falhar explícito e cedo em vez disso.
+    expect(published.statusCode).toBe(200);
+    expect(published.json<{ data: { status: string } }>().data.status).toBe('PUBLISHED');
     return listingId;
   }
 
