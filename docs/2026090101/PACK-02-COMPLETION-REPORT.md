@@ -2,7 +2,9 @@
 
 > **Spec**: `docs/2026090101/TRUST_PACK-02_Commercial_Amount_and_Fee_Foundation_v1.0.md`
 > **Escopo**: modelo comercial FIXED_PRICE/HOURLY + Trust Fee configurável + snapshot econômico imutável do contrato · **Data**: 2026-09-01
-> **Status**: implementado; aguardando revisão do diff (§21/§22).
+> **Status**: implementado, e2e confirmado verde (2026-09-02); aguardando revisão do diff (§21/§22).
+>
+> **Atualização 2026-09-02**: a suíte `pnpm test:e2e` foi executada até o fim (algo que a versão original deste relatório não conseguiu confirmar por interferência de ambiente — ver §6/§9 originais, mantidos abaixo para histórico). Na primeira execução completa, 3 dos 4 casos de `pack-02.e2e.spec.ts` falharam por um bug no **teste** (não no código de produção): `publishListing()` não esperava o pipeline assíncrono do Trust Score atingir BRONZE antes de publicar um anúncio na categoria `HOME_REPAIRS` (que exige esse nível mínimo), nem verificava o status do `publish` — a falha ficava silenciosa e só estourava, de forma opaca, no `/contact` seguinte. Corrigido em `apps/api/test/integration/pack-02.e2e.spec.ts` adicionando `waitForBronze()` (mesmo padrão de `mrk-001-008.e2e.spec.ts`) e asserção explícita do status/resultado do `publish`. **Nenhum código de domínio ou de produção do PACK-02 foi alterado.** Depois da correção, `pnpm test:e2e` roda **57/57 suítes, 383/383 testes verdes, 0 falhas**, incluindo os 4 casos do PACK-02 e os 3 do PACK-01 (regressão). Detalhes em `PACK-02-DIFF-REVIEW.md` §F.
 
 ## 1. Preflight (§14)
 
@@ -95,12 +97,13 @@ Nenhum evento novo criado (§17 respeitado). `MarketplaceOffer.Created` ganha ca
 | Unitários novos (PACK-02) | 17 (`marketplace-commercial-snapshot.spec.ts`) + 5 (`hourly-pricing.service.spec.ts`) = **22** |
 | Unitários estendidos | `marketplace-offer.spec.ts` (31 testes, incl. novos casos de pricing), `marketplace-order.spec.ts` (17), `accept-offer.usecase.spec.ts` (9, incl. verificação do snapshot) |
 | E2E novos (PACK-02) | 4 (`pack-02.e2e.spec.ts`) — seed da política, fluxo FIXED_PRICE completo, fluxo HOURLY completo, regressão PACK-01 |
-| **Suíte unitária completa** (`pnpm test`) | **309 testes / 37 suítes verdes, 0 falhas** (rodado e confirmado nesta revisão) |
-| Typecheck (`pnpm typecheck`) | **limpo, 0 erros** (confirmado nesta revisão) |
+| **Suíte unitária completa** (`pnpm test`) | **309 testes / 37 suítes verdes, 0 falhas** |
+| Typecheck (`pnpm typecheck`) | **limpo, 0 erros** |
+| **Suíte completa com e2e** (`pnpm test:e2e`, confirmado 2026-09-02) | **383 testes / 57 suítes verdes, 0 falhas** — inclui os 4 casos de `pack-02.e2e.spec.ts` e os 3 de `pack-01.e2e.spec.ts` (regressão) |
 
-Os testes cobrem todos os itens do §18.1: cálculo FIXED_PRICE, cálculo HOURLY a partir de rate/duração, incremento de 30min resolvido por configuração (não hard-coded), incremento customizado persistido, taxa lida de configuração e congelada (mudança de política não afeta snapshot já criado), SERVICE fee-eligible, MATERIAL_COST excluído da base, MATERIAL_MARKUP incluído, arredondamento determinístico em centavos, `providerNetBeforePspFees`, rejeição de valores negativos/inconsistentes.
+Os testes cobrem todos os itens do §18.1: cálculo FIXED_PRICE, cálculo HOURLY a partir de rate/duração, incremento de 30min resolvido por configuração (não hard-coded), incremento customizado persistido, taxa lida de configuração e congelada (mudança de política não afeta snapshot já criado), SERVICE fee-eligible, MATERIAL_COST excluído da base, MATERIAL_MARKUP incluído, arredondamento determinístico em centavos, `providerNetBeforePspFees`, rejeição de valores negativos/inconsistentes — e, agora confirmado por execução real (não só leitura de código), os itens de §18.2: proposta aceita → snapshot congelado → Payment com `grossAmount` correto (FIXED_PRICE e HOURLY), e custódia do PACK-01 segurando o valor cheio sem recalcular fee.
 
-**Nota sobre a execução do e2e nesta revisão**: o comando `pnpm test:e2e` (Postgres embutido descartável, mesmo mecanismo usado pelos PACKs anteriores) **não pôde ser executado até o fim neste ambiente Windows local** — o `initdb` do Postgres embutido tem seus arquivos apagados no meio da própria escrita por um processo externo (padrão consistente com interferência de antivírus/proteção em tempo real do Windows, não relacionado ao código deste Pack), reproduzido em 4 tentativas independentes mesmo após limpar processos e diretórios travados. O arquivo `pack-02.e2e.spec.ts` foi revisado manualmente linha a linha e está correto e completo; sua execução real (CI ou máquina sem essa interferência) é o item pendente — ver §9.
+**Histórico da execução do e2e (mantido para rastreabilidade)**: a primeira tentativa de rodar `pnpm test:e2e` neste ambiente Windows local não completou — o `initdb` do Postgres embutido tinha arquivos apagados no meio da própria escrita (padrão de interferência externa, não relacionado ao código). Numa segunda rodada, o Postgres embutido subiu normalmente e a suíte completou, revelando 3 falhas reais em `pack-02.e2e.spec.ts` — não por interferência de ambiente, mas por um bug no próprio arquivo de teste (ver nota no topo deste documento e `PACK-02-DIFF-REVIEW.md` §F). Corrigido o teste, a suíte completa roda 100% verde — ver linha da tabela acima.
 
 ## 7. Critérios de aceite (§20)
 
@@ -115,7 +118,7 @@ Os testes cobrem todos os itens do §18.1: cálculo FIXED_PRICE, cálculo HOURLY
 | `grossAmount` do Payment bate com o snapshot congelado | PASS |
 | Comportamento de custódia/liberação do PACK-01 inalterado | PASS |
 | Nenhum workflow de PSP/split/refund/change-order introduzido | PASS |
-| Todos os testes (existentes + novos) passam | PASS — unitários confirmados verdes; e2e escrito e revisado, execução bloqueada por ambiente local (§6/§9) |
+| Todos os testes (existentes + novos) passam | PASS — 383/383 testes verdes (`pnpm test:e2e`), confirmado por execução real em 2026-09-02 (§6) |
 
 ## 8. Desvios e decisões
 
@@ -131,12 +134,15 @@ Os testes cobrem todos os itens do §18.1: cálculo FIXED_PRICE, cálculo HOURLY
 
 **D6 — Onde calcular o fee: marketplace, não payment.** A spec exige que o snapshot esteja congelado ANTES da criação do Payment (§10 passo 6). Como o Payment nasce reativamente a partir de `MarketplaceOrder.Created` (evento já existente, disparado dentro do `AcceptOfferUseCase`), o cálculo do snapshot só pode acontecer no momento do aceite da oferta — dentro do módulo marketplace. Isso preserva a direção de dependência já estabelecida no PACK-01 (D4 daquele pack: "Marketplace continua sem conhecer Payments; a direção contrária segue só por evento") e evita qualquer mudança no módulo payment.
 
+**D7 — bug de teste encontrado e corrigido depois do fechamento inicial deste relatório (2026-09-02).** A execução real de `pnpm test:e2e` (pendente na versão original deste documento) revelou que `pack-02.e2e.spec.ts` publicava anúncios na categoria `HOME_REPAIRS` (que exige nível mínimo BRONZE, MRK-003 BR-002) sem esperar o pipeline assíncrono do Trust Score calcular esse nível para a identidade recém-criada, e sem verificar o status do `publish` — a falha ficava silenciosa e só estourava, de forma opaca, na chamada seguinte a `/contact`. Corrigido adicionando `waitForBronze()` (mesmo padrão já usado em `mrk-001-008.e2e.spec.ts`) e asserção explícita de `published.statusCode`/`data.status` antes de prosseguir. Mudança **restrita ao arquivo de teste**; nenhuma linha de domínio, aplicação ou infraestrutura do PACK-02 foi tocada. Os 4 casos do Pack passam sem alteração na lógica que estavam validando.
+
 ## 9. Pendências conhecidas
 
 1. **Confirmação da taxa Trust Fee real** — o seed de 1000 bps (D5) precisa de validação de negócio do founder/Kondo antes de qualquer uso com dinheiro real (mesma pendência já registrada para o seed técnico do PACK-01).
-2. **Execução do `pnpm test:e2e` neste ambiente** — bloqueada por uma interferência externa ao Postgres embutido durante `initdb` (não reproduzida no CI nem em ambientes anteriores dos PACKs 00/01; ver §6). O arquivo de teste está completo e revisado; falta a confirmação de execução real. Recomendação: rodar em CI ou em outra máquina antes do merge.
-3. **PACK-03 (Change Orders)** — o snapshot já está desenhado para ser estendido (`approvedChangeOrders[]` futuro, §12), mas nenhum campo de Change Order existe ainda — proposital.
-4. **Material cost/markup** — arquitetura suporta (`materialCostAmount`/`materialMarkupAmount` já existem no snapshot e são fee-classificados corretamente), mas nenhuma oferta hoje captura esses valores (sempre 0) — evidência/compra de material é escopo futuro (§19).
+2. ~~Execução do `pnpm test:e2e` neste ambiente~~ — **resolvido em 2026-09-02**: suíte completa (57/57 suítes, 383/383 testes) confirmada verde após corrigir um bug no arquivo de teste `pack-02.e2e.spec.ts` (faltava esperar o pipeline assíncrono do Trust Score atingir BRONZE antes de publicar; nenhum código de produção foi alterado). Ver §6 e `PACK-02-DIFF-REVIEW.md` §F.
+3. **CI do repositório está quebrado por um motivo não relacionado a este Pack** — o pipeline falha no passo de Lint, em `tools/extract-docx.mjs` (globals de Node não reconhecidos pelo ESLint), antes mesmo de chegar no Typecheck/Test/Build. Confirmado que essa falha já existia no commit do PACK-01 (anterior a este Pack), então não é uma regressão introduzida aqui — mas significa que o CI não valida nenhum Pack recente. Fora do escopo desta entrega corrigir; registrado para visibilidade.
+4. **PACK-03 (Change Orders)** — o snapshot já está desenhado para ser estendido (`approvedChangeOrders[]` futuro, §12), mas nenhum campo de Change Order existe ainda — proposital.
+5. **Material cost/markup** — arquitetura suporta (`materialCostAmount`/`materialMarkupAmount` já existem no snapshot e são fee-classificados corretamente), mas nenhuma oferta hoje captura esses valores (sempre 0) — evidência/compra de material é escopo futuro (§19).
 
 ## 10. Fora de escopo (confirmado, §19)
 
@@ -144,4 +150,9 @@ Nada de Trust Change Order, Check-in/Check-out/Trust Pause, elapsed/billable/pau
 
 ## 11. Commit
 
-Pendente — implementação registrada nesta entrega, aguardando `git commit` pelo usuário e revisão do diff pelo Kondo (mesmo fluxo do PACK-00/PACK-01).
+| Commit | Conteúdo |
+|---|---|
+| `25d8cb1` | Implementação do PACK-02 (domínio, persistência, migration 0026, testes unitários e e2e) |
+| `754e95f` | Correção do fixture de teste e2e (`pack-02.e2e.spec.ts` — D7 acima); nenhum código de produção alterado |
+
+`main` está com a suíte completa verde (`pnpm test:e2e` — 383/383 testes) no commit `754e95f`. Aguardando revisão do diff pelo Kondo (mesmo fluxo do PACK-00/PACK-01).
