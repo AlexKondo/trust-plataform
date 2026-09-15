@@ -226,7 +226,15 @@ export class ServiceExecutionUseCase {
     session.resume(pausedMinutes, now); // recusa retomar fora de PAUSED (§24)
 
     await this.db.transaction(async (tx) => {
-      await this.executionRepository.savePause(openPause, tx);
+      // IP-001 — compare-and-set: entre o `findOpenPause` acima e este
+      // UPDATE, outra chamada concorrente de Resume pode ter fechado a mesma
+      // pausa. `closePauseIfOpen` só grava se `resumed_at` ainda estiver NULL
+      // no banco; se perder a corrida, a transação é abortada e o duplo
+      // Resume nunca chega a persistir a sessão nem a publicar o evento.
+      const closed = await this.executionRepository.closePauseIfOpen(openPause, tx);
+      if (!closed) {
+        throw new ServiceExecutionTransitionException(session.status, 'ACTIVE');
+      }
       await this.executionRepository.saveSession(session, tx);
       await this.outboxService.enqueue(tx, {
         eventType: 'ServiceExecution.Resumed',

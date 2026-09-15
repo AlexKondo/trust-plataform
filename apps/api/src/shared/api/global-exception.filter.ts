@@ -1,11 +1,15 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from '@nestjs/common';
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { PinoLogger } from 'nestjs-pino';
+import postgres from 'postgres';
 import { ApiErrorBody, ApiErrorEnvelope } from './api-envelope';
 import { ValidationException } from './validation.exception';
 import { DomainException } from '../domain/exceptions/domain.exception';
 import { RequestContext } from '../logging/correlation-id.middleware';
 import { requestIdOf, resolveCorrelationId } from '../logging/correlation';
+
+/** Código Postgres de violação de UNIQUE/EXCLUDE constraint (SQLSTATE 23505). */
+const POSTGRES_UNIQUE_VIOLATION = '23505';
 
 const STATUS_TO_CODE: Record<number, string> = {
   400: 'BAD_REQUEST',
@@ -130,9 +134,37 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       };
     }
 
+    // IP-001 — rede de segurança geral: nem todo repositório mapeia sua
+    // violação de UNIQUE/EXCLUDE constraint para uma DomainException própria
+    // (o padrão específico, com mensagem amigável, continua sendo a forma
+    // preferida — ex.: EmailAlreadyExistsException). Quando nenhum módulo
+    // capturou o erro do driver antes, isto evita expor um 500 genérico para
+    // um conflito de estado legítimo e determinístico (23505 é sempre um
+    // conflito com dado já existente, nunca um erro de infraestrutura).
+    // Nunca ecoa constraint/tabela/coluna ao cliente — só o código canônico.
+    if (this.isUniqueConstraintViolation(exception)) {
+      return {
+        status: HttpStatus.CONFLICT,
+        error: {
+          code: 'CONFLICT',
+          message: 'The request conflicts with existing data.',
+        },
+      };
+    }
+
     return {
       status: HttpStatus.INTERNAL_SERVER_ERROR,
       error: { code: 'INTERNAL_ERROR', message: 'An unexpected error occurred.' },
     };
+  }
+
+  private isUniqueConstraintViolation(exception: unknown): boolean {
+    if (exception instanceof postgres.PostgresError) {
+      return exception.code === POSTGRES_UNIQUE_VIOLATION;
+    }
+    if (exception instanceof Error && exception.cause instanceof postgres.PostgresError) {
+      return exception.cause.code === POSTGRES_UNIQUE_VIOLATION;
+    }
+    return false;
   }
 }

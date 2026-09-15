@@ -74,6 +74,31 @@ export class DrizzleServiceExecutionRepository extends ServiceExecutionRepositor
       });
   }
 
+  /**
+   * IP-001 — compare-and-set: fecha a pausa só se `resumed_at` ainda for NULL
+   * no banco (mesma técnica de `saveWithExpectedStatus` do Trust Change
+   * Order). `updated.length === 0` significa que outra chamada concorrente já
+   * fechou esta mesma pausa entre o read e este write.
+   */
+  async closePauseIfOpen(
+    pause: ServiceExecutionPause,
+    executor?: DatabaseExecutor,
+  ): Promise<boolean> {
+    const target = executor ?? this.db;
+    const props = pause.toProps();
+    const updated = await target
+      .update(serviceExecutionPauses)
+      .set({ resumedAt: props.resumedAt, durationMinutes: props.durationMinutes })
+      .where(
+        and(
+          eq(serviceExecutionPauses.id, props.id),
+          isNull(serviceExecutionPauses.resumedAt),
+        ),
+      )
+      .returning({ id: serviceExecutionPauses.id });
+    return updated.length > 0;
+  }
+
   async findOpenPause(
     sessionId: string,
     executor?: DatabaseExecutor,

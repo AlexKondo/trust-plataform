@@ -1,5 +1,6 @@
 import { ArgumentsHost, UnauthorizedException } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
+import postgres from 'postgres';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { GlobalExceptionFilter } from './global-exception.filter';
@@ -101,6 +102,51 @@ describe('GlobalExceptionFilter', () => {
       success: false,
       error: { code: 'INVALID_TOKEN', message: 'Invalid or expired access token.', ...TRACE },
     });
+  });
+
+  it('IP-001: violação de UNIQUE constraint (23505) não mapeada por módulo algum → 409 CONFLICT genérico', () => {
+    const { filter, reply } = makeFilter();
+    // O driver `postgres` monta este erro internamente com Object.assign a
+    // partir da resposta do servidor (ver postgres/src/errors.js); os .d.ts
+    // só tipam o construtor herdado de Error, então reproduzimos o mesmo
+    // shape runtime aqui em vez de forçar o construtor a aceitar um objeto.
+    const pgError = Object.assign(
+      new postgres.PostgresError(
+        'duplicate key value violates unique constraint "idx_marketplace_review_order_reviewer"',
+      ),
+      {
+        code: '23505',
+        constraint_name: 'idx_marketplace_review_order_reviewer',
+        table_name: 'marketplace_reviews',
+      },
+    );
+    filter.catch(pgError, hostFor(reply));
+    expect(reply.status).toHaveBeenCalledWith(409);
+    expect(reply.send).toHaveBeenCalledWith({
+      success: false,
+      error: { code: 'CONFLICT', message: 'The request conflicts with existing data.', ...TRACE },
+    });
+  });
+
+  it('IP-001: PostgresError 23505 envolvido em causa (driver assíncrono) também vira 409', () => {
+    const { filter, reply } = makeFilter();
+    const pgError = Object.assign(
+      new postgres.PostgresError('duplicate key value violates unique constraint'),
+      { code: '23505' },
+    );
+    const wrapped = new Error('query failed', { cause: pgError });
+    filter.catch(wrapped, hostFor(reply));
+    expect(reply.status).toHaveBeenCalledWith(409);
+  });
+
+  it('IP-001: outro erro de Postgres (ex.: not-null violation, 23502) continua 500, não vira 409', () => {
+    const { filter, reply } = makeFilter();
+    const pgError = Object.assign(
+      new postgres.PostgresError('null value in column violates not-null constraint'),
+      { code: '23502' },
+    );
+    filter.catch(pgError, hostFor(reply));
+    expect(reply.status).toHaveBeenCalledWith(500);
   });
 
   it('erro desconhecido → 500 INTERNAL_ERROR sem vazar detalhes', () => {

@@ -1,3 +1,4 @@
+/* global process, Buffer, console */
 /** Extrai texto de .docx (ZIP + word/document.xml) sem dependencia externa. */
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readdirSync, writeFileSync } from 'node:fs';

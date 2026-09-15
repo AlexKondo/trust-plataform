@@ -13,7 +13,7 @@
  * Requer TEST_DATABASE_URL (use `pnpm test:e2e`).
  */
 import { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { resolve } from 'node:path';
@@ -453,6 +453,140 @@ describe.runIf(Boolean(testDatabaseUrl))('PACK-03 — Trust Change Order & Time 
     expect(execution.rawActiveMinutes).toBeGreaterThanOrEqual(59);
     expect(execution.billableMinutes).toBe(60);
     expect(execution.pauses[0]!.reasonCode).toBe('MEAL');
+  }, 120000);
+
+  // ── IP-001 ────────────────────────────────────────────────────────────────
+  it('Trust Resume concorrente: duas chamadas simultâneas não podem ambas retomar a mesma pausa', async () => {
+    const contract = await hourlyContractInProgress([
+      'Renato Bittencourt Salgado',
+      'Ivone Cardoso Prestes',
+    ]);
+    await backdateCheckIn(contract.orderId, 100);
+
+    const paused = await app.inject({
+      method: 'POST',
+      url: `/api/v1/marketplace/orders/${contract.orderId}/pause`,
+      headers: contract.seller.auth,
+      payload: { reasonCode: 'MEAL', note: 'Parada para almoço' },
+    });
+    expect(paused.statusCode).toBe(200);
+
+    const [session] = await db
+      .select()
+      .from(serviceExecutionSessions)
+      .where(eq(serviceExecutionSessions.orderId, contract.orderId));
+    await db
+      .update(serviceExecutionPauses)
+      .set({ pausedAt: new Date(Date.now() - 40 * 60000) })
+      .where(eq(serviceExecutionPauses.sessionId, session!.id));
+
+    // PACK-03 §25.2.3 já prova o double-Resume SEQUENCIAL (a segunda chamada
+    // encontra `findOpenPause() === null` e recebe 409). O que este teste
+    // prova é a corrida real de IP-001: duas chamadas CONCORRENTES podem ler
+    // a MESMA pausa aberta antes de qualquer uma escrever — sem
+    // compare-and-set no fechamento da pausa, ambas fechariam/retomariam com
+    // sucesso, duplicando `pausedMinutes` e publicando dois
+    // `ServiceExecution.Resumed`. `closePauseIfOpen` (repositório) faz o
+    // UPDATE condicional a `resumed_at IS NULL`: só uma das duas vence.
+    const [first, second] = await Promise.all([
+      app.inject({
+        method: 'POST',
+        url: `/api/v1/marketplace/orders/${contract.orderId}/resume`,
+        headers: contract.seller.auth,
+      }),
+      app.inject({
+        method: 'POST',
+        url: `/api/v1/marketplace/orders/${contract.orderId}/resume`,
+        headers: contract.seller.auth,
+      }),
+    ]);
+
+    const statusCodes = [first.statusCode, second.statusCode].sort();
+    // Exatamente uma das duas vence (200); a outra perde a corrida (409) —
+    // nunca as duas com sucesso, e nunca as duas em erro.
+    expect(statusCodes).toEqual([200, 409]);
+
+    const winner = first.statusCode === 200 ? first : second;
+    const winnerBody = winner.json<{ data: { pausedMinutes: number } }>().data;
+    // ~40 minutos pausados uma única vez — não 80 (o que aconteceria se as
+    // duas chamadas tivessem retomado com sucesso e somado a pausa 2x).
+    expect(winnerBody.pausedMinutes).toBeGreaterThanOrEqual(39);
+    expect(winnerBody.pausedMinutes).toBeLessThan(79);
+
+    // Nenhuma pausa aberta sobra pendurada: a que existia foi fechada
+    // exatamente uma vez.
+    const stillOpen = await db
+      .select()
+      .from(serviceExecutionPauses)
+      .where(
+        and(eq(serviceExecutionPauses.sessionId, session!.id), isNull(serviceExecutionPauses.resumedAt)),
+      );
+    expect(stillOpen.length).toBe(0);
+
+    await checkOut(contract);
+    const summary = await serviceSummary(contract);
+    // O acumulado final também reflete uma única pausa fechada, não duas.
+    expect(summary.execution!.pausedMinutes).toBeGreaterThanOrEqual(39);
+    expect(summary.execution!.pausedMinutes).toBeLessThan(79);
+  }, 120000);
+
+  // ── IP-001 ────────────────────────────────────────────────────────────────
+  it('Trust Pause concorrente: duas chamadas simultâneas colidem no índice parcial e a perdedora recebe 409, não 500', async () => {
+    const contract = await hourlyContractInProgress([
+      'Fabiano Lustosa Cerqueira',
+      'Adélia Gouveia Marchetti',
+    ]);
+    await backdateCheckIn(contract.orderId, 100);
+
+    // Duas chamadas concorrentes de Pause partem da MESMA sessão ACTIVE: a
+    // checagem de transição em memória (session.pause()) passa nas duas, e
+    // quem realmente impede duas pausas abertas simultâneas é o índice
+    // parcial `UNIQUE(session_id) WHERE resumed_at IS NULL` (migration 0027,
+    // §19). Antes do IP-001, a violação de UNIQUE não capturada por nenhum
+    // módulo caía no branch genérico do GlobalExceptionFilter → 500. Este
+    // teste prova que a generalização do mapeamento 23505→409 fecha essa
+    // lacuna também aqui, não só no módulo identity.
+    const [first, second] = await Promise.all([
+      app.inject({
+        method: 'POST',
+        url: `/api/v1/marketplace/orders/${contract.orderId}/pause`,
+        headers: contract.seller.auth,
+        payload: { reasonCode: 'MEAL' },
+      }),
+      app.inject({
+        method: 'POST',
+        url: `/api/v1/marketplace/orders/${contract.orderId}/pause`,
+        headers: contract.seller.auth,
+        payload: { reasonCode: 'PERSONAL_CALL' },
+      }),
+    ]);
+
+    const statusCodes = [first.statusCode, second.statusCode].sort();
+    // Exatamente uma vence (200); a outra é um CONFLICT determinístico (409),
+    // nunca um INTERNAL_ERROR (500) vazando a constraint do Postgres.
+    expect(statusCodes).toEqual([200, 409]);
+
+    const loser = first.statusCode === 409 ? first : second;
+    const loserBody = loser.json<{ error: { code: string } }>();
+    // 'CONFLICT' = a corrida bateu no índice parcial do banco (via
+    // GlobalExceptionFilter); 'SERVICE_EXECUTION_INVALID_TRANSITION' = o
+    // agendamento das duas chamadas não colidiu no banco (a primeira já
+    // tinha terminado quando a segunda leu a sessão), pego pela checagem de
+    // domínio antes de chegar lá. Ambos são 409 determinísticos; nunca 500.
+    expect(['CONFLICT', 'SERVICE_EXECUTION_INVALID_TRANSITION']).toContain(loserBody.error.code);
+
+    // Só uma pausa aberta existe — a colisão não deixou duplicata nenhuma.
+    const [session] = await db
+      .select()
+      .from(serviceExecutionSessions)
+      .where(eq(serviceExecutionSessions.orderId, contract.orderId));
+    const openPauses = await db
+      .select()
+      .from(serviceExecutionPauses)
+      .where(
+        and(eq(serviceExecutionPauses.sessionId, session!.id), isNull(serviceExecutionPauses.resumedAt)),
+      );
+    expect(openPauses.length).toBe(1);
   }, 120000);
 
   // ── §25.2.4 ────────────────────────────────────────────────────────────────
