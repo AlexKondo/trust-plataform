@@ -1,7 +1,18 @@
 /**
  * Tradução dos enums da API para a linguagem do produto.
  * A API fala UPPER_SNAKE_CASE (DOC-001); a tela fala português.
+ *
+ * IP-002: as funções `format*` abaixo delegam para `lib/i18n/format.ts`
+ * (locale-aware, `Intl`) sempre com locale fixo 'pt-BR' — nenhuma das ~25
+ * telas existentes muda de comportamento. Telas novas que precisam seguir o
+ * locale do usuário corrente devem chamar `lib/i18n/format.ts` diretamente
+ * com o `locale` do `useLocale()`, em vez de importar daqui.
  */
+import {
+  formatCurrency as formatCurrencyForLocale,
+  formatDate as formatDateForLocale,
+  formatDateTime as formatDateTimeForLocale,
+} from './i18n/format';
 
 export const LEVEL_LABEL: Record<string, string> = {
   UNVERIFIED: 'Não verificado',
@@ -148,16 +159,15 @@ export const LISTING_TYPE_LABEL: Record<string, string> = {
   PRODUCT: 'Produto',
 };
 
+/** Sempre PT-BR aqui — mesmo output de antes, só que passando pelo utilitário compartilhado. */
 export function formatCurrency(value: number | null, currency = 'BRL'): string {
-  if (value === null) {
-    return '—';
-  }
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency }).format(value);
+  return formatCurrencyForLocale(value, 'pt-BR', currency);
 }
 
 /**
  * Data válida ou null. `Intl.format` LANÇA em data inválida — sem esta guarda,
- * um campo ausente na resposta derruba a página inteira.
+ * um campo ausente na resposta derruba a página inteira. (Guarda vive em
+ * `lib/i18n/format.ts`; mantida aqui só como referência do motivo do '—'.)
  */
 function parseDate(iso: string | null | undefined): Date | null {
   if (!iso) {
@@ -168,18 +178,21 @@ function parseDate(iso: string | null | undefined): Date | null {
 }
 
 export function formatDate(iso: string | null | undefined): string {
-  const date = parseDate(iso);
-  return date ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' }).format(date) : '—';
+  return formatDateForLocale(iso, 'pt-BR');
 }
 
 export function formatDateTime(iso: string | null | undefined): string {
-  const date = parseDate(iso);
-  return date
-    ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(date)
-    : '—';
+  return formatDateTimeForLocale(iso, 'pt-BR');
 }
 
-/** "há 3 dias" — para listas de conversas e timelines. */
+/**
+ * "há 3 dias" — para listas de conversas e timelines. Implementação PRÓPRIA
+ * (não delega para `lib/i18n/format.ts`) para preservar exatamente a
+ * abreviação usada nas ~25 telas existentes ("há 3 min", não "3 minutos
+ * atrás" do `Intl.RelativeTimeFormat` pt-BR) — mudar o texto aqui seria um
+ * refactor de tela fora do escopo desta IP. A versão locale-aware para
+ * telas novas fica em `lib/i18n/format.ts`.
+ */
 export function formatRelative(iso: string | null | undefined): string {
   const date = parseDate(iso);
   if (!date) {

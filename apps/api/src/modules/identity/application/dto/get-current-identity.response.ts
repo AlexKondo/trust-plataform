@@ -16,4 +16,6 @@ export interface GetCurrentIdentityResponse {
    * terceiro e o frontend precisa dela para decidir se mostra o painel admin.
    */
   isAdmin: boolean;
+  /** IP-002 — preferência de locale do usuário (ex.: 'pt-BR', 'en-US'). */
+  preferredLocale: string;
 }

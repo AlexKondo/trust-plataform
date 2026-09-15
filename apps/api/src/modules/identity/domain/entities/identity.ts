@@ -1,4 +1,6 @@
 import { v7 as uuidv7 } from 'uuid';
+import { DEFAULT_LOCALE, isSupportedLocale } from '../../../../shared/i18n/locale';
+import { UnsupportedLocaleException } from '../exceptions/locale.exceptions';
 import { IDENTITY_STATUS, IdentityStatus } from './identity-status';
 
 interface IdentityProps {
@@ -12,6 +14,7 @@ interface IdentityProps {
   failedLoginAttempts: number;
   lockedUntil: Date | null;
   isAdmin: boolean;
+  preferredLocale: string;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -21,6 +24,8 @@ interface CreateNewIdentityInput {
   fullName: string;
   email: string;
   passwordHash: string;
+  /** IP-002 — resolvido pelo use case (preferência inexistente ainda → Accept-Language → default). */
+  preferredLocale?: string;
 }
 
 /**
@@ -44,6 +49,9 @@ export class Identity {
       failedLoginAttempts: 0,
       lockedUntil: null,
       isAdmin: false,
+      preferredLocale: isSupportedLocale(input.preferredLocale)
+        ? input.preferredLocale
+        : DEFAULT_LOCALE,
       createdAt: now,
       updatedAt: now,
       deletedAt: null,
@@ -110,6 +118,10 @@ export class Identity {
     return this.props.isAdmin;
   }
 
+  get preferredLocale(): string {
+    return this.props.preferredLocale;
+  }
+
   /** IDN-002 BR-005: e-mail confirmado → conta ativada. */
   activate(now = new Date()): void {
     this.props.status = IDENTITY_STATUS.ACTIVE;
@@ -143,6 +155,19 @@ export class Identity {
     this.props.lastLoginAt = now;
     this.props.failedLoginAttempts = 0;
     this.props.lockedUntil = null;
+    this.props.updatedAt = now;
+  }
+
+  /**
+   * IP-002 — troca a preferência de locale do usuário. Defesa em profundidade:
+   * o DTO na borda já valida contra `SUPPORTED_LOCALES`, mas a Entity nunca
+   * aceita um valor fora do catálogo, mesmo vinda de outro caminho de código.
+   */
+  changePreferredLocale(locale: string, now = new Date()): void {
+    if (!isSupportedLocale(locale)) {
+      throw new UnsupportedLocaleException(locale);
+    }
+    this.props.preferredLocale = locale;
     this.props.updatedAt = now;
   }
 }

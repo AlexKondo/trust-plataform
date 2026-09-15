@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 import { DRIZZLE, Database, DatabaseExecutor } from '../../../../shared/database/database.module';
-import { NotificationDraft } from '../../domain/notification-rules';
+import { LocalizedNotificationDraft } from '../../domain/notification-rules';
 import { NotificationRow, notifications } from './notifications.schema';
 
 @Injectable()
@@ -10,7 +10,10 @@ export class NotificationRepository {
   constructor(@Inject(DRIZZLE) private readonly db: Database) {}
 
   /** Criação em lote — um evento pode avisar as duas partes (ex.: disputa). */
-  async createMany(drafts: NotificationDraft[], executor?: DatabaseExecutor): Promise<void> {
+  async createMany(
+    drafts: LocalizedNotificationDraft[],
+    executor?: DatabaseExecutor,
+  ): Promise<void> {
     if (drafts.length === 0) {
       return;
     }
@@ -24,6 +27,7 @@ export class NotificationRepository {
         body: draft.body,
         resourceType: draft.resourceType,
         resourceId: draft.resourceId,
+        locale: draft.locale,
         createdAt: new Date(),
       })),
     );

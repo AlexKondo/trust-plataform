@@ -10,6 +10,7 @@ import { RefreshSessionUseCase } from './application/usecases/refresh-session.us
 import { ResetPasswordUseCase } from './application/usecases/reset-password.usecase';
 import { CreateIdentityUseCase } from './application/usecases/create-identity.usecase';
 import { GenerateEmailVerificationUseCase } from './application/usecases/generate-email-verification.usecase';
+import { UpdatePreferredLocaleUseCase } from './application/usecases/update-preferred-locale.usecase';
 import { VerifyEmailUseCase } from './application/usecases/verify-email.usecase';
 import { EmailVerificationTokenRepository } from './domain/repositories/email-verification-token.repository';
 import { IdentityRepository } from './domain/repositories/identity.repository';
@@ -44,6 +45,7 @@ const BREVO_REST_KEY_PREFIX = 'xkeysib-';
     AuthenticateIdentityUseCase,
     RefreshSessionUseCase,
     GetCurrentIdentityUseCase,
+    UpdatePreferredLocaleUseCase,
     LogoutUseCase,
     ForgotPasswordUseCase,
     ResetPasswordUseCase,

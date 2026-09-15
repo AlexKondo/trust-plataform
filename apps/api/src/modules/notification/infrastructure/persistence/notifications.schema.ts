@@ -21,6 +21,14 @@ export const notifications = pgTable(
     /** Para onde a tela deve levar quando o aviso é clicado. */
     resourceType: varchar('resource_type', { length: 60 }),
     resourceId: uuid('resource_id'),
+    /**
+     * IP-002 — locale do destinatário resolvido no momento em que o aviso
+     * nasce (preferência salva → PT-BR default). O texto em si ainda só
+     * existe em PT-BR (catálogo NTF-001 é conteúdo pré-existente, fora do
+     * escopo desta fundação), mas o campo já deixa a renderização localizada
+     * pronta para entrar sem mais uma migration.
+     */
+    locale: varchar('locale', { length: 10 }).notNull().default('pt-BR'),
     readAt: timestamp('read_at', { withTimezone: true, mode: 'date' }),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
   },

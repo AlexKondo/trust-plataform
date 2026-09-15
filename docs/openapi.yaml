@@ -140,10 +140,56 @@ paths:
                   createdAt: '2026-08-08T10:00:00.000Z'
                   lastLoginAt: '2026-08-08T20:30:00.000Z'
                   isAdmin: false
+                  preferredLocale: pt-BR
         '401':
           description: Sem token ou token inválido/expirado (INVALID_TOKEN)
         '403':
           description: Identity não está ativa (IDENTITY_NOT_ACTIVE)
+        '404':
+          description: Identity não encontrada (IDENTITY_NOT_FOUND)
+
+  /identities/me/locale:
+    patch:
+      tags: [Identity]
+      summary: IP-002 — Trocar a preferência de locale da própria Identity
+      description: >
+        Ownership vem sempre do token (anti-IDOR); não existe parâmetro de
+        identityId na rota. `preferredLocale` precisa estar em
+        `SUPPORTED_LOCALES` (hoje `pt-BR` | `en-US`) — valor fora do catálogo
+        é rejeitado com 400 antes de chegar ao domínio. Idempotente: reenviar
+        o mesmo locale não gera nova auditoria.
+      operationId: updatePreferredLocale
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              preferredLocale: en-US
+      responses:
+        '200':
+          description: Preferência atualizada (ou já era essa — idempotente)
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  identityId: '019fe415-6318-7bfb-a184-3f47c3f0b7e1'
+                  preferredLocale: en-US
+                  updatedAt: '2026-09-15T10:00:00.000Z'
+        '400':
+          description: preferredLocale fora do catálogo suportado
+          content:
+            application/json:
+              example:
+                success: false
+                error:
+                  code: VALIDATION_ERROR
+                  message: Validation failed.
+                  details:
+                    - path: preferredLocale
+                      message: 'preferredLocale must be one of: pt-BR, en-US'
+        '401':
+          description: Sem token ou token inválido/expirado (INVALID_TOKEN)
         '404':
           description: Identity não encontrada (IDENTITY_NOT_FOUND)
 

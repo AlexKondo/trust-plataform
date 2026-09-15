@@ -20,6 +20,7 @@ export const IdentityMapper = {
       createdAt: identity.createdAt.toISOString(),
       lastLoginAt: identity.lastLoginAt?.toISOString() ?? null,
       isAdmin: identity.isAdmin,
+      preferredLocale: identity.preferredLocale,
     };
   },
 };

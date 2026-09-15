@@ -4,18 +4,9 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createContext, useContext, useEffect, useState } from 'react';
 import { ApiError, CurrentIdentity, authApi, logout, tokenStore } from '../lib/api';
+import { useLocale } from '../lib/i18n/LocaleProvider';
 import { NotificationBell } from './notification-bell';
 import { Icon } from './ui';
-
-const MENU = [
-  { href: '/dashboard', icon: 'home', label: 'Início' },
-  { href: '/trust-score', icon: 'shield', label: 'Trust Score' },
-  { href: '/trust-passport', icon: 'badge', label: 'Trust Passport' },
-  { href: '/verifications', icon: 'fact_check', label: 'Verificações' },
-  { href: '/marketplace', icon: 'storefront', label: 'Marketplace' },
-  { href: '/conversations', icon: 'forum', label: 'Conversas' },
-  { href: '/orders', icon: 'receipt_long', label: 'Pedidos' },
-];
 
 const IdentityContext = createContext<CurrentIdentity | null>(null);
 export const useIdentity = () => useContext(IdentityContext);
@@ -23,8 +14,19 @@ export const useIdentity = () => useContext(IdentityContext);
 export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const { t } = useLocale();
   const [identity, setIdentity] = useState<CurrentIdentity | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const MENU = [
+    { href: '/dashboard', icon: 'home', label: t('nav.home') },
+    { href: '/trust-score', icon: 'shield', label: t('nav.trustScore') },
+    { href: '/trust-passport', icon: 'badge', label: t('nav.trustPassport') },
+    { href: '/verifications', icon: 'fact_check', label: t('nav.verifications') },
+    { href: '/marketplace', icon: 'storefront', label: t('nav.marketplace') },
+    { href: '/conversations', icon: 'forum', label: t('nav.conversations') },
+    { href: '/orders', icon: 'receipt_long', label: t('nav.orders') },
+  ];
 
   useEffect(() => {
     if (!tokenStore.access) {
@@ -95,7 +97,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               }`}
             >
               <Icon name="admin_panel_settings" size={20} />
-              Moderação
+              {t('nav.moderation')}
             </Link>
           ) : null}
           <Link
@@ -107,7 +109,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             }`}
           >
             <Icon name="settings" size={20} />
-            Configurações
+            {t('nav.settings')}
           </Link>
         </aside>
 
@@ -139,7 +141,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   type="button"
                   onClick={() => void handleLogout()}
                   className="body-sm text-on-surface-variant transition-colors hover:text-error"
-                  title="Sair"
+                  title={t('nav.logout')}
                 >
                   <Icon name="logout" size={20} />
                 </button>

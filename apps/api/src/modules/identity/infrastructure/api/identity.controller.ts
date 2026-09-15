@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import { FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { RequestContext } from '../../../../shared/logging/correlation-id.middleware';
@@ -12,9 +12,15 @@ import {
 } from '../../application/dto/create-identity.request';
 import { CreateIdentityResponse } from '../../application/dto/create-identity.response';
 import { GetCurrentIdentityResponse } from '../../application/dto/get-current-identity.response';
+import {
+  UpdatePreferredLocaleRequest,
+  UpdatePreferredLocaleResponse,
+  updatePreferredLocaleRequestSchema,
+} from '../../application/dto/update-preferred-locale.request';
 import { CreateIdentityUseCase, RequestMetadata } from '../../application/usecases/create-identity.usecase';
 import { GenerateEmailVerificationUseCase } from '../../application/usecases/generate-email-verification.usecase';
 import { GetCurrentIdentityUseCase } from '../../application/usecases/get-current-identity.usecase';
+import { UpdatePreferredLocaleUseCase } from '../../application/usecases/update-preferred-locale.usecase';
 import {
   VerifyEmailResponse,
   VerifyEmailUseCase,
@@ -36,6 +42,7 @@ export class IdentityController {
     private readonly verifyEmailUseCase: VerifyEmailUseCase,
     private readonly generateEmailVerificationUseCase: GenerateEmailVerificationUseCase,
     private readonly getCurrentIdentityUseCase: GetCurrentIdentityUseCase,
+    private readonly updatePreferredLocaleUseCase: UpdatePreferredLocaleUseCase,
   ) {}
 
   /** IDN-005 — dados da Identity autenticada (rota protegida pelo guard global). */
@@ -55,6 +62,24 @@ export class IdentityController {
     @Req() request: RequestWithContext,
   ): Promise<CreateIdentityResponse> {
     return this.createIdentityUseCase.execute(body, this.metadataFrom(request));
+  }
+
+  /**
+   * IP-002 — troca a preferência de locale da própria Identity autenticada.
+   * Ownership vem sempre do token (anti-IDOR), nunca de parâmetro de rota.
+   */
+  @Patch('me/locale')
+  async updatePreferredLocale(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Body(new ZodValidationPipe(updatePreferredLocaleRequestSchema))
+    body: UpdatePreferredLocaleRequest,
+    @Req() request: RequestWithContext,
+  ): Promise<UpdatePreferredLocaleResponse> {
+    return this.updatePreferredLocaleUseCase.execute(
+      identity.identityId,
+      body,
+      this.metadataFrom(request),
+    );
   }
 
   /** IDN-002 — confirma o e-mail via link (público). */
@@ -84,6 +109,7 @@ export class IdentityController {
       requestId: request.requestContext?.requestId,
       ipAddress: request.ip,
       userAgent: request.headers['user-agent'],
+      acceptLanguage: request.headers['accept-language'],
     };
   }
 }

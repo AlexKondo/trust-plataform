@@ -205,4 +205,6 @@ export interface CurrentIdentity {
   lastLoginAt: string | null;
   /** Decide se o painel de moderação aparece no menu. */
   isAdmin: boolean;
+  /** IP-002 — preferência de locale do usuário (ex.: 'pt-BR', 'en-US'). */
+  preferredLocale: string;
 }

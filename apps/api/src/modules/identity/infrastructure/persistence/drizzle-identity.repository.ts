@@ -32,6 +32,7 @@ export class DrizzleIdentityRepository extends IdentityRepository {
           failedLoginAttempts: identity.failedLoginAttempts,
           lockedUntil: identity.lockedUntil,
           isAdmin: identity.isAdmin,
+          preferredLocale: identity.preferredLocale,
           createdAt: identity.createdAt,
           updatedAt: identity.updatedAt,
           deletedAt: identity.deletedAt,
@@ -46,6 +47,7 @@ export class DrizzleIdentityRepository extends IdentityRepository {
             failedLoginAttempts: identity.failedLoginAttempts,
             lockedUntil: identity.lockedUntil,
             isAdmin: identity.isAdmin,
+            preferredLocale: identity.preferredLocale,
             updatedAt: new Date(),
             deletedAt: identity.deletedAt,
           },
@@ -59,8 +61,9 @@ export class DrizzleIdentityRepository extends IdentityRepository {
     }
   }
 
-  async findById(id: string): Promise<Identity | null> {
-    const [row] = await this.db
+  async findById(id: string, executor?: DatabaseExecutor): Promise<Identity | null> {
+    const target = executor ?? this.db;
+    const [row] = await target
       .select()
       .from(identities)
       .where(and(eq(identities.id, id), isNull(identities.deletedAt)))
@@ -98,6 +101,7 @@ export class DrizzleIdentityRepository extends IdentityRepository {
       failedLoginAttempts: row.failedLoginAttempts,
       lockedUntil: row.lockedUntil,
       isAdmin: row.isAdmin,
+      preferredLocale: row.preferredLocale,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
       deletedAt: row.deletedAt,

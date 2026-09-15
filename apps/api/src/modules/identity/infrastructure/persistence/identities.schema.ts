@@ -27,6 +27,12 @@ export const identities = pgTable(
     lockedUntil: timestamp('locked_until', { withTimezone: true, mode: 'date' }),
     /** Flag mínima de admin do MVP (PLANO §4); concedida manualmente no banco. */
     isAdmin: boolean('is_admin').notNull().default(false),
+    /**
+     * IP-002 — preferência de locale do usuário (BCP 47, ex.: 'pt-BR', 'en-US').
+     * Default PT-BR (produto). Resolvida no cadastro via Accept-Language e
+     * alterável depois via PATCH /identities/me/locale.
+     */
+    preferredLocale: varchar('preferred_locale', { length: 10 }).notNull().default('pt-BR'),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
     deletedAt: timestamp('deleted_at', { withTimezone: true, mode: 'date' }),

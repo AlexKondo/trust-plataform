@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { AuditLogService } from '../../../../shared/audit/audit-log.service';
 import { DRIZZLE, Database } from '../../../../shared/database/database.module';
+import { resolveLocale } from '../../../../shared/i18n/locale-resolver';
 import { Identity } from '../../domain/entities/identity';
 import { BreachedPasswordException } from '../../domain/exceptions/breached-password.exception';
 import { EmailAlreadyExistsException } from '../../domain/exceptions/email-already-exists.exception';
@@ -18,6 +19,8 @@ export interface RequestMetadata {
   requestId?: string;
   ipAddress?: string;
   userAgent?: string;
+  /** IP-002 — cabeçalho `Accept-Language` bruto; usado só para resolver o locale inicial no cadastro. */
+  acceptLanguage?: string;
 }
 
 /**
@@ -55,10 +58,14 @@ export class CreateIdentityUseCase {
     }
 
     const passwordHash = await this.passwordHashService.hash(request.password);
+    // IP-002 — sem preferência salva ainda (Identity acabou de nascer): resolve
+    // pelo Accept-Language do navegador, com PT-BR como fallback final.
+    const preferredLocale = resolveLocale(null, metadata.acceptLanguage);
     const identity = Identity.createNew({
       fullName: request.fullName,
       email: request.email,
       passwordHash,
+      preferredLocale,
     });
 
     await this.db.transaction(async (tx) => {

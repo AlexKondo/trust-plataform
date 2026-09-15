@@ -121,6 +121,24 @@ própria tabela de metadados e o próprio bucket — o Change Order usa
 `change-order-evidences`, **que precisa ser criado no Supabase Storage** (privado).
 
 
+## IP-002 — Internacionalização e localização (fundação) (2026-09-15)
+
+Fundação de i18n sobre o baseline do Multi-Agent Implementation Pack: `identities`
+ganhou `preferred_locale` (migration 0028, default `pt-BR`, `CHECK` restrito ao
+catálogo `SUPPORTED_LOCALES` em `apps/api/src/shared/i18n/locale.ts`), resolvido
+no cadastro por `Accept-Language` (fallback PT-BR) e alterável via
+`PATCH /identities/me/locale`. `notifications` ganhou `locale` (mesma migration):
+o consumer resolve o locale do **destinatário** (nunca do remetente) antes de
+persistir o aviso — o texto do catálogo NTF-001 continua só em PT-BR neste
+release (conteúdo pré-existente, fora do escopo da fundação), mas o mecanismo de
+resolução já está pronto para renderização localizada entrar sem nova migration.
+Frontend: `apps/web/lib/i18n/` (catálogo de mensagens `pt-BR`/`en-US`,
+`LocaleProvider`, `format.ts` com `Intl` locale-aware) + seletor de idioma em
+`/settings/language`, provando a arquitetura com `en-US` como segundo locale de
+teste sobre uma fatia representativa de telas — não é uma tradução completa do
+produto (fora de escopo do IP-002). Detalhes, decisões e critérios de aceite em
+[docs/Multi-Agent Implementation Doc/IPS/IP-002-COMPLETION-REPORT.md](docs/Multi-Agent%20Implementation%20Doc/IPS/IP-002-COMPLETION-REPORT.md).
+
 ## Documentos-guia (ler nesta ordem)
 
 1. [PLANO-DE-MODULOS.md](PLANO-DE-MODULOS.md) — quebra em módulos, ordem de desenvolvimento, grafo de dependências

@@ -17,6 +17,16 @@ export interface NotificationDraft {
 }
 
 /**
+ * IP-002 — draft com o locale do destinatário já resolvido, pronto para
+ * persistência. A resolução (preferência do destinatário → PT-BR default)
+ * é responsabilidade do consumer, não da regra: a regra descreve QUEM e O
+ * QUÊ, o consumer decide EM QUE IDIOMA gravar.
+ */
+export interface LocalizedNotificationDraft extends NotificationDraft {
+  locale: string;
+}
+
+/**
  * Regra de notificação: dado o payload de um evento, quem deve ser avisado e
  * com que texto. Retornar `[]` significa "este evento não gera aviso".
  */

@@ -40,6 +40,7 @@ describe('GetCurrentIdentityUseCase (IDN-005)', () => {
       createdAt: identity.createdAt.toISOString(),
       lastLoginAt: identity.lastLoginAt?.toISOString(),
       isAdmin: false,
+      preferredLocale: 'pt-BR',
     });
   });
 
@@ -61,6 +62,7 @@ describe('GetCurrentIdentityUseCase (IDN-005)', () => {
       'identityId',
       'isAdmin',
       'lastLoginAt',
+      'preferredLocale',
       'status',
     ]);
   });
