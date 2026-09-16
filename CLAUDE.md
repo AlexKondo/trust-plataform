@@ -294,6 +294,67 @@ migration/evento novo: é pura leitura sobre entidades já persistidas
 `TrustScore`). Detalhes, decisões e critérios de aceite em
 [docs/Multi-Agent Implementation Doc/IPS/IP-004-COMPLETION-REPORT.md](docs/Multi-Agent%20Implementation%20Doc/IPS/IP-004-COMPLETION-REPORT.md).
 
+## IP-005 — Scheduling, Availability, Location & ETA (2026-09-16)
+
+Três gaps confirmados em código (não assumidos) antes de implementar: (1)
+nenhuma entidade "disponibilidade do Partner" existia em lugar nenhum do
+repositório — só conflito reativo entre agendamentos já confirmados
+(`findActiveSchedulingsForSeller`, MRK-019 BR-004); (2) `marketplace_order_schedulings`
+tinha `UNIQUE(order_id)` sem nenhum caminho de reagendamento, exatamente como
+`INCONSISTENCIAS #26` documentou desde o MVP ("se reagendamento entrar, trocar
+por `UNIQUE(order_id) WHERE status = 'ACTIVE'`"); (3) nenhum conceito de
+status de deslocamento/ETA existia — só o check-in/check-out do MRK-020/021,
+que já captura GPS real mas só APÓS a execução começar.
+
+**Disponibilidade do Partner** (`PartnerAvailabilityWindow`, nova tabela
+`marketplace_partner_availability_windows`): janela semanal recorrente por dia
+(`dayOfWeek 0-6`, `startMinute`/`endMinute`, `timezone`), declarada via
+`PUT /marketplace/partner-availability` (replace-all). Sem nenhuma janela
+declarada, o agendamento não sofre NENHUMA restrição nova — comportamento
+idêntico ao que já existia (backward-compatible por construção). Com janelas
+declaradas, `schedule`/`reschedule` recusam (`409
+MARKETPLACE_SCHEDULING_OUTSIDE_AVAILABILITY`) uma janela pedida que caia fora
+de toda disponibilidade, via `fitsAvailability()` (domínio puro, `Intl.DateTimeFormat`
+para converter o instante UTC pedido no dia/minuto local do fuso declarado —
+zero dependência nova).
+
+**Reagendamento** (`ManageOrderUseCase.reschedule`, `POST
+/marketplace/orders/{id}/reschedule`) resolve o caminho que a própria
+`INCONSISTENCIAS #26` já previa: a constraint virou `UNIQUE(order_id) WHERE
+status = 'ACTIVE'` (migration `0033`), então um pedido acumula histórico
+CANCELLED sem nunca ter mais de uma janela ACTIVE. A janela antiga nunca é
+apagada — `Scheduling.cancel(reason)` grava `cancelledReason`, o único jeito
+de distinguir "substituída por reagendamento" (`reason` presente) de "morreu
+porque o pedido inteiro cancelou" (`null`, comportamento pré-IP-005
+inalterado). Válido só em `SCHEDULED` com execução ainda não iniciada — depois
+do check-in (MRK-020) o caminho é disputa/cancelamento, não reagendar. Motivo
+obrigatório (mesma regra de MRK-018 BR-003), mesma checagem de conflito de
+agenda e de disponibilidade do agendamento original.
+
+**Status de deslocamento/ETA** (`OrderTravelStatus`, nova tabela
+`marketplace_order_travel_statuses`, `GET/POST .../travel-status[/en-route|/arrived]`):
+modelo de TRANSIÇÃO DECLARADA (`NOT_STARTED -> EN_ROUTE -> ARRIVED`), NUNCA
+rastreamento contínuo de GPS — o mandato desta IP proíbe explicitamente
+"rastreamento invasivo em segundo plano" e "vazar localização precisa
+contínua além da necessidade" (Shared Standards §7). O Partner declara
+`declaredEtaMinutes` manualmente; `EtaEstimatorPort` (porta) +
+`DeclaredEtaAdapter` (única implementação na Release 1, já que
+`.env.example` não declara nenhuma chave de geocoding/roteamento) apenas
+valida e repassa esse número, honestamente marcado `PARTNER_DECLARED` — zero
+geo-roteamento inventado. Trocar por um provedor real no futuro é só trocar o
+adapter ligado ao port em `marketplace.module.ts`; nenhum domínio/use
+case/controller muda. Só se aplica a um pedido `SCHEDULED` ainda não iniciado;
+ambos os participantes leem o status (visibilidade do Member sobre o
+progresso da chegada), só o Partner declara. Nenhuma coluna de
+latitude/longitude nesta tabela — a única coordenada real do sistema continua
+sendo a do check-in/check-out (PACK-03), inalterada por esta IP.
+
+Migration `0033` (aditiva): coluna `cancelled_reason` em
+`marketplace_order_schedulings`, troca do índice único de agendamento pela
+versão parcial, e as duas tabelas novas. Detalhes, decisões e critérios de
+aceite em
+[docs/Multi-Agent Implementation Doc/IPS/IP-005-COMPLETION-REPORT.md](docs/Multi-Agent%20Implementation%20Doc/IPS/IP-005-COMPLETION-REPORT.md).
+
 ## Documentos-guia (ler nesta ordem)
 
 1. [PLANO-DE-MODULOS.md](PLANO-DE-MODULOS.md) — quebra em módulos, ordem de desenvolvimento, grafo de dependências

@@ -12,6 +12,22 @@ export const scheduleOrderRequestSchema = z.object({
 export type ScheduleOrderRequest = z.infer<typeof scheduleOrderRequestSchema>;
 
 /**
+ * IP-005 — reagendar troca a janela de um pedido JÁ agendado (INCONSISTENCIAS
+ * #26's own migration path). `reason` é obrigatório pelo mesmo motivo do
+ * cancelamento (MRK-018 BR-003): mudar um compromisso já confirmado com o
+ * cliente merece justificativa auditável, não só um novo horário silencioso.
+ */
+export const rescheduleOrderRequestSchema = z.object({
+  scheduledStart: z.coerce.date().refine((value) => value.getTime() > Date.now(), {
+    message: 'scheduledStart must be in the future',
+  }),
+  estimatedDuration: z.number().int().min(15).max(1440),
+  timezone: z.string().trim().min(3).max(50).default('America/Sao_Paulo'),
+  reason: z.string().trim().min(3, 'reason is required').max(500),
+});
+export type RescheduleOrderRequest = z.infer<typeof rescheduleOrderRequestSchema>;
+
+/**
  * MRK-020/021 — evidências do check-in/check-out. Tudo opcional: a
  * geolocalização informa, mas nunca bloqueia a execução (MRK-020 BR-004).
  * Fotos e vídeos ficam no futuro módulo de Evidências.
@@ -87,4 +103,25 @@ export interface OrderDetailsResponse extends OrderResponse {
   listingTitle: string | null;
   scheduling: SchedulingResponse | null;
   timeline: OrderTimelineEntry[];
+}
+
+// ── IP-005 — status de deslocamento / ETA ───────────────────────────────────
+
+export const declareEnRouteRequestSchema = z.object({
+  /** Minutos declarados pelo próprio Partner — fonte de verdade na Release 1
+   * (nenhum roteamento geográfico é computado, ver EtaEstimatorPort). */
+  declaredEtaMinutes: z.number().int().min(1).max(480),
+});
+export type DeclareEnRouteRequest = z.infer<typeof declareEnRouteRequestSchema>;
+
+export interface TravelStatusResponse {
+  orderId: string;
+  /** NOT_STARTED | EN_ROUTE | ARRIVED */
+  status: string;
+  declaredEtaMinutes: number | null;
+  estimatedArrivalAt: string | null;
+  /** PARTNER_DECLARED | PROVIDER_COMPUTED */
+  etaSource: string | null;
+  enRouteAt: string | null;
+  arrivedAt: string | null;
 }

@@ -16,6 +16,12 @@ export interface SchedulingProps {
   scheduledEnd: Date;
   timezone: string;
   status: SchedulingStatus;
+  /** IP-005 — motivo do cancelamento, só preenchido quando a causa foi um
+   * REAGENDAMENTO (o Partner/Member trocou o horário). `null` continua
+   * significando "cancelado porque o pedido inteiro foi cancelado" (MRK-018),
+   * o único caminho que existia antes desta IP — nenhum dado histórico muda
+   * de significado. */
+  cancelledReason: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -60,6 +66,7 @@ export class Scheduling {
       scheduledEnd: new Date(input.scheduledStart.getTime() + input.estimatedDuration * 60000),
       timezone: input.timezone,
       status: SCHEDULING_STATUS.ACTIVE,
+      cancelledReason: null,
       createdAt: now,
       updatedAt: now,
     });
@@ -101,9 +108,20 @@ export class Scheduling {
     return this.props.createdAt;
   }
 
-  /** MRK-018: o agendamento morre junto com o pedido cancelado, mas fica no histórico. */
-  cancel(now = new Date()): void {
+  get cancelledReason(): string | null {
+    return this.props.cancelledReason;
+  }
+
+  /**
+   * MRK-018: o agendamento morre junto com o pedido cancelado, mas fica no
+   * histórico. IP-005: o MESMO método cobre "esta janela foi substituída por
+   * um reagendamento" — a única diferença observável é o `reason` (quando
+   * presente, foi um reagendamento; quando `null`, foi o pedido inteiro que
+   * cancelou, o único caminho que existia antes desta IP).
+   */
+  cancel(reason: string | null = null, now = new Date()): void {
     this.props.status = SCHEDULING_STATUS.CANCELLED;
+    this.props.cancelledReason = reason?.trim() || null;
     this.props.updatedAt = now;
   }
 

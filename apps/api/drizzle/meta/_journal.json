@@ -232,6 +232,13 @@
       "when": 1794000000000,
       "tag": "0032_ip021_privacy_lgpd_data_lifecycle",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1795000000000,
+      "tag": "0033_ip005_scheduling_availability_location_eta",
+      "breakpoints": true
     }
   ]
 }

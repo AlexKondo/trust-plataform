@@ -18,14 +18,19 @@ import { CurrentIdentity } from '../../../../shared/security/current-identity.de
 import {
   CancelOrderRequest,
   ConfirmOrderRequest,
+  DeclareEnRouteRequest,
   ExecutionEvidenceRequest,
+  RescheduleOrderRequest,
   ScheduleOrderRequest,
   cancelOrderRequestSchema,
   confirmOrderRequestSchema,
+  declareEnRouteRequestSchema,
   executionEvidenceSchema,
+  rescheduleOrderRequestSchema,
   scheduleOrderRequestSchema,
 } from '../../application/dto/marketplace-order.dtos';
 import { RequestMeta, paginationQuerySchema } from '../../application/dto/marketplace.dtos';
+import { ManageOrderTravelStatusUseCase } from '../../application/usecases/manage-order-travel-status.usecase';
 import { ManageOrderUseCase } from '../../application/usecases/manage-order.usecase';
 
 type RequestWithContext = FastifyRequest & { requestContext?: RequestContext };
@@ -39,7 +44,10 @@ const orderIdSchema = z.string().uuid('orderId must be a valid UUID');
  */
 @Controller('marketplace/orders')
 export class MarketplaceOrderController {
-  constructor(private readonly manageOrder: ManageOrderUseCase) {}
+  constructor(
+    private readonly manageOrder: ManageOrderUseCase,
+    private readonly travelStatus: ManageOrderTravelStatusUseCase,
+  ) {}
 
   /** Meus pedidos (como comprador ou vendedor). */
   @Get()
@@ -71,6 +79,50 @@ export class MarketplaceOrderController {
     @Req() request: RequestWithContext,
   ) {
     return this.manageOrder.schedule(identity.identityId, orderId, body, this.meta(request));
+  }
+
+  /** IP-005 — reagenda um pedido já agendado (troca a janela, motivo obrigatório). */
+  @Post(':orderId/reschedule')
+  @HttpCode(HttpStatus.OK)
+  async reschedule(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('orderId', new ZodValidationPipe(orderIdSchema)) orderId: string,
+    @Body(new ZodValidationPipe(rescheduleOrderRequestSchema)) body: RescheduleOrderRequest,
+    @Req() request: RequestWithContext,
+  ) {
+    return this.manageOrder.reschedule(identity.identityId, orderId, body, this.meta(request));
+  }
+
+  /** IP-005 — status de deslocamento do Partner (leitura: ambos participantes). */
+  @Get(':orderId/travel-status')
+  async getTravelStatus(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('orderId', new ZodValidationPipe(orderIdSchema)) orderId: string,
+  ) {
+    return this.travelStatus.get(identity.identityId, orderId);
+  }
+
+  /** IP-005 — Partner declara "a caminho" + ETA (declarado, não geo-computado). */
+  @Post(':orderId/travel-status/en-route')
+  @HttpCode(HttpStatus.OK)
+  async declareEnRoute(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('orderId', new ZodValidationPipe(orderIdSchema)) orderId: string,
+    @Body(new ZodValidationPipe(declareEnRouteRequestSchema)) body: DeclareEnRouteRequest,
+    @Req() request: RequestWithContext,
+  ) {
+    return this.travelStatus.markEnRoute(identity.identityId, orderId, body, this.meta(request));
+  }
+
+  /** IP-005 — Partner declara "cheguei". */
+  @Post(':orderId/travel-status/arrived')
+  @HttpCode(HttpStatus.OK)
+  async declareArrived(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('orderId', new ZodValidationPipe(orderIdSchema)) orderId: string,
+    @Req() request: RequestWithContext,
+  ) {
+    return this.travelStatus.markArrived(identity.identityId, orderId, this.meta(request));
   }
 
   /** MRK-020 — check-in do prestador; a execução começa. */

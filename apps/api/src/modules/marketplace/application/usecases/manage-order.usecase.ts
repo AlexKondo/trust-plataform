@@ -1,11 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { PaginatedResult } from '../../../../shared/api/api-envelope';
 import { AuditLogService } from '../../../../shared/audit/audit-log.service';
+import { fitsAvailability } from '../../domain/services/availability.service';
 import { Scheduling } from '../../domain/entities/marketplace-order-execution';
-import { ORDER_STATUS } from '../../domain/entities/marketplace-types';
-import { SchedulingConflictException } from '../../domain/exceptions/marketplace.exceptions';
+import { ORDER_STATUS, SCHEDULING_STATUS } from '../../domain/entities/marketplace-types';
+import {
+  OrderNotReschedulableException,
+  SchedulingConflictException,
+  SchedulingNotFoundException,
+  SchedulingOutsideAvailabilityException,
+} from '../../domain/exceptions/marketplace.exceptions';
 import { MarketplaceListingRepository } from '../../domain/repositories/marketplace-listing.repository';
 import { MarketplaceOrderRepository } from '../../domain/repositories/marketplace-order.repository';
+import { PartnerAvailabilityRepository } from '../../domain/repositories/partner-availability.repository';
 import { ServiceExecutionRepository } from '../../domain/repositories/service-execution.repository';
 import {
   CancelOrderRequest,
@@ -14,6 +21,7 @@ import {
   OrderDetailsResponse,
   OrderResponse,
   OrderTimelineEntry,
+  RescheduleOrderRequest,
   ScheduleOrderRequest,
 } from '../dto/marketplace-order.dtos';
 import { RequestMeta } from '../dto/marketplace.dtos';
@@ -36,6 +44,7 @@ export class ManageOrderUseCase {
     private readonly orderRepository: MarketplaceOrderRepository,
     private readonly listingRepository: MarketplaceListingRepository,
     private readonly executionRepository: ServiceExecutionRepository,
+    private readonly availabilityRepository: PartnerAvailabilityRepository,
     private readonly lifecycle: OrderLifecycleService,
     private readonly serviceExecution: ServiceExecutionUseCase,
     private readonly auditLogService: AuditLogService,
@@ -64,7 +73,7 @@ export class ManageOrderUseCase {
     const { order } = await this.lifecycle.loadForParticipant(orderId, identityId);
     const [listing, scheduling, executionEvents, confirmation] = await Promise.all([
       this.listingRepository.findById(order.listingId),
-      this.orderRepository.findSchedulingByOrder(orderId),
+      this.orderRepository.findLatestSchedulingByOrder(orderId),
       this.orderRepository.listExecutionEvents(orderId),
       this.orderRepository.findConfirmationByOrder(orderId),
     ]);
@@ -165,6 +174,13 @@ export class ManageOrderUseCase {
     if (existing.some((other) => other.overlaps(scheduling.scheduledStart, scheduling.scheduledEnd))) {
       throw new SchedulingConflictException();
     }
+    // IP-005: se o Partner declarou disponibilidade, a janela pedida precisa
+    // caber nela. Sem nenhuma janela declarada, não existe restrição — mesmo
+    // comportamento de antes desta IP (backward-compatible por construção).
+    const availability = await this.availabilityRepository.listByPartner(order.sellerId);
+    if (!fitsAvailability(availability, scheduling.scheduledStart, scheduling.scheduledEnd, scheduling.timezone)) {
+      throw new SchedulingOutsideAvailabilityException();
+    }
 
     order.markScheduled(); // valida a transição (BR-001)
 
@@ -187,6 +203,92 @@ export class ManageOrderUseCase {
       auditMetadata: { scheduledStart: scheduling.scheduledStart.toISOString() },
       meta,
       alsoInTransaction: (tx) => this.orderRepository.saveScheduling(scheduling, tx),
+    });
+
+    return this.get(identityId, orderId, meta);
+  }
+
+  /**
+   * IP-005 — reagenda um pedido já agendado, fechando o gap que a própria
+   * INCONSISTENCIAS #26 previa desde o MVP: "se reagendamento entrar, trocar
+   * `UNIQUE(order_id)` por `UNIQUE(order_id) WHERE status = 'ACTIVE'`" (feito
+   * em `marketplace-order.schema.ts`). A janela antiga não é apagada — vira
+   * uma linha CANCELLED com `cancelledReason` preenchido, distinguível de um
+   * cancelamento de pedido inteiro (que deixa `cancelledReason: null`).
+   *
+   * Restrito a `SCHEDULED` com execução ainda não iniciada: `AWAITING_EXECUTION`
+   * nunca é produzido no MVP (INCONSISTENCIAS #36) e uma vez que o check-in
+   * (MRK-020) já aconteceu, o caminho correto é disputa/cancelamento, não
+   * reagendar um serviço que já começou.
+   */
+  async reschedule(
+    identityId: string,
+    orderId: string,
+    body: RescheduleOrderRequest,
+    meta: RequestMeta = {},
+  ): Promise<OrderDetailsResponse> {
+    const { order } = await this.lifecycle.loadForParticipant(orderId, identityId);
+    const previousStatus = order.status;
+
+    if (order.status !== ORDER_STATUS.SCHEDULED || order.startedAt !== null) {
+      throw new OrderNotReschedulableException(order.status);
+    }
+
+    const current = await this.orderRepository.findLatestSchedulingByOrder(orderId);
+    if (!current || current.status !== SCHEDULING_STATUS.ACTIVE) {
+      throw new SchedulingNotFoundException();
+    }
+
+    const next = Scheduling.create({
+      orderId,
+      scheduledStart: body.scheduledStart,
+      estimatedDuration: body.estimatedDuration,
+      timezone: body.timezone,
+    });
+
+    // Mesma checagem de conflito do agendamento original (BR-004): exclui o
+    // próprio pedido (sua janela antiga e a nova ainda não persistida) e olha
+    // só para os OUTROS compromissos ativos do prestador.
+    const existing = await this.orderRepository.findActiveSchedulingsForSeller(order.sellerId, orderId);
+    if (existing.some((other) => other.overlaps(next.scheduledStart, next.scheduledEnd))) {
+      throw new SchedulingConflictException();
+    }
+    const availability = await this.availabilityRepository.listByPartner(order.sellerId);
+    if (!fitsAvailability(availability, next.scheduledStart, next.scheduledEnd, next.timezone)) {
+      throw new SchedulingOutsideAvailabilityException();
+    }
+
+    current.cancel(body.reason); // marca a janela antiga como substituída, não apaga
+
+    await this.lifecycle.commit({
+      order,
+      previousStatus,
+      actorId: identityId,
+      operation: 'RescheduleMarketplaceOrder',
+      eventType: 'MarketplaceOrder.Rescheduled',
+      eventPayload: {
+        orderId,
+        listingId: order.listingId,
+        buyerId: order.buyerId,
+        sellerId: order.sellerId,
+        previousSchedulingId: current.id,
+        previousScheduledStart: current.scheduledStart.toISOString(),
+        schedulingId: next.id,
+        scheduledStart: next.scheduledStart.toISOString(),
+        scheduledEnd: next.scheduledEnd.toISOString(),
+        reason: body.reason,
+        status: order.status,
+      },
+      auditMetadata: {
+        previousScheduledStart: current.scheduledStart.toISOString(),
+        newScheduledStart: next.scheduledStart.toISOString(),
+        reason: body.reason,
+      },
+      meta,
+      alsoInTransaction: async (tx) => {
+        await this.orderRepository.saveScheduling(current, tx);
+        await this.orderRepository.saveScheduling(next, tx);
+      },
     });
 
     return this.get(identityId, orderId, meta);
@@ -357,8 +459,12 @@ export class ManageOrderUseCase {
 
     // Valida a política de estado (BR-002) e exige o motivo (BR-003)
     order.cancel(identityId, body.reason);
-    const scheduling = await this.orderRepository.findSchedulingByOrder(orderId);
-    scheduling?.cancel();
+    const scheduling = await this.orderRepository.findLatestSchedulingByOrder(orderId);
+    // `cancelledReason: null` aqui é o sinal que distingue este caminho (o
+    // pedido inteiro cancelou) do reagendamento (que sempre grava um motivo).
+    if (scheduling && scheduling.status === SCHEDULING_STATUS.ACTIVE) {
+      scheduling.cancel();
+    }
 
     await this.lifecycle.commit({
       order,

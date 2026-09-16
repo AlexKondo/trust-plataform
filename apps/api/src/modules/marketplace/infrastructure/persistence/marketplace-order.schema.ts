@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import {
   char,
   index,
@@ -76,8 +77,14 @@ export const marketplaceOrders = pgTable(
 );
 
 /**
- * Agendamento (MRK-019). `UNIQUE(order_id)` porque o MVP não tem reagendamento
- * (INCONSISTENCIAS #26); quando entrar, vira parcial `WHERE status = 'ACTIVE'`.
+ * Agendamento (MRK-019). IP-005 troca `UNIQUE(order_id)` pelo caminho que a
+ * própria INCONSISTENCIAS #26 já previa: "se reagendamento entrar, trocar por
+ * `UNIQUE(order_id) WHERE status = 'ACTIVE'`" — agora que existe reagendamento
+ * (`ManageOrderUseCase.reschedule`), um pedido pode ter várias linhas
+ * históricas CANCELLED, mas nunca mais de uma ACTIVE ao mesmo tempo (a mesma
+ * garantia de antes, só que reaplicada ao subconjunto certo). `cancelledReason`
+ * é o único jeito de distinguir, na leitura, "substituída por reagendamento"
+ * de "morreu porque o pedido inteiro foi cancelado" (ver Scheduling.cancel).
  */
 export const marketplaceOrderSchedulings = pgTable(
   'marketplace_order_schedulings',
@@ -93,11 +100,16 @@ export const marketplaceOrderSchedulings = pgTable(
     timezone: varchar('timezone', { length: 50 }).notNull(),
     /** ACTIVE | CANCELLED */
     status: varchar('status', { length: 30 }).notNull(),
+    /** IP-005 — motivo do reagendamento; `null` quando a causa foi o pedido
+     * inteiro cancelar (comportamento pré-IP-005, inalterado). */
+    cancelledReason: text('cancelled_reason'),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
   },
   (table) => [
-    uniqueIndex('idx_marketplace_scheduling_order').on(table.orderId),
+    uniqueIndex('idx_marketplace_scheduling_order_active')
+      .on(table.orderId)
+      .where(sql`${table.status} = 'ACTIVE'`),
     index('idx_marketplace_scheduling_start').on(table.scheduledStart),
     index('idx_marketplace_scheduling_status').on(table.status),
   ],

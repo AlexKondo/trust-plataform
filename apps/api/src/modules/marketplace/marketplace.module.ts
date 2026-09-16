@@ -10,6 +10,8 @@ import { GetOffersUseCase } from './application/usecases/get-offers.usecase';
 import { ManageDisputeUseCase } from './application/usecases/manage-dispute.usecase';
 import { ManageChangeOrderUseCase } from './application/usecases/manage-change-order.usecase';
 import { ManageOrderUseCase } from './application/usecases/manage-order.usecase';
+import { ManageOrderTravelStatusUseCase } from './application/usecases/manage-order-travel-status.usecase';
+import { ManagePartnerAvailabilityUseCase } from './application/usecases/manage-partner-availability.usecase';
 import { CreateServiceRequestUseCase } from './application/usecases/create-service-request.usecase';
 import { GetServiceRequestUseCase } from './application/usecases/get-service-request.usecase';
 import { DiscoverServiceRequestMatchesUseCase } from './application/usecases/discover-service-request-matches.usecase';
@@ -41,8 +43,11 @@ import { MarketplaceConversationRepository } from './domain/repositories/marketp
 import { MarketplaceListingRepository } from './domain/repositories/marketplace-listing.repository';
 import { MarketplaceOfferRepository } from './domain/repositories/marketplace-offer.repository';
 import { MarketplaceOrderRepository } from './domain/repositories/marketplace-order.repository';
+import { OrderTravelStatusRepository } from './domain/repositories/order-travel-status.repository';
+import { PartnerAvailabilityRepository } from './domain/repositories/partner-availability.repository';
 import { ServiceExecutionRepository } from './domain/repositories/service-execution.repository';
 import { ServiceRequestRepository } from './domain/repositories/service-request.repository';
+import { EtaEstimatorPort } from './domain/ports/eta-estimator.port';
 import { TrustChangeOrderRepository } from './domain/repositories/trust-change-order.repository';
 import { MarketplaceReviewRepository } from './domain/repositories/marketplace-review.repository';
 import { MarketplaceConversationController } from './infrastructure/api/marketplace-conversation.controller';
@@ -51,6 +56,7 @@ import { MarketplaceOfferController } from './infrastructure/api/marketplace-off
 import { MarketplaceServiceRequestController } from './infrastructure/api/marketplace-service-request.controller';
 import { MarketplaceChangeOrderController } from './infrastructure/api/marketplace-change-order.controller';
 import { MarketplaceOrderController } from './infrastructure/api/marketplace-order.controller';
+import { MarketplacePartnerAvailabilityController } from './infrastructure/api/marketplace-partner-availability.controller';
 import {
   MarketplaceDisputeAdminController,
   MarketplaceReviewController,
@@ -66,9 +72,12 @@ import { DrizzleMarketplaceListingRepository } from './infrastructure/persistenc
 import { DrizzleMarketplaceOfferRepository } from './infrastructure/persistence/drizzle-marketplace-offer.repository';
 import { DrizzleMarketplaceOrderRepository } from './infrastructure/persistence/drizzle-marketplace-order.repository';
 import { DrizzleMarketplaceReviewRepository } from './infrastructure/persistence/drizzle-marketplace-review.repository';
+import { DrizzleOrderTravelStatusRepository } from './infrastructure/persistence/drizzle-order-travel-status.repository';
+import { DrizzlePartnerAvailabilityRepository } from './infrastructure/persistence/drizzle-partner-availability.repository';
 import { DrizzleServiceExecutionRepository } from './infrastructure/persistence/drizzle-service-execution.repository';
 import { DrizzleServiceRequestRepository } from './infrastructure/persistence/drizzle-service-request.repository';
 import { DrizzleTrustChangeOrderRepository } from './infrastructure/persistence/drizzle-trust-change-order.repository';
+import { DeclaredEtaAdapter } from './infrastructure/eta/declared-eta.adapter';
 
 /**
  * Marketplace — Módulos 6 a 9, o ciclo completo da transação:
@@ -89,6 +98,7 @@ import { DrizzleTrustChangeOrderRepository } from './infrastructure/persistence/
     MarketplaceServiceRequestController,
     MarketplaceOfferController,
     MarketplaceOrderController,
+    MarketplacePartnerAvailabilityController,
     MarketplaceChangeOrderController,
     MarketplaceReviewController,
     MarketplaceDisputeAdminController,
@@ -119,6 +129,8 @@ import { DrizzleTrustChangeOrderRepository } from './infrastructure/persistence/
     GetOffersUseCase,
     OrderLifecycleService,
     ManageOrderUseCase,
+    ManageOrderTravelStatusUseCase,
+    ManagePartnerAvailabilityUseCase,
     ManageChangeOrderUseCase,
     ServiceExecutionUseCase,
     ManageDisputeUseCase,
@@ -134,6 +146,13 @@ import { DrizzleTrustChangeOrderRepository } from './infrastructure/persistence/
     { provide: ServiceExecutionRepository, useClass: DrizzleServiceExecutionRepository },
     { provide: ServiceRequestRepository, useClass: DrizzleServiceRequestRepository },
     { provide: CommercialPolicyRepository, useClass: DrizzleCommercialPolicyRepository },
+    { provide: PartnerAvailabilityRepository, useClass: DrizzlePartnerAvailabilityRepository },
+    { provide: OrderTravelStatusRepository, useClass: DrizzleOrderTravelStatusRepository },
+    // IP-005 — nenhum fornecedor de mapas está configurado nesta release
+    // (`.env.example` não declara nenhuma chave de geocoding/roteamento):
+    // `DeclaredEtaAdapter` é o único adapter atrás do port. Trocar de provedor
+    // no futuro é só trocar esta linha — nenhum use case/controller muda.
+    { provide: EtaEstimatorPort, useClass: DeclaredEtaAdapter },
     {
       provide: MarketplaceCommercialSnapshotRepository,
       useClass: DrizzleMarketplaceCommercialSnapshotRepository,
@@ -150,6 +169,8 @@ import { DrizzleTrustChangeOrderRepository } from './infrastructure/persistence/
     MarketplaceReviewRepository,
     CommercialPolicyRepository,
     MarketplaceCommercialSnapshotRepository,
+    PartnerAvailabilityRepository,
+    OrderTravelStatusRepository,
   ],
 })
 export class MarketplaceModule {}

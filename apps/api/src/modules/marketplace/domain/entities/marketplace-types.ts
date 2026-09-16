@@ -367,3 +367,45 @@ export const URGENCY_LEVELS = [
   URGENCY_LEVEL.THIS_WEEK,
   URGENCY_LEVEL.FLEXIBLE,
 ] as const;
+
+// ── IP-005 — Scheduling, Availability, Location & ETA ───────────────────────
+
+/**
+ * Dia da semana no mesmo mapeamento de `Intl.DateTimeFormat`/JS `Date#getDay()`:
+ * 0 = domingo ... 6 = sábado. Usado pela janela de disponibilidade do Partner
+ * (BR do IP-005: "quando eu costumo estar disponível", não reação por pedido).
+ */
+export const WEEKDAYS = [0, 1, 2, 3, 4, 5, 6] as const;
+export type Weekday = (typeof WEEKDAYS)[number];
+
+/**
+ * IP-005 — de onde veio a estimativa de chegada. `PARTNER_DECLARED` é a única
+ * fonte real na Release 1 (nenhum provedor de mapas está configurado —
+ * `.env.example` não declara nenhuma chave de geocoding/roteamento).
+ * `PROVIDER_COMPUTED` já existe no vocabulário para quando um adapter real for
+ * ligado atrás do mesmo `EtaEstimatorPort`, sem qualquer mudança de domínio.
+ */
+export const ETA_SOURCE = {
+  PARTNER_DECLARED: 'PARTNER_DECLARED',
+  PROVIDER_COMPUTED: 'PROVIDER_COMPUTED',
+} as const;
+
+export type EtaSource = (typeof ETA_SOURCE)[keyof typeof ETA_SOURCE];
+
+/**
+ * IP-005 — status de deslocamento do Partner até o local do serviço.
+ * Deliberadamente um modelo de TRANSIÇÃO DECLARADA ("saí" / "cheguei"), nunca
+ * rastreamento contínuo de GPS: não existe fornecedor de mapas configurado, e
+ * o mandato proíbe explicitamente "rastreamento invasivo em segundo plano" e
+ * vazar localização precisa contínua além da necessidade (Shared Standards §7).
+ * O check-in/check-out do MRK-020/021 continua sendo o único lugar do sistema
+ * com coordenadas reais — este status não introduz nenhuma coordenada nova,
+ * só um enum de 3 estados + uma estimativa de minutos declarada pelo Partner.
+ */
+export const TRAVEL_STATUS = {
+  NOT_STARTED: 'NOT_STARTED',
+  EN_ROUTE: 'EN_ROUTE',
+  ARRIVED: 'ARRIVED',
+} as const;
+
+export type TravelStatus = (typeof TRAVEL_STATUS)[keyof typeof TRAVEL_STATUS];

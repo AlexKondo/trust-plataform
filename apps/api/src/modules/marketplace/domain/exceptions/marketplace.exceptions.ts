@@ -248,6 +248,64 @@ export class InvalidSchedulingWindowException extends BusinessRuleViolationExcep
   }
 }
 
+// ── IP-005 — Scheduling, Availability, Location & ETA ───────────────────────
+
+/** IP-005: reagendamento só é possível enquanto o pedido está SCHEDULED e a
+ * execução ainda não começou (INCONSISTENCIAS #26's own migration path — a
+ * vez que a execução iniciou, o caminho é disputa/cancelamento, não reagenda). */
+export class OrderNotReschedulableException extends StateConflictException {
+  readonly code = 'MARKETPLACE_ORDER_NOT_RESCHEDULABLE';
+
+  constructor(status: string) {
+    super(`An order in ${status} (or already checked in) cannot be rescheduled.`);
+  }
+}
+
+/** IP-005: reagendar exige um agendamento ativo existente → 404. */
+export class SchedulingNotFoundException extends EntityNotFoundException {
+  readonly code = 'MARKETPLACE_SCHEDULING_NOT_FOUND';
+
+  constructor() {
+    super('No active scheduling exists for this order.');
+  }
+}
+
+/** IP-005: a janela pedida cai fora de toda disponibilidade declarada do Partner → 409. */
+export class SchedulingOutsideAvailabilityException extends StateConflictException {
+  readonly code = 'MARKETPLACE_SCHEDULING_OUTSIDE_AVAILABILITY';
+
+  constructor() {
+    super('The requested window falls outside the provider\'s declared availability.');
+  }
+}
+
+/** IP-005: janela de disponibilidade do Partner inválida (formato/sobreposição) → 422. */
+export class PartnerAvailabilityValidationException extends BusinessRuleViolationException {
+  readonly code = 'MARKETPLACE_PARTNER_AVAILABILITY_INVALID';
+
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+/** IP-005: status de deslocamento só se aplica antes do check-in → 409. */
+export class OrderTravelStatusNotApplicableException extends StateConflictException {
+  readonly code = 'MARKETPLACE_ORDER_TRAVEL_NOT_APPLICABLE';
+
+  constructor(status: string) {
+    super(`Travel status only applies to a scheduled order that has not started execution yet (current: ${status}).`);
+  }
+}
+
+/** IP-005: transição de status de deslocamento inválida (ex.: "cheguei" sem "a caminho") → 409. */
+export class OrderTravelTransitionException extends StateConflictException {
+  readonly code = 'MARKETPLACE_ORDER_TRAVEL_TRANSITION_INVALID';
+
+  constructor(from: string, to: string) {
+    super(`Cannot move travel status from ${from} to ${to}.`);
+  }
+}
+
 // ── Disputas e avaliações (MRK-023..025) ────────────────────────────────────
 
 export class MarketplaceDisputeNotFoundException extends EntityNotFoundException {

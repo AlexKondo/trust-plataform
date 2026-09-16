@@ -4,10 +4,11 @@ import { DisputeDecision, MarketplaceDispute } from '../../domain/entities/marke
 import { MarketplaceOffer } from '../../domain/entities/marketplace-offer';
 import { Scheduling } from '../../domain/entities/marketplace-order-execution';
 import { MarketplaceOrder } from '../../domain/entities/marketplace-order';
+import { OrderTravelStatus } from '../../domain/entities/order-travel-status';
 import { MarketplaceReview } from '../../domain/entities/marketplace-review';
 import { MarketplaceCategory, ListingSearchRow } from '../../domain/repositories/marketplace-listing.repository';
 import { OfferResponse } from '../dto/marketplace-offer.dtos';
-import { OrderResponse, SchedulingResponse } from '../dto/marketplace-order.dtos';
+import { OrderResponse, SchedulingResponse, TravelStatusResponse } from '../dto/marketplace-order.dtos';
 import { DisputeResponse, ReviewResponse } from '../dto/marketplace-review.dtos';
 import {
   ConversationResponse,
@@ -149,6 +150,19 @@ export function toSchedulingResponse(scheduling: Scheduling): SchedulingResponse
     estimatedDuration: scheduling.estimatedDuration,
     timezone: scheduling.timezone,
     status: scheduling.status,
+  };
+}
+
+/** IP-005 — nunca inclui coordenadas: só o status declarado + a estimativa. */
+export function toTravelStatusResponse(travelStatus: OrderTravelStatus): TravelStatusResponse {
+  return {
+    orderId: travelStatus.orderId,
+    status: travelStatus.status,
+    declaredEtaMinutes: travelStatus.declaredEtaMinutes,
+    estimatedArrivalAt: travelStatus.estimatedArrivalAt?.toISOString() ?? null,
+    etaSource: travelStatus.etaSource,
+    enRouteAt: travelStatus.enRouteAt?.toISOString() ?? null,
+    arrivedAt: travelStatus.arrivedAt?.toISOString() ?? null,
   };
 }
 

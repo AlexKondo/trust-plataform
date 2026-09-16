@@ -1532,8 +1532,121 @@ paths:
               timezone: America/Sao_Paulo
       responses:
         '200': { description: 'SCHEDULED; publica MarketplaceOrder.Scheduled' }
-        '409': { description: 'Agenda ocupada (MARKETPLACE_SCHEDULING_CONFLICT) ou transição inválida' }
+        '409': { description: 'Agenda ocupada (MARKETPLACE_SCHEDULING_CONFLICT), fora da disponibilidade declarada (MARKETPLACE_SCHEDULING_OUTSIDE_AVAILABILITY) ou transição inválida' }
         '422': { description: 'Janela inválida (MARKETPLACE_INVALID_SCHEDULING_WINDOW)' }
+
+  /marketplace/orders/{orderId}/reschedule:
+    post:
+      tags: [Marketplace]
+      summary: IP-005 — Reagendar (troca a janela de um pedido já agendado)
+      description: >
+        Fecha o gap previsto desde o MVP (INCONSISTENCIAS #26: "se
+        reagendamento entrar, trocar UNIQUE(order_id) por
+        UNIQUE(order_id) WHERE status = 'ACTIVE'"). Válido só em SCHEDULED com
+        execução ainda não iniciada (check-in não realizado); depois disso o
+        caminho é disputa/cancelamento. A janela antiga não é apagada: vira
+        uma linha `CANCELLED` com `cancelledReason` preenchido (distinguível
+        de um cancelamento do pedido inteiro, que grava `null`). Motivo
+        obrigatório, mesma regra de MRK-018 BR-003.
+      operationId: rescheduleMarketplaceOrder
+      parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              scheduledStart: '2026-08-13T12:00:00Z'
+              estimatedDuration: 240
+              timezone: America/Sao_Paulo
+              reason: Cliente pediu para adiar
+      responses:
+        '200': { description: 'SCHEDULED com a nova janela; publica MarketplaceOrder.Rescheduled' }
+        '403': { description: Não é participante do pedido }
+        '409': { description: 'Não reagendável (MARKETPLACE_ORDER_NOT_RESCHEDULABLE), sem agendamento ativo (MARKETPLACE_SCHEDULING_NOT_FOUND), conflito (MARKETPLACE_SCHEDULING_CONFLICT) ou fora da disponibilidade (MARKETPLACE_SCHEDULING_OUTSIDE_AVAILABILITY)' }
+        '400': { description: 'reason ausente ou janela fora do formato aceito (VALIDATION_ERROR)' }
+
+  /marketplace/orders/{orderId}/travel-status:
+    get:
+      tags: [Marketplace]
+      summary: IP-005 — Status de deslocamento do Partner (leitura)
+      description: >
+        NOT_STARTED | EN_ROUTE | ARRIVED. Modelo de transição DECLARADA, nunca
+        rastreamento contínuo de GPS — nenhuma coordenada é exposta aqui.
+        Visível a ambos os participantes (visibilidade do Member sobre o
+        progresso da chegada sem vazar localização precisa contínua).
+      operationId: getMarketplaceOrderTravelStatus
+      parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Status de deslocamento corrente }
+        '403': { description: Não é participante do pedido }
+
+  /marketplace/orders/{orderId}/travel-status/en-route:
+    post:
+      tags: [Marketplace]
+      summary: IP-005 — Partner declara "a caminho" + ETA
+      description: >
+        Só o prestador. `declaredEtaMinutes` é um número que o PRÓPRIO Partner
+        informa — nenhum roteamento geográfico é computado nesta release
+        (nenhum fornecedor de mapas está configurado; ver EtaEstimatorPort,
+        que existe justamente para permitir trocar por um provedor real no
+        futuro sem mudar nenhum contrato de API). Só se aplica a um pedido
+        SCHEDULED cuja execução ainda não começou. Idempotente: redeclarar
+        atualiza o ETA sem gerar uma nova transição de estado.
+      operationId: declareMarketplaceOrderPartnerEnRoute
+      parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example: { declaredEtaMinutes: 15 }
+      responses:
+        '200': { description: 'EN_ROUTE; publica MarketplaceOrder.PartnerEnRoute' }
+        '403': { description: Não é o prestador }
+        '409': { description: 'Não se aplica (MARKETPLACE_ORDER_TRAVEL_NOT_APPLICABLE)' }
+
+  /marketplace/orders/{orderId}/travel-status/arrived:
+    post:
+      tags: [Marketplace]
+      summary: IP-005 — Partner declara "cheguei"
+      description: Só o prestador. Exige ter declarado EN_ROUTE antes; terminal.
+      operationId: declareMarketplaceOrderPartnerArrived
+      parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: 'ARRIVED; publica MarketplaceOrder.PartnerArrived' }
+        '403': { description: Não é o prestador }
+        '409': { description: 'Transição inválida (MARKETPLACE_ORDER_TRAVEL_TRANSITION_INVALID) ou não se aplica (MARKETPLACE_ORDER_TRAVEL_NOT_APPLICABLE)' }
+
+  /marketplace/partner-availability:
+    put:
+      tags: [Marketplace]
+      summary: IP-005 — Declara a disponibilidade semanal do Partner (replace-all)
+      description: >
+        Substitui o conjunto INTEIRO de janelas do chamador (não é um patch
+        incremental). Cada janela é `{dayOfWeek (0=domingo..6=sábado),
+        startMinute, endMinute, timezone}`, um único dia, mínimo 30 minutos.
+        Sem nenhuma janela declarada, o agendamento não sofre nenhuma
+        restrição de disponibilidade (comportamento idêntico ao que já
+        existia antes desta IP).
+      operationId: setPartnerAvailability
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              windows:
+                - { dayOfWeek: 1, startMinute: 480, endMinute: 1080, timezone: America/Sao_Paulo }
+                - { dayOfWeek: 3, startMinute: 480, endMinute: 1080, timezone: America/Sao_Paulo }
+      responses:
+        '200': { description: Conjunto de janelas persistido }
+        '422': { description: 'Janela inválida ou sobreposta no mesmo dia (MARKETPLACE_PARTNER_AVAILABILITY_INVALID)' }
+
+  /marketplace/partner-availability/mine:
+    get:
+      tags: [Marketplace]
+      summary: IP-005 — Lista a disponibilidade declarada pelo chamador
+      operationId: listMyPartnerAvailability
+      responses:
+        '200': { description: Janelas declaradas pelo chamador }
 
   /marketplace/orders/{orderId}/start:
     post:

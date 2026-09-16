@@ -166,6 +166,21 @@ Para isso, dois payloads foram enriquecidos (adição retrocompatível): `Verifi
 - **Payloads**: `Scheduled {orderId, listingId, buyerId, sellerId, schedulingId, scheduledStart, scheduledEnd, status}`; `Started {orderId, listingId, buyerId, sellerId, startedBy, startedAt, sessionId, status}`; `ExecutionCompleted {orderId, listingId, buyerId, sellerId, completedBy, completedAt, actualDuration, sessionId, elapsedMinutes, pausedMinutes, billableMinutes, authorizedMinutes, status}`
 - **Nota (PACK-03 §22)**: `sessionId` e os campos de tempo são **adições retrocompatíveis**. `actualDuration` continua sendo o tempo DECORRIDO do check-in ao check-out — não foi redefinido; quem quer tempo faturável usa `billableMinutes`.
 
+### MarketplaceOrder.Rescheduled (v1.0) — IP-005
+
+- **Descrição**: o Partner/Member trocou a janela de um pedido já `SCHEDULED` cuja execução ainda não começou. Fecha o gap previsto desde o MVP (INCONSISTENCIAS #26: "se reagendamento entrar, trocar `UNIQUE(order_id)` por `UNIQUE(order_id) WHERE status = 'ACTIVE'`", aplicado em `marketplace-order.schema.ts`). A janela antiga nunca é apagada — vira uma linha `CANCELLED` com `cancelledReason` preenchido no histórico de `marketplace_order_schedulings`.
+- **Produtor**: marketplace-service · **Agregado**: `MarketplaceOrder`
+- **Consumidores**: nenhum no MVP (mesmo estágio de `MarketplaceOrder.Scheduled` — agenda/SLA/lembrete são pós-MVP).
+- **Payload**: `{ orderId, listingId, buyerId, sellerId, previousSchedulingId, previousScheduledStart, schedulingId, scheduledStart, scheduledEnd, reason, status }`
+
+### MarketplaceOrder.PartnerEnRoute (v1.0) · MarketplaceOrder.PartnerArrived (v1.0) — IP-005
+
+- **Descrição**: status de deslocamento do Partner até o local do serviço (NOT_STARTED → EN_ROUTE → ARRIVED). Modelo de TRANSIÇÃO DECLARADA ("saí"/"cheguei"), nunca rastreamento contínuo de GPS — nenhum fornecedor de mapas está configurado nesta release (`.env.example` sem nenhuma chave de geocoding/roteamento; ver `EtaEstimatorPort`/`DeclaredEtaAdapter`). `declaredEtaMinutes` é sempre o número que o PRÓPRIO Partner informou — nunca um valor geo-computado. Só se aplica a um pedido `SCHEDULED` cujo check-in (MRK-020) ainda não aconteceu.
+- **Produtor**: marketplace-service · **Agregado**: `MarketplaceOrder`
+- **Consumidores**: nenhum no MVP. Visibilidade do Member é servida por leitura síncrona (`GET .../travel-status`), não por notificação — evita reintroduzir, pela porta dos fundos, o "vazar localização precisa contínua" que esta IP existe para evitar.
+- **Payloads**: `PartnerEnRoute {orderId, buyerId, sellerId, declaredEtaMinutes, estimatedArrivalAt, etaSource}`; `PartnerArrived {orderId, buyerId, sellerId, arrivedAt}`
+- **Nota de privacidade**: nenhum payload destes dois eventos carrega latitude/longitude — a única coordenada real do sistema continua sendo a do check-in/check-out (`MarketplaceOrder.Started`/`ExecutionCompleted`, PACK-03), inalterada por esta IP.
+
 ### TrustChangeOrder.Submitted (v1.0) · TrustChangeOrder.Approved (v1.0) · TrustChangeOrder.Rejected (v1.0)
 
 - **Descrição**: mudança comercial proposta pelo Trust Partner e decidida pelo Trust Member (PACK-03 §6/§22). O fato que importa é a **decisão**: só `Approved` altera o valor autorizado do contrato.

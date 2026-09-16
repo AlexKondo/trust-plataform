@@ -25,9 +25,17 @@ export abstract class MarketplaceOrderRepository {
     executor?: DatabaseExecutor,
   ): Promise<{ items: MarketplaceOrder[]; totalItems: number }>;
 
-  // ── Agendamento (MRK-019) ──────────────────────────────────────────────────
+  // ── Agendamento (MRK-019 / reagendamento IP-005) ───────────────────────────
   abstract saveScheduling(scheduling: Scheduling, executor?: DatabaseExecutor): Promise<void>;
-  abstract findSchedulingByOrder(orderId: string): Promise<Scheduling | null>;
+  /**
+   * IP-005 — a linha mais RECENTE (por `createdAt`) entre todas as do pedido,
+   * ativa ou cancelada. Antes desta IP só existia 0 ou 1 linha por pedido, e
+   * "mais recente" e "a única" eram a mesma coisa — este método é um
+   * substituto comportamentalmente idêntico ao antigo `findSchedulingByOrder`
+   * para todo pedido que nunca foi reagendado, e correto (mostra a janela
+   * ATIVA corrente) para todo pedido que já foi.
+   */
+  abstract findLatestSchedulingByOrder(orderId: string): Promise<Scheduling | null>;
 
   /**
    * Agendamentos ativos do prestador que podem colidir com a janela pedida

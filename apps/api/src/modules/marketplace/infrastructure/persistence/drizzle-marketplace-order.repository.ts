@@ -113,27 +113,40 @@ export class DrizzleMarketplaceOrderRepository extends MarketplaceOrderRepositor
   async saveScheduling(scheduling: Scheduling, executor?: DatabaseExecutor): Promise<void> {
     const target = executor ?? this.db;
     const props = scheduling.toProps();
+    // IP-005: o conflito é resolvido pela PRIMARY KEY (id), não mais por
+    // order_id — order_id deixou de ser único (só é único condicionado a
+    // status='ACTIVE', ver marketplace-order.schema.ts) desde que reagendar
+    // passou a poder criar uma SEGUNDA linha (nova, ACTIVE) para o mesmo
+    // pedido, ao lado da antiga (agora CANCELLED). `id` continua sempre único
+    // (uuidv7 por instância de Scheduling), então este upsert-por-id ainda
+    // cobre os dois casos que sempre existiram: inserir uma linha nova, ou
+    // atualizar em lugar uma linha já existente (ex.: cancelar).
     await target
       .insert(marketplaceOrderSchedulings)
       .values(props)
       .onConflictDoUpdate({
-        target: marketplaceOrderSchedulings.orderId,
+        target: marketplaceOrderSchedulings.id,
         set: {
           scheduledStart: props.scheduledStart,
           estimatedDuration: props.estimatedDuration,
           scheduledEnd: props.scheduledEnd,
           timezone: props.timezone,
           status: props.status,
+          cancelledReason: props.cancelledReason,
           updatedAt: props.updatedAt,
         },
       });
   }
 
-  async findSchedulingByOrder(orderId: string): Promise<Scheduling | null> {
+  /** IP-005 — a linha mais recente do pedido (ativa ou cancelada); ver a
+   * doc do método abstrato para por que isto substitui com segurança o antigo
+   * `findSchedulingByOrder` (que assumia no máximo uma linha por pedido). */
+  async findLatestSchedulingByOrder(orderId: string): Promise<Scheduling | null> {
     const [row] = await this.db
       .select()
       .from(marketplaceOrderSchedulings)
       .where(eq(marketplaceOrderSchedulings.orderId, orderId))
+      .orderBy(desc(marketplaceOrderSchedulings.createdAt))
       .limit(1);
     return row ? toScheduling(row) : null;
   }
@@ -239,6 +252,7 @@ function toScheduling(row: MarketplaceSchedulingRow): Scheduling {
     scheduledEnd: row.scheduledEnd,
     timezone: row.timezone,
     status: row.status as SchedulingStatus,
+    cancelledReason: row.cancelledReason,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });
