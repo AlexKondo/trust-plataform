@@ -13,6 +13,7 @@ import { LegalConsentModule } from './shared/privacy/legal-consent.module';
 import { ResponseEnvelopeInterceptor } from './shared/api/response-envelope.interceptor';
 import { GlobalExceptionFilter } from './shared/api/global-exception.filter';
 import { HealthModule } from './modules/health/health.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { IdentityModule } from './modules/identity/identity.module';
 import { MarketplaceModule } from './modules/marketplace/marketplace.module';
 import { NotificationModule } from './modules/notification/notification.module';
@@ -41,6 +42,7 @@ import { VerificationModule } from './modules/verification/verification.module';
     NotificationModule,
     PaymentModule,
     PrivacyModule,
+    AnalyticsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

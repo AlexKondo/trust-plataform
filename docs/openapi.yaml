@@ -27,6 +27,7 @@ tags:
   - name: Notification
   - name: Payment
   - name: Privacy
+  - name: Analytics
 
 paths:
   /health:
@@ -2174,6 +2175,97 @@ paths:
         '401': { description: Sem token ou token inválido/expirado (INVALID_TOKEN) }
         '403': { description: 'Não é o titular (PRIVACY_REQUEST_ACCESS_DENIED)' }
         '404': { description: 'Solicitação não encontrada (PRIVACY_REQUEST_NOT_FOUND)' }
+
+  /admin/analytics/overview:
+    get:
+      tags: [Analytics]
+      summary: IP-020 — Funil, conversão, desfechos e pagamentos (ADMIN)
+      description: >
+        Agregação READ-ONLY, calculada sob demanda direto das tabelas
+        operacionais (nenhum contador paralelo) — ver
+        `apps/api/src/modules/analytics/domain/metrics-definitions.ts` para a
+        fórmula exata de cada campo e o(s) evento(s) de origem no catálogo.
+        Toda resposta é agregada (contagens/somas/taxas); nunca uma linha
+        identificável por pessoa.
+      operationId: getAnalyticsOverview
+      parameters:
+        - { name: from, in: query, required: false, schema: { type: string, format: date-time }, description: 'Default: 30 dias antes de `to`.' }
+        - { name: to, in: query, required: false, schema: { type: string, format: date-time }, description: 'Default: agora.' }
+      responses:
+        '200':
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  range: { from: '2026-08-17T00:00:00.000Z', to: '2026-09-16T00:00:00.000Z' }
+                  funnel:
+                    requestsCreated: 42
+                    requestsMatched: 30
+                    offersCreated: 55
+                    ordersCreated: 28
+                    executionCompleted: 22
+                    customerConfirmed: 20
+                    paymentsReleased: 19
+                    grossOrderValueCents: 1520000
+                    releasedCustodyValueCents: 1420000
+                  conversion:
+                    requestToMatch: 0.7143
+                    offerToOrder: 0.5091
+                    orderToExecution: 0.7857
+                    executionToConfirmation: 0.9091
+                    confirmationToPayment: 0.95
+                  outcomes: { ordersCreated: 28, completionRate: 0.7143, cancellationRate: 0.0714, disputeRate: 0.0357 }
+                  payments: { authorizationsAttempted: 30, authorizationsApproved: 28, paymentSuccessRate: 0.9333 }
+                  timing: { avgTimeToFirstOfferMinutes: 42.5, avgPartnerResponseMinutes: 18.2 }
+        '400': { description: '`from` posterior a `to` (VALIDATION_ERROR)' }
+        '401': { description: Sem token ou token inválido/expirado (INVALID_TOKEN) }
+        '403': { description: ADMIN_REQUIRED }
+
+  /admin/analytics/trust-adoption:
+    get:
+      tags: [Analytics]
+      summary: IP-020 — Adoção de Trust Passport, nível e verificação (ADMIN)
+      description: Snapshot do estado ATUAL (não um período) — sempre agregado, nunca uma identidade nomeada.
+      operationId: getAnalyticsTrustAdoption
+      responses:
+        '200':
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  activeIdentities: 340
+                  identitiesWithPassport: 340
+                  passportAdoptionRate: 1
+                  documentVerifiedShare: 0.61
+                  levelDistribution:
+                    - { level: UNVERIFIED, count: 40 }
+                    - { level: BRONZE, count: 180 }
+                    - { level: SILVER, count: 90 }
+                    - { level: GOLD, count: 25 }
+                    - { level: PLATINUM, count: 5 }
+        '401': { description: Sem token ou token inválido/expirado (INVALID_TOKEN) }
+        '403': { description: ADMIN_REQUIRED }
+
+  /admin/analytics/cohorts:
+    get:
+      tags: [Analytics]
+      summary: IP-020 — Retenção básica por coorte mensal de cadastro (ADMIN)
+      operationId: getAnalyticsCohorts
+      parameters:
+        - { name: months, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 24, default: 6 }, description: Quantos meses de coorte incluir. }
+      responses:
+        '200':
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  - { cohortMonth: '2026-07', cohortSize: 58, retainedMonth1: 21, retainedMonth2: 14, retentionRateMonth1: 0.3621, retentionRateMonth2: 0.2414 }
+                  - { cohortMonth: '2026-08', cohortSize: 63, retainedMonth1: 18, retainedMonth2: 0, retentionRateMonth1: 0.2857, retentionRateMonth2: 0 }
+        '401': { description: Sem token ou token inválido/expirado (INVALID_TOKEN) }
+        '403': { description: ADMIN_REQUIRED }
 
 components:
   securitySchemes:

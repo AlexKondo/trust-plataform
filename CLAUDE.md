@@ -233,6 +233,33 @@ opcional/promocional no MVP, logo não há opt-out para construir. Detalhes,
 decisões e critérios de aceite em
 [docs/Multi-Agent Implementation Doc/IPS/IP-013-COMPLETION-REPORT.md](docs/Multi-Agent%20Implementation%20Doc/IPS/IP-013-COMPLETION-REPORT.md).
 
+## IP-020 — Analytics & Operational Intelligence (2026-09-16)
+
+Nenhuma tabela nova, nenhuma migration. `apps/api/src/modules/analytics/`
+é um módulo READ-ONLY: `AnalyticsRepository` lê diretamente as tabelas já
+exportadas por Marketplace/Payment/Trust/Identity (via schema Drizzle, não
+via injeção dos repositórios de domínio daqueles módulos — zero arquivo de
+`marketplace/**`/`payment/**` tocado) e calcula, sob demanda, o funil
+Request→Offer→Contract→Execution→Confirmation→Payment, conversão entre
+estágios, tempo até a 1ª proposta e de resposta do Partner, taxas de
+conclusão/cancelamento/disputa/sucesso de pagamento, adoção de Trust
+(Passport/nível/verificação) e retenção básica por coorte mensal — 3 rotas
+`admin/analytics/*`, `AdminGuard` (mesma flag `is_admin`, DOC-002), sem
+frontend fora de `/admin/analytics` (link novo em `/admin`).
+
+Toda métrica é recalculada a cada chamada direto da tabela real — não
+existe contador paralelo que possa divergir da fonte ("reconcilia com a
+transação de origem" por construção). Definição exata de cada fórmula em
+`apps/api/src/modules/analytics/domain/metrics-definitions.ts` (catálogo
+machine-readable) e `docs/analytics-metrics.md` (versão para leitura
+humana, derivada dele). Toda resposta é agregada — nenhum endpoint devolve
+uma linha identificável por pessoa; verificado por teste e2e dedicado que
+confirma nome/e-mail/id de identidades de teste nunca aparecem na resposta
+serializada. Dinheiro sempre em centavos inteiros
+(`grossOrderValueCents`/`releasedCustodyValueCents`), nunca ponto
+flutuante. Detalhes, decisões e critérios de aceite em
+[docs/Multi-Agent Implementation Doc/IPS/IP-020-COMPLETION-REPORT.md](docs/Multi-Agent%20Implementation%20Doc/IPS/IP-020-COMPLETION-REPORT.md).
+
 ## Documentos-guia (ler nesta ordem)
 
 1. [PLANO-DE-MODULOS.md](PLANO-DE-MODULOS.md) — quebra em módulos, ordem de desenvolvimento, grafo de dependências

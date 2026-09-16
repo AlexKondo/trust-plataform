@@ -46,6 +46,14 @@ function AdminHome() {
       count: null,
       countLabel: '',
     },
+    {
+      href: '/admin/analytics',
+      icon: 'monitoring',
+      title: 'Analytics',
+      description: 'Funil, conversão, desfechos, pagamento e adoção de Trust — números recalculados na hora.',
+      count: null,
+      countLabel: '',
+    },
   ];
 
   return (
