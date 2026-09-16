@@ -122,6 +122,21 @@ Para isso, dois payloads foram enriquecidos (adição retrocompatível): `Verifi
 - **Idempotência**: `UNIQUE(change_order_id)` e `UNIQUE(idempotency_key)` em `payment_incremental_authorizations` — no máximo UMA autorização incremental por Change Order, para sempre, mesmo sob reentrega do evento gatilho ou corrida entre duas entregas concorrentes (prova: teste de corrida em `ip-007-incremental-payment-authorization.e2e.spec.ts`). `idempotencyKey = incremental-auth:{changeOrderId}` (determinística, mesmo padrão de `release:{custodyId}`).
 
 
+### IP-003 — ServiceRequest.Created (v1.0) · ServiceRequest.Matched (v1.0) · ServiceRequest.Closed (v1.0) · ServiceRequest.Cancelled (v1.0)
+
+- **Descrição**: ciclo de vida do pedido de serviço do Trust Member (fecha o gap autorreportado pela reconciliação de baseline — IP-000-COMPLETION-REPORT.md §14, linha IP-003: "não existe entidade de necessidade do Member"). `Matched` sai só na PRIMEIRA vez que o Member engaja um Partner elegível (`OPEN -> MATCHED`); engajar um segundo/terceiro Partner depois NÃO republica este evento — `MATCHED` é só o fato "já houve pelo menos um contato", não uma reserva de exclusividade (essa continua sendo `MarketplaceListing.reserve()`, no aceite da proposta, MRK-013). `Closed`/`Cancelled` são estados terminais e mutuamente exclusivos. `EXPIRED` nunca é publicado como evento — é sempre um status DERIVADO de `expiresAt` na leitura (mesmo padrão de `MarketplaceOffer.effectiveStatus`), sem job de varredura.
+- **Produtor**: marketplace-service · **Agregado**: `ServiceRequest`
+- **Consumidores**: nenhum hoje (notificação ao Member/Partner é escopo do IP-013, que ainda não existe).
+- **Payloads**: `Created {serviceRequestId, memberId, category, locationLabel, urgency, status: "OPEN", createdAt}`; `Matched {serviceRequestId, memberId, listingId, partnerId, matchedAt}`; `Closed {serviceRequestId, memberId, previousStatus, closedAt}`; `Cancelled {serviceRequestId, memberId, previousStatus, reason, cancelledAt}`
+
+### IP-003 — ServiceRequestEngagement.Created (v1.0)
+
+- **Descrição**: registra que uma conversa (`MarketplaceConversation`, MRK-006) nasceu a partir de um `ServiceRequest` com um Partner/anúncio específico. Não é um novo mecanismo de conversa — `POST /marketplace/service-requests/{id}/engage` reaproveita `ContactListingOwnerUseCase` (MRK-006) SEM NENHUMA modificação nesse caso de uso; este evento só registra a ligação (a mesma chamada também publica `MarketplaceConversation.Created`/`MarketplaceMessage.Sent`, como qualquer contato normal). Publicado no máximo uma vez por par (serviceRequestId, listingId) — `UNIQUE(service_request_id, listing_id)` — reengajar o mesmo anúncio reaproveita a conversa e não republica este evento (mesma convenção "reutilizar, nunca duplicar" do MRK-006 BR-005).
+- **Produtor**: marketplace-service · **Agregado**: `ServiceRequestEngagement`
+- **Consumidores**: nenhum hoje.
+- **Payload**: `{ serviceRequestId, listingId, partnerId, conversationId, engagedBy, engagedAt }`
+- **Nota de determinismo**: "Partner elegível" (o que aparece em `GET /marketplace/service-requests/{id}/matches`) é calculado por `DiscoverServiceRequestMatchesUseCase`, reaproveitando `MarketplaceListingRepository.search()` (MRK-004) com critérios derivados do pedido (categoria, `locationLabel` como texto livre, nível mínimo de confiança via `levelsAtOrAbove`) — mesma consulta, mesmos índices, zero IA/embedding/ranking por modelo. Geolocalização por raio geométrico não é calculada. Isto não é por falta de QUALQUER coordenada de Partner no repositório — `marketplace_order_execution_events` (migration 0017, PACK-03) guarda geotags reais capturadas no check-in/check-out da execução em campo — mas porque não existe um perfil de localização do Partner PRÉ-engajamento (uma "base"/área de atendimento), associável a um pedido ainda sem execução, que sustente matching prospectivo; aquele dado só nasce depois que um pedido já chegou à execução e reaproveitá-lo exigiria infraestrutura de agregação nova. Fica para o IP-005.
+
 ### MarketplaceReview.Created (v1.0)
 
 - **Descrição**: avaliação da transação (MRK-025). Fecha o ciclo de reputação: a opinião de quem contratou vira score de quem prestou (e vice-versa — os dois lados se avaliam).

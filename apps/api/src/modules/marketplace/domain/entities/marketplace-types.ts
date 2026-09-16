@@ -301,3 +301,69 @@ export const PAUSE_REASON_CODES = [
   PAUSE_REASON_CODE.MEAL,
   PAUSE_REASON_CODE.OTHER_NON_BILLABLE,
 ] as const;
+
+// ── IP-003 — Service Request, Discovery & Matching ──────────────────────────
+
+/**
+ * IP-003 — ciclo de vida do pedido de serviço do Trust Member. Deliberadamente
+ * menor que ORDER_STATUS: um ServiceRequest só existe até o Member escolher um
+ * Trust Partner e a conversa nascer — dali em diante quem manda é o ciclo já
+ * existente de MarketplaceConversation/MarketplaceOffer/MarketplaceOrder (esta
+ * IP não duplica esse fluxo, só linka nele — ver ServiceRequestEngagement).
+ *
+ * `EXPIRED` nunca é gravado — é DERIVADO de `expiresAt`, exatamente como o
+ * `MarketplaceOffer.effectiveStatus()` já faz (mesmo motivo: não existe job de
+ * varredura no MVP, INCONSISTENCIAS #33).
+ */
+export const SERVICE_REQUEST_STATUS = {
+  OPEN: 'OPEN',
+  MATCHED: 'MATCHED',
+  CLOSED: 'CLOSED',
+  CANCELLED: 'CANCELLED',
+  EXPIRED: 'EXPIRED',
+} as const;
+
+export type ServiceRequestStatus =
+  (typeof SERVICE_REQUEST_STATUS)[keyof typeof SERVICE_REQUEST_STATUS];
+
+/**
+ * `OPEN -> MATCHED` acontece na primeira vez que o Member engaja um Partner
+ * elegível (`ServiceRequest.markMatched`) e NÃO impede novos engajamentos —
+ * "matched" é só um fato informativo ("pelo menos um contato já foi feito"),
+ * não uma reserva exclusiva (isso é papel do MarketplaceListing.reserve() no
+ * aceite de proposta, que esta IP não toca). `CLOSED`/`CANCELLED` são finais.
+ */
+export const SERVICE_REQUEST_TRANSITIONS: Readonly<
+  Record<ServiceRequestStatus, readonly ServiceRequestStatus[]>
+> = {
+  OPEN: [SERVICE_REQUEST_STATUS.MATCHED, SERVICE_REQUEST_STATUS.CLOSED, SERVICE_REQUEST_STATUS.CANCELLED],
+  MATCHED: [SERVICE_REQUEST_STATUS.CLOSED, SERVICE_REQUEST_STATUS.CANCELLED],
+  CLOSED: [],
+  CANCELLED: [],
+  EXPIRED: [],
+};
+
+/** Status em que o pedido ainda aceita novos engajamentos com Partners. */
+export const SERVICE_REQUEST_ENGAGEABLE_STATUSES: readonly ServiceRequestStatus[] = [
+  SERVICE_REQUEST_STATUS.OPEN,
+  SERVICE_REQUEST_STATUS.MATCHED,
+];
+
+/**
+ * IP-003 §"timing/scheduling constraint" — restrição de tempo deliberadamente
+ * simples (enum + data opcional). Agenda/disponibilidade real é IP-005; este
+ * campo é só um sinal de urgência que o Member declara ao descrever a necessidade.
+ */
+export const URGENCY_LEVEL = {
+  ASAP: 'ASAP',
+  THIS_WEEK: 'THIS_WEEK',
+  FLEXIBLE: 'FLEXIBLE',
+} as const;
+
+export type UrgencyLevel = (typeof URGENCY_LEVEL)[keyof typeof URGENCY_LEVEL];
+
+export const URGENCY_LEVELS = [
+  URGENCY_LEVEL.ASAP,
+  URGENCY_LEVEL.THIS_WEEK,
+  URGENCY_LEVEL.FLEXIBLE,
+] as const;

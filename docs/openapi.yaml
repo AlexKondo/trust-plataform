@@ -1081,6 +1081,144 @@ paths:
         '404': { description: 'Anúncio inexistente ou indisponível (MARKETPLACE_LISTING_UNAVAILABLE)' }
         '422': { description: 'Contato com o próprio anúncio (CANNOT_CONTACT_OWN_LISTING)' }
 
+  # ── Service Request, Discovery & Matching (IP-003) ────────────────────────
+  # Todas as rotas abaixo exigem autenticação e são SEMPRE privadas ao Trust
+  # Member dono do pedido — não existe rota pública/@Public() aqui, ao
+  # contrário de /marketplace/listings. Um identityId diferente do dono
+  # recebe 404 (SERVICE_REQUEST_NOT_FOUND), nunca 403: o agregado não tem
+  # visão pública alguma (privacidade — ver 02_SHARED_ENGINEERING_STANDARDS §7).
+  /marketplace/service-requests:
+    post:
+      tags: [Marketplace]
+      summary: IP-003 — Trust Member descreve uma necessidade de serviço
+      description: >
+        Nasce completo e já OPEN (não existe rascunho, ao contrário do MRK-001
+        — este agregado nunca é publicamente navegável). `locationLabel` é
+        texto livre e grosseiro ("Bairro, Cidade/UF"), o mesmo formato de
+        `marketplace_listings.location`; não existe latitude/longitude
+        precisa neste recurso (decisão de privacidade). `radiusKm` é uma
+        preferência declarada — matching por raio geométrico fica para o
+        IP-005: não por falta de qualquer coordenada de Partner no
+        repositório (existem geotags de execução em campo em
+        marketplace_order_execution_events, migration 0017), mas porque não
+        existe um perfil de localização do Partner PRÉ-engajamento que
+        sustente matching prospectivo hoje.
+      operationId: createServiceRequest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              title: Preciso trocar uma torneira e consertar uma dobradiça
+              description: A torneira da cozinha está vazando e a porta do quarto não fecha direito.
+              category: HOME_REPAIRS
+              locationLabel: Vila Mariana, São Paulo/SP
+              radiusKm: 10
+              urgency: THIS_WEEK
+              budgetMinAmount: 50
+              budgetMaxAmount: 300
+      responses:
+        '201': { description: Pedido criado em OPEN }
+        '401': { description: Sem token (INVALID_TOKEN) }
+        '422': { description: 'Categoria inexistente/inativa (MARKETPLACE_CATEGORY_NOT_FOUND) ou budgetMinAmount > budgetMaxAmount (SERVICE_REQUEST_INVALID)' }
+
+  /marketplace/service-requests/mine:
+    get:
+      tags: [Marketplace]
+      summary: Meus pedidos de serviço
+      operationId: listMyServiceRequests
+      parameters:
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: size, in: query, schema: { type: integer, default: 20, maximum: 50 } }
+      responses: { '200': { description: Resumo paginado } }
+
+  /marketplace/service-requests/{serviceRequestId}:
+    get:
+      tags: [Marketplace]
+      summary: Detalhe do pedido — sempre privado ao dono
+      operationId: getServiceRequest
+      parameters: [{ name: serviceRequestId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Pedido completo (status EXPIRED é derivado de expiresAt, nunca gravado) }
+        '404': { description: 'Inexistente ou pertence a outro Member (SERVICE_REQUEST_NOT_FOUND)' }
+
+  /marketplace/service-requests/{serviceRequestId}/matches:
+    get:
+      tags: [Marketplace]
+      summary: IP-003 — Descoberta determinística de Partners elegíveis (sem IA)
+      description: >
+        Reaproveita a mesma busca do MRK-004 (`MarketplaceListingRepository.search()`),
+        filtrando por categoria + `locationLabel` (texto livre) + nível mínimo
+        de confiança do pedido, ordenado por reputação (`sort=trust_score`).
+        Nenhum ranking por IA/embedding; nenhuma distância geométrica é
+        calculada (ver observação em `POST /marketplace/service-requests`).
+      operationId: discoverServiceRequestMatches
+      parameters:
+        - { name: serviceRequestId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: size, in: query, schema: { type: integer, default: 20, maximum: 50 } }
+      responses:
+        '200': { description: 'Anúncios PUBLISHED elegíveis (shape do MRK-004) + bloco pagination; `alreadyEngaged` indica contato já feito' }
+        '404': { description: 'Inexistente ou pertence a outro Member (SERVICE_REQUEST_NOT_FOUND)' }
+
+  /marketplace/service-requests/{serviceRequestId}/engage:
+    post:
+      tags: [Marketplace]
+      summary: IP-003 — Engaja um Partner elegível (liga o pedido à conversa já existente)
+      description: >
+        Reaproveita `POST /marketplace/listings/{listingId}/contact` (MRK-006)
+        por baixo — cria ou reutiliza a conversa ativa entre as mesmas partes,
+        exatamente com a mesma semântica de dedupe. 201 no primeiro
+        engajamento com este anúncio; 200 ao reengajar (reaproveita a mesma
+        conversa). Na primeira vez, o pedido transiciona OPEN -> MATCHED
+        (idempotente: engajar outro Partner depois não é erro nem reserva
+        exclusividade).
+      operationId: engageServiceRequest
+      parameters: [{ name: serviceRequestId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example: { listingId: 019fe8f0-0000-7000-8000-000000000001, message: 'Olá! Vi que você atende na minha região, pode me ajudar?' }
+      responses:
+        '201': { description: '{engagement, conversation, message, created: true}' }
+        '200': { description: '{engagement, conversation, message, created: false} — engajamento reaproveitado' }
+        '404': { description: 'Pedido inexistente/de outro Member, ou anúncio indicado indisponível' }
+        '409': { description: 'Pedido CLOSED/CANCELLED/EXPIRED não aceita novo engajamento (SERVICE_REQUEST_NOT_ENGAGEABLE)' }
+        '422': { description: 'Engajar o próprio anúncio (CANNOT_CONTACT_OWN_LISTING, herdado do MRK-006)' }
+
+  /marketplace/service-requests/{serviceRequestId}/close:
+    post:
+      tags: [Marketplace]
+      summary: Trust Member fecha o pedido (por exemplo, achou o Partner certo)
+      operationId: closeServiceRequest
+      parameters: [{ name: serviceRequestId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        content:
+          application/json:
+            example: { reason: 'Combinei com o profissional pela conversa.' }
+      responses:
+        '200': { description: 'CLOSED; publica ServiceRequest.Closed' }
+        '404': { description: 'Inexistente ou de outro Member (SERVICE_REQUEST_NOT_FOUND)' }
+        '409': { description: 'Pedido já é CLOSED/CANCELLED (SERVICE_REQUEST_INVALID_TRANSITION)' }
+
+  /marketplace/service-requests/{serviceRequestId}/cancel:
+    post:
+      tags: [Marketplace]
+      summary: Trust Member desiste do pedido (motivo obrigatório)
+      operationId: cancelServiceRequest
+      parameters: [{ name: serviceRequestId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example: { reason: 'Resolvi contratar um conhecido.' }
+      responses:
+        '200': { description: 'CANCELLED; publica ServiceRequest.Cancelled' }
+        '400': { description: 'reason ausente (VALIDATION_ERROR)' }
+        '404': { description: 'Inexistente ou de outro Member (SERVICE_REQUEST_NOT_FOUND)' }
+        '409': { description: 'Pedido já é CLOSED/CANCELLED (SERVICE_REQUEST_INVALID_TRANSITION)' }
+
   /marketplace/conversations:
     get:
       tags: [Marketplace]

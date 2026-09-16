@@ -449,3 +449,58 @@ export class ServiceSummaryUnavailableException extends BusinessRuleViolationExc
     super('This order has no frozen commercial snapshot; no service summary is available.');
   }
 }
+
+// ── Service Request, Discovery & Matching (IP-003) ──────────────────────────
+
+export class ServiceRequestNotFoundException extends EntityNotFoundException {
+  readonly code = 'SERVICE_REQUEST_NOT_FOUND';
+
+  constructor() {
+    super('Service request not found.');
+  }
+}
+
+/** Só o Trust Member dono do pedido consulta/altera → 403. */
+export class ServiceRequestOwnershipException extends ForbiddenOperationException {
+  readonly code = 'SERVICE_REQUEST_FORBIDDEN';
+
+  constructor(message = 'Only the Trust Member who created this service request can perform this operation.') {
+    super(message);
+  }
+}
+
+/** Porta única de mudança de estado recusa saltos (mesmo padrão de MarketplaceOrder) → 409. */
+export class ServiceRequestTransitionException extends StateConflictException {
+  readonly code = 'SERVICE_REQUEST_INVALID_TRANSITION';
+
+  constructor(from: string, to: string) {
+    super(`Service request cannot move from ${from} to ${to}.`);
+  }
+}
+
+/** Pedido CLOSED/CANCELLED/EXPIRED não aceita novo engajamento com Partner → 409. */
+export class ServiceRequestNotEngageableException extends StateConflictException {
+  readonly code = 'SERVICE_REQUEST_NOT_ENGAGEABLE';
+
+  constructor(status: string) {
+    super(`A service request with status ${status} can no longer be engaged with a Trust Partner.`);
+  }
+}
+
+/** Dados do pedido violam uma regra de negócio (ex.: budgetMin > budgetMax) → 422. */
+export class ServiceRequestValidationException extends BusinessRuleViolationException {
+  readonly code = 'SERVICE_REQUEST_INVALID';
+
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+/** O anúncio indicado para engajamento não está publicamente disponível → 404. */
+export class ServiceRequestListingUnavailableException extends EntityNotFoundException {
+  readonly code = 'SERVICE_REQUEST_LISTING_UNAVAILABLE';
+
+  constructor() {
+    super('The selected listing is not available for engagement.');
+  }
+}

@@ -10,6 +10,14 @@ import { GetOffersUseCase } from './application/usecases/get-offers.usecase';
 import { ManageDisputeUseCase } from './application/usecases/manage-dispute.usecase';
 import { ManageChangeOrderUseCase } from './application/usecases/manage-change-order.usecase';
 import { ManageOrderUseCase } from './application/usecases/manage-order.usecase';
+import { CreateServiceRequestUseCase } from './application/usecases/create-service-request.usecase';
+import { GetServiceRequestUseCase } from './application/usecases/get-service-request.usecase';
+import { DiscoverServiceRequestMatchesUseCase } from './application/usecases/discover-service-request-matches.usecase';
+import { EngageServiceRequestUseCase } from './application/usecases/engage-service-request.usecase';
+import {
+  CancelServiceRequestUseCase,
+  CloseServiceRequestUseCase,
+} from './application/usecases/resolve-service-request.usecase';
 import { ServiceExecutionUseCase } from './application/usecases/service-execution.usecase';
 import { ReviewTransactionUseCase } from './application/usecases/review-transaction.usecase';
 import { MarketplaceOfferService } from './application/usecases/marketplace-offer.service';
@@ -33,11 +41,13 @@ import { MarketplaceListingRepository } from './domain/repositories/marketplace-
 import { MarketplaceOfferRepository } from './domain/repositories/marketplace-offer.repository';
 import { MarketplaceOrderRepository } from './domain/repositories/marketplace-order.repository';
 import { ServiceExecutionRepository } from './domain/repositories/service-execution.repository';
+import { ServiceRequestRepository } from './domain/repositories/service-request.repository';
 import { TrustChangeOrderRepository } from './domain/repositories/trust-change-order.repository';
 import { MarketplaceReviewRepository } from './domain/repositories/marketplace-review.repository';
 import { MarketplaceConversationController } from './infrastructure/api/marketplace-conversation.controller';
 import { MarketplaceListingController } from './infrastructure/api/marketplace-listing.controller';
 import { MarketplaceOfferController } from './infrastructure/api/marketplace-offer.controller';
+import { MarketplaceServiceRequestController } from './infrastructure/api/marketplace-service-request.controller';
 import { MarketplaceChangeOrderController } from './infrastructure/api/marketplace-change-order.controller';
 import { MarketplaceOrderController } from './infrastructure/api/marketplace-order.controller';
 import {
@@ -56,6 +66,7 @@ import { DrizzleMarketplaceOfferRepository } from './infrastructure/persistence/
 import { DrizzleMarketplaceOrderRepository } from './infrastructure/persistence/drizzle-marketplace-order.repository';
 import { DrizzleMarketplaceReviewRepository } from './infrastructure/persistence/drizzle-marketplace-review.repository';
 import { DrizzleServiceExecutionRepository } from './infrastructure/persistence/drizzle-service-execution.repository';
+import { DrizzleServiceRequestRepository } from './infrastructure/persistence/drizzle-service-request.repository';
 import { DrizzleTrustChangeOrderRepository } from './infrastructure/persistence/drizzle-trust-change-order.repository';
 
 /**
@@ -74,6 +85,7 @@ import { DrizzleTrustChangeOrderRepository } from './infrastructure/persistence/
   controllers: [
     MarketplaceListingController,
     MarketplaceConversationController,
+    MarketplaceServiceRequestController,
     MarketplaceOfferController,
     MarketplaceOrderController,
     MarketplaceChangeOrderController,
@@ -89,6 +101,12 @@ import { DrizzleTrustChangeOrderRepository } from './infrastructure/persistence/
     ContactListingOwnerUseCase,
     ConversationMessagingUseCase,
     CloseConversationUseCase,
+    CreateServiceRequestUseCase,
+    GetServiceRequestUseCase,
+    DiscoverServiceRequestMatchesUseCase,
+    EngageServiceRequestUseCase,
+    CloseServiceRequestUseCase,
+    CancelServiceRequestUseCase,
     MarketplaceOfferService,
     CreateOfferUseCase,
     UpdateOfferUseCase,
@@ -112,6 +130,7 @@ import { DrizzleTrustChangeOrderRepository } from './infrastructure/persistence/
     { provide: MarketplaceReviewRepository, useClass: DrizzleMarketplaceReviewRepository },
     { provide: TrustChangeOrderRepository, useClass: DrizzleTrustChangeOrderRepository },
     { provide: ServiceExecutionRepository, useClass: DrizzleServiceExecutionRepository },
+    { provide: ServiceRequestRepository, useClass: DrizzleServiceRequestRepository },
     { provide: CommercialPolicyRepository, useClass: DrizzleCommercialPolicyRepository },
     {
       provide: MarketplaceCommercialSnapshotRepository,
@@ -122,6 +141,7 @@ import { DrizzleTrustChangeOrderRepository } from './infrastructure/persistence/
     MarketplaceListingRepository,
     TrustChangeOrderRepository,
     ServiceExecutionRepository,
+    ServiceRequestRepository,
     MarketplaceConversationRepository,
     MarketplaceOfferRepository,
     MarketplaceOrderRepository,

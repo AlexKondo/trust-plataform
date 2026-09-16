@@ -163,6 +163,38 @@ tranche por tranche. Migration 0029 aditiva (2 tabelas novas). Detalhes,
 decisões e critérios de aceite em
 [docs/Multi-Agent Implementation Doc/IPS/IP-007-COMPLETION-REPORT.md](docs/Multi-Agent%20Implementation%20Doc/IPS/IP-007-COMPLETION-REPORT.md).
 
+## IP-003 — Service Request, Discovery & Matching (2026-09-15)
+
+Até aqui o Marketplace era estritamente baseado em anúncio: o Partner posta,
+o Member busca. Esta IP acrescenta o outro sentido — o Member descreve uma
+necessidade (`ServiceRequest`: categoria, descrição, `locationLabel` livre,
+`radiusKm` opcional, urgência ASAP/THIS_WEEK/FLEXIBLE, faixa de orçamento
+opcional) e descobre Partners elegíveis de forma **determinística, sem IA**:
+`GET /marketplace/service-requests/{id}/matches` reaproveita literalmente
+`MarketplaceListingRepository.search()` (MRK-004) com critérios derivados do
+pedido — mesma consulta, mesmos índices, mesmo `levelsAtOrAbove` para o nível
+mínimo de confiança. Nenhuma coordenada geográfica precisa é armazenada: só
+`locationLabel` texto livre (mesmo formato de `marketplace_listings.location`)
+— decisão de privacidade deliberada, não um corte de escopo (ver §11 do
+Completion Report). Não é por faltar QUALQUER coordenada de Partner no
+repositório (`marketplace_order_execution_events`, migration 0017, já guarda
+geotags reais de execução em campo); é que não existe um perfil de
+localização do Partner PRÉ-engajamento que sustente matching prospectivo —
+raio geométrico real fica para o IP-005.
+
+Engajar um Partner (`POST /marketplace/service-requests/{id}/engage`)
+reaproveita `ContactListingOwnerUseCase` (MRK-006) **verbatim, sem nenhuma
+modificação** — a mesma conversa, o mesmo dedupe, a mesma máquina de proposta
+já existente passam a valer também para quem chegou via ServiceRequest. Uma
+tabela nova (`service_request_engagements`, `UNIQUE(service_request_id,
+listing_id)`) só registra essa origem. O pedido transiciona OPEN -> MATCHED na
+primeira vez que um contato é feito (CAS `UPDATE ... WHERE status = 'OPEN'`,
+mesmo padrão do PACK-03/IP-001) — idempotente: engajar um segundo Partner
+depois não é erro nem reserva exclusividade. Migration 0030 aditiva (2 tabelas
+novas: `service_requests`, `service_request_engagements`). Detalhes, decisões
+e critérios de aceite em
+[docs/Multi-Agent Implementation Doc/IPS/IP-003-COMPLETION-REPORT.md](docs/Multi-Agent%20Implementation%20Doc/IPS/IP-003-COMPLETION-REPORT.md).
+
 ## Documentos-guia (ler nesta ordem)
 
 1. [PLANO-DE-MODULOS.md](PLANO-DE-MODULOS.md) — quebra em módulos, ordem de desenvolvimento, grafo de dependências
