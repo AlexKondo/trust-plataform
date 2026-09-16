@@ -29,6 +29,24 @@ export const notifications = pgTable(
      * pronta para entrar sem mais uma migration.
      */
     locale: varchar('locale', { length: 10 }).notNull().default('pt-BR'),
+    /**
+     * IP-013 — por qual canal este aviso foi (ou será) entregue. Hoje só
+     * IN_APP nasce de verdade (a criação da linha JÁ É a entrega); EMAIL/PUSH
+     * são valores estruturalmente aceitos para um adapter futuro gravar aqui
+     * sem precisar de outra migration — nenhum provedor de e-mail/push é
+     * chamado por este módulo (fora de escopo, ver notification-types.ts).
+     */
+    channel: varchar('channel', { length: 20 }).notNull().default('IN_APP'),
+    /**
+     * IP-013 — status de entrega do aviso NESTE canal. IN_APP é sempre
+     * DELIVERED no instante da criação (não existe "enviar" separado de
+     * "criar" para um aviso in-app); PENDING/FAILED existem para um canal
+     * assíncrono (EMAIL/PUSH) que ainda não está implementado.
+     */
+    deliveryStatus: varchar('delivery_status', { length: 20 }).notNull().default('DELIVERED'),
+    deliveredAt: timestamp('delivered_at', { withTimezone: true, mode: 'date' }),
+    /** Motivo da falha de entrega quando deliveryStatus = FAILED (canal futuro). */
+    failedReason: text('failed_reason'),
     readAt: timestamp('read_at', { withTimezone: true, mode: 'date' }),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
   },

@@ -51,6 +51,9 @@ export class NotificationController {
         resourceType: row.resourceType,
         resourceId: row.resourceId,
         read: row.readAt !== null,
+        // IP-013 — canal/status de entrega, provider-ready (hoje só IN_APP/DELIVERED).
+        channel: row.channel,
+        deliveryStatus: row.deliveryStatus,
         createdAt: row.createdAt.toISOString(),
       })),
       page,

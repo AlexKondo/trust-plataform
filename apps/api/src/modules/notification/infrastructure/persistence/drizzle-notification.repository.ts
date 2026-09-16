@@ -3,6 +3,10 @@ import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 import { DRIZZLE, Database, DatabaseExecutor } from '../../../../shared/database/database.module';
 import { LocalizedNotificationDraft } from '../../domain/notification-rules';
+import {
+  NOTIFICATION_CHANNEL,
+  NOTIFICATION_DELIVERY_STATUS,
+} from '../../domain/notification-types';
 import { NotificationRow, notifications } from './notifications.schema';
 
 @Injectable()
@@ -18,6 +22,7 @@ export class NotificationRepository {
       return;
     }
     const target = executor ?? this.db;
+    const now = new Date();
     await target.insert(notifications).values(
       drafts.map((draft) => ({
         id: uuidv7(),
@@ -28,7 +33,12 @@ export class NotificationRepository {
         resourceType: draft.resourceType,
         resourceId: draft.resourceId,
         locale: draft.locale,
-        createdAt: new Date(),
+        // IP-013 — único canal produzido hoje; a criação da linha JÁ É a
+        // entrega (não existe passo de "enviar" separado para IN_APP).
+        channel: NOTIFICATION_CHANNEL.IN_APP,
+        deliveryStatus: NOTIFICATION_DELIVERY_STATUS.DELIVERED,
+        deliveredAt: now,
+        createdAt: now,
       })),
     );
   }

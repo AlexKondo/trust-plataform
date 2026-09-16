@@ -5,6 +5,7 @@ import {
   VERIFICATION_TYPE_LABEL,
   formatMoney,
 } from './notification-labels';
+import { NOTIFICATION_CATEGORY, NotificationCategory } from './notification-types';
 
 /** Uma notificação a ser criada — já resolvida para um destinatário. */
 export interface NotificationDraft {
@@ -33,6 +34,14 @@ export interface LocalizedNotificationDraft extends NotificationDraft {
 export interface NotificationRule {
   eventType: string;
   consumerName: string;
+  /**
+   * IP-013 — TRANSACTIONAL (padrão quando omitido) vs OPTIONAL. Toda regra
+   * hoje neste catálogo é TRANSACTIONAL (decorre de um fato da própria
+   * transação/conta do destinatário) — omitir o campo é equivalente a
+   * declará-lo explicitamente, não um valor "esquecido". Ver
+   * `notification-types.ts` para por que não existe opt-out no MVP.
+   */
+  category?: NotificationCategory;
   build(payload: Record<string, unknown>): NotificationDraft[];
 }
 
@@ -363,6 +372,119 @@ export const NOTIFICATION_RULES: NotificationRule[] = [
         body: 'O cliente não aprovou a mudança. O valor do contrato continua o mesmo.',
         resourceType: 'TrustChangeOrder',
         resourceId: str(payload, 'changeOrderId'),
+      }),
+  },
+
+  // ── Pedido de serviço (IP-003) ───────────────────────────────────────────
+  // ServiceRequest.Created/Matched/Closed/Cancelled não geram aviso: o ator de
+  // toda transição é sempre o próprio Member dono do pedido (regra "o autor
+  // nunca é notificado do próprio ato"), e o Partner engajado já é avisado
+  // pela mensagem que o mesmo engajamento cria (MarketplaceMessage.Sent →
+  // ntf.message-sent). ServiceRequestEngagement.Created é o único evento
+  // deste agregado com um destinatário distinto do ator: dá ao Partner um
+  // aviso com o CONTEXTO do pedido de serviço (não só "nova mensagem").
+  {
+    eventType: 'ServiceRequestEngagement.Created',
+    consumerName: 'ntf.service-request-engagement-created',
+    category: NOTIFICATION_CATEGORY.TRANSACTIONAL,
+    build: (payload) =>
+      to(str(payload, 'partnerId'), {
+        type: 'SERVICE_REQUEST_ENGAGEMENT_RECEIVED',
+        title: 'Um Trust Member entrou em contato',
+        body: 'Um Trust Member viu seu anúncio e entrou em contato a partir de um pedido de serviço. Confira a conversa.',
+        resourceType: 'ServiceRequestEngagement',
+        resourceId: str(payload, 'serviceRequestId'),
+      }),
+  },
+
+  // ── Pagamento (IP-007 / PAY) ─────────────────────────────────────────────
+  // Payment.Created/Authorized não geram aviso próprio: já ficam implícitos
+  // em OFFER_ACCEPTED (a negociação fechada JÁ diz "o pedido foi criado e
+  // pago"); duplicar seria repetir o mesmo fato duas vezes (fora de escopo:
+  // "no spam engine"). AuthorizationFailed é diferente — é um desfecho ruim
+  // que o comprador precisa saber para agir (tentar de novo / trocar cartão).
+  {
+    eventType: 'Payment.AuthorizationFailed',
+    consumerName: 'ntf.payment-authorization-failed',
+    category: NOTIFICATION_CATEGORY.TRANSACTIONAL,
+    build: (payload) =>
+      to(str(payload, 'buyerId'), {
+        type: 'PAYMENT_AUTHORIZATION_FAILED',
+        title: 'Não foi possível autorizar o pagamento',
+        body: 'O pagamento deste pedido não foi autorizado pela operadora. Tente novamente ou use outro método de pagamento.',
+        resourceType: 'MarketplaceOrder',
+        resourceId: str(payload, 'orderId'),
+      }),
+  },
+  {
+    eventType: 'PaymentIncrementalAuthorization.Approved',
+    consumerName: 'ntf.incremental-payment-approved',
+    category: NOTIFICATION_CATEGORY.TRANSACTIONAL,
+    build: (payload) =>
+      to(str(payload, 'buyerId'), {
+        type: 'INCREMENTAL_PAYMENT_APPROVED',
+        title: 'Cobrança adicional autorizada',
+        body: `A cobrança adicional de ${formatMoney(num(payload, 'amount'), str(payload, 'currency'))}, referente à mudança que você aprovou, foi autorizada com sucesso.`,
+        resourceType: 'MarketplaceOrder',
+        resourceId: str(payload, 'orderId'),
+      }),
+  },
+  {
+    eventType: 'PaymentIncrementalAuthorization.Failed',
+    consumerName: 'ntf.incremental-payment-failed',
+    category: NOTIFICATION_CATEGORY.TRANSACTIONAL,
+    build: (payload) =>
+      to(str(payload, 'buyerId'), {
+        type: 'INCREMENTAL_PAYMENT_FAILED',
+        title: 'Não foi possível autorizar a cobrança adicional',
+        body: `Não conseguimos autorizar a cobrança adicional de ${formatMoney(num(payload, 'amount'), str(payload, 'currency'))} referente à mudança que você aprovou. Verifique seu método de pagamento.`,
+        resourceType: 'MarketplaceOrder',
+        resourceId: str(payload, 'orderId'),
+      }),
+  },
+  {
+    eventType: 'Funds.Released',
+    consumerName: 'ntf.funds-released',
+    category: NOTIFICATION_CATEGORY.TRANSACTIONAL,
+    build: (payload) =>
+      to(str(payload, 'sellerId'), {
+        type: 'FUNDS_RELEASED',
+        title: 'Pagamento liberado',
+        body: `O pagamento de ${formatMoney(num(payload, 'amount'), str(payload, 'currency'))} foi liberado para você.`,
+        resourceType: 'MarketplaceOrder',
+        resourceId: str(payload, 'orderId'),
+      }),
+  },
+
+  // ── Segurança da conta (IDN) ─────────────────────────────────────────────
+  // Identity.Authenticated/Session.* não geram aviso — login/logout normal
+  // são rotineiros demais para virar notificação (spam). Mudança/recuperação
+  // de SENHA é diferente: é o tipo de evento que, se não foi o próprio
+  // usuário, ele precisa ver o quanto antes.
+  {
+    eventType: 'Identity.PasswordChanged',
+    consumerName: 'ntf.password-changed',
+    category: NOTIFICATION_CATEGORY.TRANSACTIONAL,
+    build: (payload) =>
+      to(str(payload, 'identityId'), {
+        type: 'PASSWORD_CHANGED',
+        title: 'Sua senha foi alterada',
+        body: 'A senha da sua conta foi alterada agora há pouco. Se não foi você, contate o suporte imediatamente.',
+        resourceType: 'Identity',
+        resourceId: null,
+      }),
+  },
+  {
+    eventType: 'Identity.PasswordRecoveryRequested',
+    consumerName: 'ntf.password-recovery-requested',
+    category: NOTIFICATION_CATEGORY.TRANSACTIONAL,
+    build: (payload) =>
+      to(str(payload, 'identityId'), {
+        type: 'PASSWORD_RECOVERY_REQUESTED',
+        title: 'Redefinição de senha solicitada',
+        body: 'Foi solicitada uma redefinição de senha para a sua conta. Se não foi você, ignore o link enviado por e-mail — sua senha atual continua válida.',
+        resourceType: 'Identity',
+        resourceId: null,
       }),
   },
 ];

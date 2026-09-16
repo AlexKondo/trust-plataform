@@ -218,6 +218,13 @@
       "when": 1792000000000,
       "tag": "0030_ip003_service_request_discovery_matching",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1793000000000,
+      "tag": "0031_ip013_notification_communication_completion",
+      "breakpoints": true
     }
   ]
 }

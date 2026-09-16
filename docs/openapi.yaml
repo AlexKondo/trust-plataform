@@ -1926,7 +1926,11 @@ paths:
       summary: Meus avisos in-app
       description: >
         Projeção de eventos de domínio. Não existe endpoint de criação: todo
-        aviso nasce de um evento consumido do outbox.
+        aviso nasce de um evento consumido do outbox. IP-013 acrescenta
+        `channel`/`deliveryStatus` (provider-ready: hoje sempre
+        `IN_APP`/`DELIVERED` — a criação do aviso JÁ É a entrega; `EMAIL`/
+        `PUSH`/`PENDING`/`FAILED` existem para um adapter futuro, nenhum
+        provedor de e-mail/push é chamado por este módulo hoje).
       operationId: listNotifications
       parameters:
         - { name: onlyUnread, in: query, schema: { type: string, enum: ['true', 'false'] } }
@@ -1947,6 +1951,8 @@ paths:
                     resourceType: MarketplaceConversation
                     resourceId: 019fe8f0-0000-7000-8000-0000000000f1
                     read: false
+                    channel: IN_APP
+                    deliveryStatus: DELIVERED
                     createdAt: '2026-08-10T18:00:00.000Z'
                 pagination: { page: 1, pageSize: 20, totalItems: 1, totalPages: 1 }
 

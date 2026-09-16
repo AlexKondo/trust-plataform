@@ -195,6 +195,44 @@ novas: `service_requests`, `service_request_engagements`). Detalhes, decisões
 e critérios de aceite em
 [docs/Multi-Agent Implementation Doc/IPS/IP-003-COMPLETION-REPORT.md](docs/Multi-Agent%20Implementation%20Doc/IPS/IP-003-COMPLETION-REPORT.md).
 
+## IP-013 — Notification & Communication Completion (2026-09-15)
+
+O catálogo `NOTIFICATION_RULES` (NTF-001) tinha 21 regras in-app e nenhuma
+delas cobria os eventos que as IPs de Wave 2 acabaram de criar: os 5 eventos
+`ServiceRequest.*`/`ServiceRequestEngagement.*` (IP-003) e os eventos de
+pagamento — `Payment.AuthorizationFailed`, `PaymentIncrementalAuthorization.
+Approved/.Failed` (IP-007), `Funds.Released` — estavam todos documentados no
+catálogo de eventos como "nenhum consumidor hoje". Esta IP fecha esse gap com
+**7 regras novas** na MESMA tabela (não 7 classes novas — o padrão table-driven
+do NTF-001 é reaproveitado literalmente): `ServiceRequestEngagement.Created`
+(avisa o Partner, com contexto de pedido de serviço, diferente do aviso
+genérico de "nova mensagem" que o mesmo engajamento também dispara),
+`Payment.AuthorizationFailed` e o par `PaymentIncrementalAuthorization.
+Approved/.Failed` (avisam o comprador), `Funds.Released` (avisa o vendedor —
+cobre a tranche original e as incrementais, mesmo `eventType` reaproveitado) e
+o par de segurança de conta `Identity.PasswordChanged`/`.
+PasswordRecoveryRequested` (avisa o titular). `ServiceRequest.Created/Matched/
+Closed/Cancelled` continuam sem regra própria — o ator de toda transição é
+sempre o Member dono do pedido (nunca se notifica o autor do próprio ato).
+
+Migration 0031 (aditiva): `notifications` ganha `channel`
+(`IN_APP`/`EMAIL`/`PUSH`, hoje só `IN_APP` é produzido) e `deliveryStatus`
+(`PENDING`/`DELIVERED`/`FAILED`, hoje sempre `DELIVERED` — para um aviso
+in-app, a linha nascer JÁ É a entrega) + `deliveredAt`/`failedReason`,
+deixando o esquema pronto para um adapter de e-mail/push futuro sem outra
+migration — **nenhum provedor de e-mail/push foi chamado por este módulo**
+(Brevo já existe e funciona, mas só para os e-mails transacionais do próprio
+módulo `identity` — verificação de e-mail e recuperação de senha — nunca foi
+conectado ao `notification`; conectá-lo é decisão de produto fora do escopo
+desta IP, não uma lacuna técnica). Retry/observabilidade de falha continuam
+sendo o mecanismo genérico já existente do outbox (`outbox_events.status`/
+`attempts`/`lastError` + pg-boss com backoff) — nenhum retry notification-
+specific foi construído por cima (seria redundante). Toda regra do catálogo
+(as 21 antigas e as 7 novas) é `category: TRANSACTIONAL` — não existe conteúdo
+opcional/promocional no MVP, logo não há opt-out para construir. Detalhes,
+decisões e critérios de aceite em
+[docs/Multi-Agent Implementation Doc/IPS/IP-013-COMPLETION-REPORT.md](docs/Multi-Agent%20Implementation%20Doc/IPS/IP-013-COMPLETION-REPORT.md).
+
 ## Documentos-guia (ler nesta ordem)
 
 1. [PLANO-DE-MODULOS.md](PLANO-DE-MODULOS.md) — quebra em módulos, ordem de desenvolvimento, grafo de dependências

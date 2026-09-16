@@ -52,14 +52,16 @@ por `shared/events/legacy-event-compat.ts`, isolado e removível — nunca valid
   ```
 ```
 
-## Consumidor transversal: notificações (NTF-001)
+## Consumidor transversal: notificações (NTF-001 + IP-013)
 
-O módulo `notification` consome **20 eventos** (verificações, Trust Layer, mensagens, propostas, pedidos, disputas, avaliações e mudanças comerciais) e os projeta em avisos in-app. Consumers `ntf.*`, um por evento, declarados na tabela `NOTIFICATION_RULES`. Regras do desenho:
+O módulo `notification` consome **28 eventos** (verificações, Trust Layer, mensagens, propostas, pedidos, disputas, avaliações, mudanças comerciais, pedido de serviço, pagamento e segurança de conta) e os projeta em avisos in-app. Consumers `ntf.*`, um por evento, declarados na tabela `NOTIFICATION_RULES`. Regras do desenho:
 
 - nenhum módulo de negócio conhece notificação — todos apenas publicam fatos;
 - o **autor da ação nunca é notificado** do próprio ato (quem aceita não recebe "proposta aceita");
 - queda de nível não vira aviso; só promoção (`TrustLevel.Changed` com nível maior);
-- `MarketplaceDispute.Opened` avisa só a parte reclamada; `Resolved` avisa as duas.
+- `MarketplaceDispute.Opened` avisa só a parte reclamada; `Resolved` avisa as duas;
+- **IP-013**: toda regra do catálogo é `category: TRANSACTIONAL` (default quando o campo é omitido — as 21 regras originais não foram tocadas) — decorre de um fato da própria transação/conta do destinatário; não existe conteúdo opcional/promocional no MVP, logo não há opt-out para construir (§4 do IP-013, "no spam engine"; ver `notification-types.ts`);
+- **IP-013**: cada aviso agora carrega `channel`/`deliveryStatus` (migration 0031) — hoje só `IN_APP`/`DELIVERED` são produzidos de verdade (a criação da linha É a entrega); `EMAIL`/`PUSH`/`PENDING`/`FAILED` são valores estruturalmente aceitos para um adapter futuro, sem nenhum provedor de e-mail/push chamado por este módulo. Retry/observabilidade de FALHA DE CONSUMO (não de canal) continuam sendo o mecanismo genérico já existente do outbox (`outbox_events.status`/`attempts`/`lastError` + retry com backoff do pg-boss, `outbox-relay.service.ts`) — nenhum mecanismo de retry notification-specific foi construído por cima dele (era redundante).
 
 Para isso, dois payloads foram enriquecidos (adição retrocompatível): `Verification.Approved/Rejected` passaram a levar `identityId`, e `MarketplaceMessage.Sent` passou a levar `recipientId` — assim quem consome não precisa carregar Passport ou conversa só para saber a quem avisar.
 
@@ -93,7 +95,7 @@ Para isso, dois payloads foram enriquecidos (adição retrocompatível): `Verifi
 
 - **Descrição**: o provedor CONFIRMOU a liberação (PAY-004). Só é publicado depois da confirmação externa — nunca por aprovação de política.
 - **Produtor**: payment-service · **Agregado**: `TrustCustody` / id da custódia
-- **Consumidores**: nenhum hoje; a Liquidação (PAY-005) e o Ledger (PAY-008) consumirão.
+- **Consumidores**: ✅ `ntf.funds-released` (IP-013 — avisa o VENDEDOR que o pagamento foi liberado para ele; cobre a tranche original E cada tranche incremental, já que reaproveitam o mesmo `eventType`, ver nota IP-007 abaixo). A Liquidação (PAY-005) e o Ledger (PAY-008) ainda não consomem.
 - **Payload**: o de `Funds.ReadyForRelease` + `paymentStatus`, `providerTransactionId`, `releasedAt`
 - **IP-007**: mesmo reaproveitamento para tranches incrementais, SEM `paymentStatus` — a liberação de uma tranche incremental nunca transiciona `Payment.status` (essa transição já aconteceu, uma única vez, quando a tranche ORIGINAL liberou; `PAYMENT_TRANSITIONS` não tem `FUNDS_RELEASED -> FUNDS_RELEASED`). "Tudo foi liberado" é uma pergunta que se responde consultando todas as tranches (`GET /payments/by-order/{orderId}`'s `custodySummary`), não o status escalar do `Payment`.
 
@@ -108,7 +110,7 @@ Para isso, dois payloads foram enriquecidos (adição retrocompatível): `Verifi
 
 - **Descrição**: desfecho da tentativa de cobrança (PAY-002). Cada tentativa gera uma linha em `payment_authorizations`; o evento reflete a decisão do provedor.
 - **Produtor**: payment-service
-- **Consumidores**: `Authorized` será consumido pela custódia (Bloco 3). `AuthorizationFailed` não tem consumidor: a falha permite nova tentativa (BR-005) e não muda nada fora do pagamento.
+- **Consumidores**: `Authorized` será consumido pela custódia (Bloco 3). `AuthorizationFailed` → ✅ `ntf.payment-authorization-failed` (IP-013 — avisa o comprador para tentar de novo/trocar de método; a falha em si continua sem efeito colateral fora do pagamento — BR-005).
 - **Payloads**: `Authorized {paymentId, orderId, buyerId, sellerId, authorizationId, providerId, amount, currency, status, authorizedAt}`; `AuthorizationFailed {…, failureCode, failedAt}`
 - **Nota de idempotência**: repetir a requisição com a mesma `Idempotency-Key` **não** republica o evento — a tentativa anterior é devolvida sem tocar no provedor.
 
@@ -117,7 +119,7 @@ Para isso, dois payloads foram enriquecidos (adição retrocompatível): `Verifi
 - **Descrição**: desfecho, em sandbox, da tentativa de autorizar o DELTA de um Trust Change Order aprovado (PACK-03 §9.1, gap `amountAuthorizedNotInCustody`). É o par `Payment.Authorized`/`Payment.AuthorizationFailed` aplicado a uma autorização incremental — mesmo port `PaymentGateway`, mesma convenção determinística do sandbox (final `.13` → DECLINED, `.99` → ERROR), tipo de evento NOVO porque o agregado é novo (`PaymentIncrementalAuthorization`, não `Payment` — o `Payment` original nunca muda de valor nem de status por causa disto).
 - **Produtor**: payment-service · **Agregado**: `PaymentIncrementalAuthorization` / id da autorização incremental
 - **Gatilho**: `TrustChangeOrder.Approved` → `pay.create-incremental-authorization-on-change-order-approved` → `CreateIncrementalAuthorizationUseCase`. Só `Approved` dispara — `Rejected`/`Cancelled`/o estado derivado `EXPIRED` nunca publicam este evento (ver nota em `TrustChangeOrder.Approved` acima).
-- **Consumidores**: nenhum externo hoje. Internamente, uma autorização `Approved` é seguida, na MESMA transação, pela criação da tranche de custódia (`TrustCustody.Created`/`Funds.Held` reaproveitados, ver acima) — não por um segundo consumer/evento, ao contrário do par PAY-002/PAY-003 original (ver justificativa na doc do use case: aqui não há ação do usuário entre autorizar e custodiar).
+- **Consumidores**: ✅ `ntf.incremental-payment-approved` / ✅ `ntf.incremental-payment-failed` (IP-013 — avisam o comprador do desfecho da cobrança extra que ele mesmo aprovou; `sellerId` já sabe da aprovação em si via `ntf.change-order-approved`, então este par é sobre o PAGAMENTO, não a decisão comercial). Internamente, uma autorização `Approved` é ADEMAIS seguida, na MESMA transação, pela criação da tranche de custódia (`TrustCustody.Created`/`Funds.Held` reaproveitados, ver acima) — não por um segundo consumer/evento, ao contrário do par PAY-002/PAY-003 original (ver justificativa na doc do use case: aqui não há ação do usuário entre autorizar e custodiar).
 - **Payloads**: `Approved {incrementalAuthorizationId, paymentId, changeOrderId, orderId, buyerId, sellerId, amount, currency, status: "APPROVED", authorizedAt}`; `Failed {…, status: "DECLINED"|"ERROR", failureCode, failedAt}`
 - **Idempotência**: `UNIQUE(change_order_id)` e `UNIQUE(idempotency_key)` em `payment_incremental_authorizations` — no máximo UMA autorização incremental por Change Order, para sempre, mesmo sob reentrega do evento gatilho ou corrida entre duas entregas concorrentes (prova: teste de corrida em `ip-007-incremental-payment-authorization.e2e.spec.ts`). `idempotencyKey = incremental-auth:{changeOrderId}` (determinística, mesmo padrão de `release:{custodyId}`).
 
@@ -126,14 +128,14 @@ Para isso, dois payloads foram enriquecidos (adição retrocompatível): `Verifi
 
 - **Descrição**: ciclo de vida do pedido de serviço do Trust Member (fecha o gap autorreportado pela reconciliação de baseline — IP-000-COMPLETION-REPORT.md §14, linha IP-003: "não existe entidade de necessidade do Member"). `Matched` sai só na PRIMEIRA vez que o Member engaja um Partner elegível (`OPEN -> MATCHED`); engajar um segundo/terceiro Partner depois NÃO republica este evento — `MATCHED` é só o fato "já houve pelo menos um contato", não uma reserva de exclusividade (essa continua sendo `MarketplaceListing.reserve()`, no aceite da proposta, MRK-013). `Closed`/`Cancelled` são estados terminais e mutuamente exclusivos. `EXPIRED` nunca é publicado como evento — é sempre um status DERIVADO de `expiresAt` na leitura (mesmo padrão de `MarketplaceOffer.effectiveStatus`), sem job de varredura.
 - **Produtor**: marketplace-service · **Agregado**: `ServiceRequest`
-- **Consumidores**: nenhum hoje (notificação ao Member/Partner é escopo do IP-013, que ainda não existe).
+- **Consumidores**: nenhum. `Matched`/`Closed`/`Cancelled` são sempre efeito de um ato do próprio Member dono do pedido (regra "o autor nunca é notificado do próprio ato" — IP-013); `Created` também não tem terceiro para avisar antes de haver engajamento. Ver `ServiceRequestEngagement.Created` abaixo para o único evento deste agregado que gera aviso.
 - **Payloads**: `Created {serviceRequestId, memberId, category, locationLabel, urgency, status: "OPEN", createdAt}`; `Matched {serviceRequestId, memberId, listingId, partnerId, matchedAt}`; `Closed {serviceRequestId, memberId, previousStatus, closedAt}`; `Cancelled {serviceRequestId, memberId, previousStatus, reason, cancelledAt}`
 
 ### IP-003 — ServiceRequestEngagement.Created (v1.0)
 
 - **Descrição**: registra que uma conversa (`MarketplaceConversation`, MRK-006) nasceu a partir de um `ServiceRequest` com um Partner/anúncio específico. Não é um novo mecanismo de conversa — `POST /marketplace/service-requests/{id}/engage` reaproveita `ContactListingOwnerUseCase` (MRK-006) SEM NENHUMA modificação nesse caso de uso; este evento só registra a ligação (a mesma chamada também publica `MarketplaceConversation.Created`/`MarketplaceMessage.Sent`, como qualquer contato normal). Publicado no máximo uma vez por par (serviceRequestId, listingId) — `UNIQUE(service_request_id, listing_id)` — reengajar o mesmo anúncio reaproveita a conversa e não republica este evento (mesma convenção "reutilizar, nunca duplicar" do MRK-006 BR-005).
 - **Produtor**: marketplace-service · **Agregado**: `ServiceRequestEngagement`
-- **Consumidores**: nenhum hoje.
+- **Consumidores**: ✅ `ntf.service-request-engagement-created` (IP-013 — avisa o Partner com o contexto "pedido de serviço", diferente do aviso genérico "nova mensagem" que a mesma chamada também dispara via `MarketplaceMessage.Sent`).
 - **Payload**: `{ serviceRequestId, listingId, partnerId, conversationId, engagedBy, engagedAt }`
 - **Nota de determinismo**: "Partner elegível" (o que aparece em `GET /marketplace/service-requests/{id}/matches`) é calculado por `DiscoverServiceRequestMatchesUseCase`, reaproveitando `MarketplaceListingRepository.search()` (MRK-004) com critérios derivados do pedido (categoria, `locationLabel` como texto livre, nível mínimo de confiança via `levelsAtOrAbove`) — mesma consulta, mesmos índices, zero IA/embedding/ranking por modelo. Geolocalização por raio geométrico não é calculada. Isto não é por falta de QUALQUER coordenada de Partner no repositório — `marketplace_order_execution_events` (migration 0017, PACK-03) guarda geotags reais capturadas no check-in/check-out da execução em campo — mas porque não existe um perfil de localização do Partner PRÉ-engajamento (uma "base"/área de atendimento), associável a um pedido ainda sem execução, que sustente matching prospectivo; aquele dado só nasce depois que um pedido já chegou à execução e reaproveitá-lo exigiria infraestrutura de agregação nova. Fica para o IP-005.
 
@@ -359,7 +361,7 @@ Para isso, dois payloads foram enriquecidos (adição retrocompatível): `Verifi
 
 - **Descrição**: pedido de recuperação de senha para conta existente (IDN-007). Nunca publicado para e-mails desconhecidos.
 - **Produtor**: identity-service
-- **Consumidores**: auditoria/analytics; sinal antifraude (futuro).
+- **Consumidores**: auditoria/analytics; sinal antifraude (futuro); ✅ `ntf.password-recovery-requested` (IP-013 — aviso in-app de segurança: se não foi o titular quem pediu, ele vê isso no próximo login mesmo sem clicar no link do e-mail).
 - **Payload**: `{ identityId: UUID, requestedAt: ISO 8601 UTC }`
 
 ### Identity.PasswordReset (v1.0)
@@ -368,12 +370,13 @@ Para isso, dois payloads foram enriquecidos (adição retrocompatível): `Verifi
 - **Produtor**: identity-service
 - **Consumidores**: auditoria/analytics.
 - **Payload**: `{ identityId: UUID, resetAt: ISO 8601 UTC }`
+- **Nota (IP-013)**: deliberadamente SEM regra de notificação in-app — todas as sessões (inclusive qualquer sessão ainda logada) são revogadas na mesma transação, então não haveria sessão autenticada para exibir o aviso; o e-mail transacional (Brevo, ver `identity/infrastructure/email`) já é o canal correto aqui, fora do NTF-001/IP-013.
 
 ### Identity.PasswordChanged (v1.0)
 
 - **Descrição**: senha alterada pelo usuário autenticado (IDN-009). Demais sessões revogadas; a sessão atual permanece.
 - **Produtor**: identity-service
-- **Consumidores**: auditoria/analytics.
+- **Consumidores**: auditoria/analytics; ✅ `ntf.password-changed` (IP-013 — aviso de segurança para o titular; a sessão atual permanece ativa, então o aviso in-app é visível imediatamente).
 - **Payload**: `{ identityId: UUID, changedAt: ISO 8601 UTC }`
 
 ### Identity.EmailVerified (v1.0)
