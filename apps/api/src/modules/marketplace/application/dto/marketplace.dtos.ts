@@ -72,6 +72,8 @@ export const searchListingsQuerySchema = z.object({
   currency: currencySchema.optional(),
   location: z.string().trim().min(2).max(160).optional(),
   minimumTrustLevel: z.string().trim().min(3).max(30).optional(),
+  /** IP-015 — 0=domingo..6=sábado; mesma convenção de `PartnerAvailabilityWindow` (IP-005). */
+  availableDayOfWeek: z.coerce.number().int().min(0).max(6).optional(),
   sort: z.enum(SEARCH_SORTS).default(SEARCH_SORT.RELEVANCE),
   page: z.coerce.number().int().min(1).default(1),
   size: z.coerce.number().int().min(1).max(50).default(20),

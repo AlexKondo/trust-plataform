@@ -1,0 +1,26 @@
+-- IP-015 — Search & Marketplace Retrieval.
+-- Aditiva e não destrutiva: nenhuma tabela/coluna existente é apagada ou
+-- reescrita; mesmo estilo de 0024..0033 (CREATE INDEX IF NOT EXISTS).
+--
+-- Um único índice de performance genuíno foi confirmado faltando no
+-- preflight: `trust_scores.identity_id` não tinha NENHUM índice (nem
+-- simples, nem único) antes desta IP, apesar de ser a coluna de JOIN usada
+-- por toda leitura de reputação do Marketplace — a busca pública do MRK-004
+-- (`SearchListingsUseCase`/`DrizzleMarketplaceListingRepository.search()`),
+-- o matching determinístico do IP-003 (`DiscoverServiceRequestMatchesUseCase`)
+-- e a comparação de ofertas do IP-004 (`CompareServiceRequestOffersUseCase`
+-- via `TrustScoreRepository.findScoreByIdentityId()`). Nenhuma regra do Trust
+-- Score é alterada — só o índice.
+--
+-- Nenhum outro índice novo foi necessário: os filtros de categoria/status/
+-- tipo/preço/data de publicação já tinham índice dedicado desde o MRK-004
+-- (`idx_marketplace_listing_search`, `idx_marketplace_listing_price`, etc.,
+-- ver marketplace.schema.ts); o novo filtro `availableDayOfWeek` reaproveita
+-- o índice que o IP-005 já criou em
+-- `marketplace_partner_availability_windows (partner_id, day_of_week)`
+-- (`idx_partner_availability_partner`) — o EXISTS deste IP não precisa de um
+-- índice próprio. `location` continua texto livre (`ilike`), sem índice de
+-- prefixo/trigram — deliberado: um índice trigram exigiria a extensão
+-- `pg_trgm`, uma peça de infraestrutura nova que a evidência atual (volume
+-- de anúncios do MVP) não justifica — ver Completion Report §Não implementado.
+CREATE INDEX IF NOT EXISTS "idx_trust_score_identity" ON "trust_scores" ("identity_id");

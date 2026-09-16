@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { SQL, and, asc, desc, eq, gte, ilike, inArray, isNull, lte, or, sql } from 'drizzle-orm';
+import { SQL, and, asc, desc, eq, exists, gte, ilike, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 import { DRIZZLE, Database, DatabaseExecutor } from '../../../../shared/database/database.module';
 import { trustScores } from '../../../trust-score/infrastructure/persistence/trust-score.schema';
@@ -19,6 +19,11 @@ import {
   marketplaceListingImages,
   marketplaceListings,
 } from './marketplace.schema';
+// IP-015 — leitura da tabela de disponibilidade do Partner (IP-005), só para
+// o EXISTS do filtro `availableDayOfWeek` abaixo. Nenhuma linha/regra do
+// IP-005 é escrita ou alterada aqui (é um JOIN de leitura, o mesmo padrão já
+// usado com `trust_scores`).
+import { marketplacePartnerAvailabilityWindows } from './partner-availability.schema';
 
 @Injectable()
 export class DrizzleMarketplaceListingRepository extends MarketplaceListingRepository {
@@ -181,6 +186,24 @@ export class DrizzleMarketplaceListingRepository extends MarketplaceListingRepos
     if (criteria.allowedSellerLevels) {
       filters.push(inArray(trustScores.level, criteria.allowedSellerLevels));
     }
+    if (criteria.availableDayOfWeek !== undefined) {
+      // Reaproveita o índice do IP-005 (`idx_partner_availability_partner`,
+      // já em `(partner_id, day_of_week)`) — nenhum índice novo é preciso
+      // para este EXISTS.
+      filters.push(
+        exists(
+          this.db
+            .select({ one: sql`1` })
+            .from(marketplacePartnerAvailabilityWindows)
+            .where(
+              and(
+                eq(marketplacePartnerAvailabilityWindows.partnerId, marketplaceListings.ownerId),
+                eq(marketplacePartnerAvailabilityWindows.dayOfWeek, criteria.availableDayOfWeek),
+              ),
+            ),
+        ),
+      );
+    }
 
     const where = and(...filters);
     const firstImage = sql<string | null>`(
@@ -212,7 +235,7 @@ export class DrizzleMarketplaceListingRepository extends MarketplaceListingRepos
         .leftJoin(marketplaceCategories, eq(marketplaceListings.categoryId, marketplaceCategories.id))
         .leftJoin(trustScores, eq(trustScores.identityId, marketplaceListings.ownerId))
         .where(where)
-        .orderBy(...orderFor(criteria.sort))
+        .orderBy(...orderFor(criteria))
         .limit(criteria.pageSize)
         .offset((criteria.page - 1) * criteria.pageSize),
       this.db
@@ -293,19 +316,63 @@ export class DrizzleMarketplaceListingRepository extends MarketplaceListingRepos
   }
 }
 
-/** BR-005 do MRK-004: `relevance` no MVP = mais recentes primeiro. */
-function orderFor(sort: ListingSearchCriteria['sort']): SQL[] {
-  switch (sort) {
+/**
+ * IP-015 — critério de ordenação, documentado explicitamente para provar que
+ * não há "ranking pago oculto": nenhuma coluna de patrocínio/destaque existe
+ * em `marketplace_listings` (confirmado lendo o schema — só `price`,
+ * `viewCount`, `publishedAt`, sem qualquer campo `sponsored`/`boosted`/
+ * `isPaid`), então cada ramo abaixo é uma função pura e determinística das
+ * colunas já expostas na busca, igual para qualquer anunciante:
+ *
+ * - `price_asc`/`price_desc`  → `marketplace_listings.price`.
+ * - `trust_score`             → `trust_scores.score` (Trust Layer, nunca
+ *                                 escrito pelo Marketplace).
+ * - `recent`                  → `marketplace_listings.publishedAt`.
+ * - `relevance` COM `q`       → correspondência textual determinística via
+ *                                 full-text search nativo do Postgres
+ *                                 (`ts_rank`/`to_tsvector('simple', ...)`,
+ *                                 config `simple` para não depender de
+ *                                 dicionário de idioma) sobre título+descrição
+ *                                 — nenhum motor de busca externo, nenhuma
+ *                                 IA/embedding (IP-015 §4). Sem `q`, cai no
+ *                                 mesmo critério de `recent` (antes desta IP,
+ *                                 `relevance` era um alias 1:1 de `recent`
+ *                                 mesmo COM `q` — o gap que este IP fecha).
+ *
+ * Todo ramo termina em `id asc` como desempate final: sem ele, duas linhas
+ * com o mesmo preço/score/data (comum em qualquer volume real de anúncios)
+ * teriam ordem não garantida entre execuções, e paginação poderia repetir ou
+ * pular itens entre páginas (o próprio critério de aceite "pagination
+ * stable" da IP-015).
+ */
+function orderFor(criteria: ListingSearchCriteria): SQL[] {
+  const idTiebreak = asc(marketplaceListings.id);
+  switch (criteria.sort) {
     case SEARCH_SORT.PRICE_ASC:
-      return [sql`${marketplaceListings.price} asc nulls last`];
+      return [sql`${marketplaceListings.price} asc nulls last`, idTiebreak];
     case SEARCH_SORT.PRICE_DESC:
-      return [sql`${marketplaceListings.price} desc nulls last`];
+      return [sql`${marketplaceListings.price} desc nulls last`, idTiebreak];
     case SEARCH_SORT.TRUST_SCORE:
-      return [sql`${trustScores.score} desc nulls last`, desc(marketplaceListings.publishedAt)];
-    case SEARCH_SORT.RECENT:
+      return [
+        sql`${trustScores.score} desc nulls last`,
+        desc(marketplaceListings.publishedAt),
+        idTiebreak,
+      ];
     case SEARCH_SORT.RELEVANCE:
+      if (criteria.text) {
+        return [
+          sql`ts_rank(
+            to_tsvector('simple', ${marketplaceListings.title} || ' ' || coalesce(${marketplaceListings.description}, '')),
+            plainto_tsquery('simple', ${criteria.text})
+          ) desc`,
+          sql`${marketplaceListings.publishedAt} desc nulls last`,
+          idTiebreak,
+        ];
+      }
+      return [sql`${marketplaceListings.publishedAt} desc nulls last`, idTiebreak];
+    case SEARCH_SORT.RECENT:
     default:
-      return [sql`${marketplaceListings.publishedAt} desc nulls last`];
+      return [sql`${marketplaceListings.publishedAt} desc nulls last`, idTiebreak];
   }
 }
 

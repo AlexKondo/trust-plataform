@@ -28,6 +28,15 @@ export interface ListingSearchCriteria {
   location?: string;
   /** Níveis aceitos do anunciante (já expandidos por rank pelo caso de uso). */
   allowedSellerLevels?: string[];
+  /**
+   * IP-015 — filtro opcional "o Partner declarou disponibilidade neste dia da
+   * semana" (0=domingo..6=sábado, mesma convenção de `PartnerAvailabilityWindow`
+   * do IP-005). Ao contrário do agendamento (onde nenhuma janela declarada =
+   * sem restrição), este é um filtro de busca opt-in: um anunciante sem
+   * nenhuma janela declarada para o dia pedido é EXCLUÍDO do resultado — é
+   * exatamente isso que "mostrar só quem atende nessa terça" significa.
+   */
+  availableDayOfWeek?: number;
   sort: SearchSort;
   page: number;
   pageSize: number;

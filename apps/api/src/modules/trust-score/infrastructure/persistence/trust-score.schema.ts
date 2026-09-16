@@ -30,7 +30,14 @@ export const trustScores = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
   },
-  (table) => [uniqueIndex('idx_trust_score_passport').on(table.trustPassportId)],
+  (table) => [
+    uniqueIndex('idx_trust_score_passport').on(table.trustPassportId),
+    // IP-015 — `identity_id` não tinha nenhum índice antes desta IP, embora
+    // seja a coluna de JOIN de todo LEFT JOIN de reputação do Marketplace
+    // (busca MRK-004, matching do IP-003, comparação do IP-004). Só índice,
+    // nenhuma regra do Trust Score é alterada.
+    index('idx_trust_score_identity').on(table.identityId),
+  ],
 );
 
 /**

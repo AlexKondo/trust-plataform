@@ -917,6 +917,19 @@ paths:
         Só retorna anúncios PUBLISHED. Filtros combináveis; ordenação por
         relevance (padrão) | recent | price_asc | price_desc | trust_score.
         `minimumTrustLevel` filtra pelo nível do anunciante (Trust Layer).
+        IP-015: `relevance`, quando `q` é informado, ranqueia por
+        correspondência textual determinística (full-text search nativo do
+        Postgres sobre título+descrição — sem motor de busca externo nem
+        IA/embedding); sem `q`, cai no mesmo critério de `recent`. Todo ramo
+        de ordenação termina em `id` como desempate — paginação nunca repete
+        nem pula um item por causa de empate em preço/score/data. Não existe
+        nenhum campo de patrocínio/destaque no modelo (`marketplace_listings`
+        não tem coluna `sponsored`/`boosted`) — nenhum ranking é influenciado
+        por pagamento. `availableDayOfWeek` (IP-015) filtra só anúncios cujo
+        dono declarou disponibilidade (IP-005) naquele dia da semana
+        (0=domingo..6=sábado) — filtro opt-in de exibição, distinto da regra
+        de agendamento (que não restringe nada quando o Partner não declarou
+        nenhuma janela).
       operationId: searchMarketplaceListings
       security: []
       parameters:
@@ -928,6 +941,7 @@ paths:
         - { name: currency, in: query, schema: { type: string, minLength: 3, maxLength: 3 } }
         - { name: location, in: query, schema: { type: string } }
         - { name: minimumTrustLevel, in: query, schema: { type: string }, description: 'Ex.: SILVER — inclui os níveis acima' }
+        - { name: availableDayOfWeek, in: query, schema: { type: integer, minimum: 0, maximum: 6 }, description: 'IP-015 — 0=domingo..6=sábado; só anúncios de Partners com janela declarada (IP-005) nesse dia' }
         - { name: sort, in: query, schema: { type: string, enum: [relevance, recent, price_asc, price_desc, trust_score] } }
         - { name: page, in: query, schema: { type: integer, default: 1 } }
         - { name: size, in: query, schema: { type: integer, default: 20, maximum: 50 } }

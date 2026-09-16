@@ -355,6 +355,74 @@ versão parcial, e as duas tabelas novas. Detalhes, decisões e critérios de
 aceite em
 [docs/Multi-Agent Implementation Doc/IPS/IP-005-COMPLETION-REPORT.md](docs/Multi-Agent%20Implementation%20Doc/IPS/IP-005-COMPLETION-REPORT.md).
 
+## IP-015 — Search & Marketplace Retrieval (2026-09-16)
+
+Preflight confirmou que a busca pública (MRK-004,
+`SearchListingsUseCase`/`DrizzleMarketplaceListingRepository.search()`) já
+cobria categoria/tipo/preço/moeda/localização-texto/nível mínimo de
+reputação/paginação — reaproveitada verbatim aqui, nunca reescrita — e que
+`DiscoverServiceRequestMatchesUseCase` (IP-003) e a comparação do IP-004 já
+chamam esse MESMO método, então os três gaps fechados abaixo propagam
+automaticamente para o matching de `ServiceRequest` sem tocar em nenhum
+arquivo do IP-003/004. Três gaps genuínos, todos confirmados em código:
+
+**`sort=relevance` deixa de ser alias 1:1 de `recent`.** Antes desta IP, com
+ou sem `q`, `relevance` só ordenava por `publishedAt desc` — o próprio gap que
+o IP-003 apontou explicitamente para esta IP (IP-003 §4). Agora, quando `q` é
+informado, ranqueia por `ts_rank(to_tsvector('simple', title || ' ' ||
+description), plainto_tsquery('simple', q))` — full-text search NATIVO do
+Postgres (config `simple`, sem dependência de dicionário de idioma), zero
+motor de busca externo/IA (IP-015 §4 proíbe ambos). Sem `q`, cai no mesmo
+critério de `recent` — mesmo comportamento de antes, só documentado
+corretamente agora. **Sem viés pago**: `marketplace_listings` não tem NENHUMA
+coluna de patrocínio/destaque (`sponsored`/`boosted`/`isPaid`) — confirmado
+lendo o schema — então nenhum ranking pode ser comprado; todo anunciante é
+ranqueado pela mesma função determinística.
+
+**Paginação estável sob empate**: todo ramo de `orderFor()` (preço, trust
+score, recência, relevância) agora termina em `id asc` como desempate final.
+Sem isso, duas linhas com o mesmo preço/score/data — comum em qualquer volume
+real — teriam ordem não garantida entre execuções, e paginação por
+LIMIT/OFFSET poderia repetir ou pular itens entre páginas (o próprio critério
+de aceite "pagination stable" desta IP).
+
+**Novo filtro opt-in `availableDayOfWeek`** (0=domingo..6=sábado, mesma
+convenção do IP-005): `EXISTS` de leitura contra
+`marketplace_partner_availability_windows` (IP-005, tabela intocada, mesmo
+índice `idx_partner_availability_partner` reaproveitado — nenhum índice novo
+para este filtro). Diferente da regra de AGENDAMENTO do IP-005 (nenhuma
+janela declarada = sem restrição), este é um filtro de EXIBIÇÃO: um Partner
+sem nenhuma janela declarada para o dia pedido é excluído do resultado — é
+exatamente isso que "mostrar só quem atende nessa terça" significa. Zero
+coordenada nova em qualquer caminho — mantém a postura de privacidade coarse
+`locationLabel`/texto-livre já estabelecida pelo IP-003/005.
+
+**"Price-model" filters**: confirmado em código que `pricingModel`
+(FIXED_PRICE/HOURLY) só existe em `MarketplaceOffer`/`MarketplaceOrder`
+(PACK-02) — nunca em `MarketplaceListing`, porque um anúncio não tem um
+modelo de preço fechado antes de virar uma negociação. `minPrice`/`maxPrice`/
+`currency` (já existentes) continuam sendo a única dimensão comercial que um
+anúncio carrega antes do contato — não foi inventado um campo novo que
+misrepresentaria o modelo de dados.
+
+**Índice de performance**: `trust_scores.identity_id` não tinha NENHUM
+índice antes desta IP, apesar de ser a coluna de JOIN de toda leitura de
+reputação do Marketplace (busca MRK-004, matching IP-003, comparação IP-004).
+Migration `0034` (aditiva) adiciona `idx_trust_score_identity` — só índice,
+nenhuma regra do Trust Score é alterada. Nenhum índice de texto (trigram/
+`pg_trgm`) foi adicionado para `location`/full-text — deliberado: exigiria
+uma extensão nova sem evidência de necessidade no volume atual do MVP (mesmo
+princípio de "não superengenheirar" já aplicado pelo IP-004/005).
+
+Nenhuma migration/mudança em `apps/api/src/modules/marketplace/domain/entities/service-request.ts`,
+`discover-service-request-matches.usecase.ts` ou qualquer outro arquivo do
+IP-003/004 — os três gaps são fechados inteiramente dentro da busca pública
+(`search-listings.usecase.ts`, `drizzle-marketplace-listing.repository.ts`,
+`marketplace.dtos.ts`) e de um índice em `trust-score.schema.ts` (IP-015 só
+adiciona o índice; nenhuma regra do Trust Score muda). Detalhes, decisões e
+critérios de aceite em
+[docs/Multi-Agent Implementation Doc/IPS/IP-015-COMPLETION-REPORT.md](docs/Multi-Agent%20Implementation%20Doc/IPS/IP-015-COMPLETION-REPORT.md).
+
 ## Documentos-guia (ler nesta ordem)
 
 1. [PLANO-DE-MODULOS.md](PLANO-DE-MODULOS.md) — quebra em módulos, ordem de desenvolvimento, grafo de dependências
