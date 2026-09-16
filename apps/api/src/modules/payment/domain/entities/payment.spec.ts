@@ -143,4 +143,37 @@ describe('Payment — reembolso (PAY-006 BR-005)', () => {
     payment.registerRefund(110000);
     expect(payment.status).toBe(PAYMENT_STATUS.REFUNDED);
   });
+
+  // IP-008 — bug real encontrado escrevendo o teste de corrida do
+  // RefundPaymentUseCase: `PAYMENT_TRANSITIONS` (PACK-01) só tinha
+  // SETTLED -> PARTIALLY_REFUNDED; um reembolso PARCIAL de dinheiro ainda em
+  // custódia (nunca liquidado) derrubava `registerRefund` com
+  // `PaymentTransitionException`. Corrigido de forma aditiva (payment-types.ts).
+  it('reembolso PARCIAL de dinheiro ainda em custódia (nunca liquidado) não lança', () => {
+    const payment = paymentAt(PAYMENT_STATUS.FUNDS_IN_CUSTODY);
+    payment.registerRefund(30000);
+    expect(payment.status).toBe(PAYMENT_STATUS.PARTIALLY_REFUNDED);
+    expect(payment.refundableCents).toBe(80000);
+  });
+
+  it('reembolso PARCIAL de dinheiro já liberado ao prestador, mas ainda não liquidado, não lança', () => {
+    const payment = paymentAt(PAYMENT_STATUS.FUNDS_RELEASED);
+    payment.registerRefund(30000);
+    expect(payment.status).toBe(PAYMENT_STATUS.PARTIALLY_REFUNDED);
+  });
+
+  // PAY-006 BR-005: "cada Payment poderá possuir MÚLTIPLOS reembolsos" — um
+  // SEGUNDO reembolso parcial que NÃO esgota o saldo (diferente do teste
+  // acima, que esgota na segunda chamada) é o caso que expõe a falta do
+  // auto-laço PARTIALLY_REFUNDED -> PARTIALLY_REFUNDED.
+  it('um terceiro reembolso parcial (nenhum deles esgota o saldo) permanece PARTIALLY_REFUNDED', () => {
+    const payment = paymentAt(PAYMENT_STATUS.SETTLED, 300000);
+    payment.registerRefund(50000);
+    expect(payment.status).toBe(PAYMENT_STATUS.PARTIALLY_REFUNDED);
+    payment.registerRefund(50000); // segunda parcial — não esgota (ainda faltam 200000)
+    expect(payment.status).toBe(PAYMENT_STATUS.PARTIALLY_REFUNDED);
+    expect(payment.refundedCents).toBe(100000);
+    payment.registerRefund(200000); // agora sim esgota
+    expect(payment.status).toBe(PAYMENT_STATUS.REFUNDED);
+  });
 });

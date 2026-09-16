@@ -71,10 +71,27 @@ export interface CustodySummaryResponse {
   incrementalTranches: IncrementalTrancheResponse[];
 }
 
+/** IP-008 (PAY-006) — um reembolso registrado contra este Payment. */
+export interface RefundResponse {
+  refundId: string;
+  amount: number;
+  currency: string;
+  reason: string;
+  reasonDetail: string | null;
+  requestedBy: string;
+  disputeId: string | null;
+  status: string;
+  providerRefundId: string | null;
+  requestedAt: string;
+  completedAt: string | null;
+}
+
 export interface PaymentDetailsResponse extends PaymentResponse {
   authorizations: AuthorizationAttemptResponse[];
   /** IP-007 — omitido quando o pedido não tem nenhum Change Order aprovado. */
   custodySummary?: CustodySummaryResponse;
+  /** IP-008 — sempre presente (pode ser `[]`); histórico completo, mais recente primeiro. */
+  refunds: RefundResponse[];
 }
 
 /** Resultado da tentativa de pagar — o front usa `authorized` para decidir a tela. */

@@ -104,8 +104,18 @@ export class DrizzleMarketplaceReviewRepository extends MarketplaceReviewReposit
 
   async saveDecision(decision: DisputeDecision, executor?: DatabaseExecutor): Promise<void> {
     const target = executor ?? this.db;
+    const props = decision.toProps();
     // Append-only (BR-006): a decisão nunca é reescrita.
-    await target.insert(marketplaceDisputeDecisions).values(decision.toProps());
+    await target.insert(marketplaceDisputeDecisions).values({
+      id: props.id,
+      disputeId: props.disputeId,
+      decidedBy: props.decidedBy,
+      decisionType: props.decisionType,
+      justification: props.justification,
+      refundAmount: props.refundAmount === null ? null : props.refundAmount.toFixed(2),
+      decidedAt: props.decidedAt,
+      createdAt: props.createdAt,
+    });
   }
 
   async findDecisionByDispute(disputeId: string): Promise<DisputeDecision | null> {
@@ -254,6 +264,7 @@ function toDecision(row: MarketplaceDisputeDecisionRow): DisputeDecision {
     decidedBy: row.decidedBy,
     decisionType: row.decisionType as DecisionType,
     justification: row.justification,
+    refundAmount: row.refundAmount === null ? null : Number(row.refundAmount),
     decidedAt: row.decidedAt,
     createdAt: row.createdAt,
   });

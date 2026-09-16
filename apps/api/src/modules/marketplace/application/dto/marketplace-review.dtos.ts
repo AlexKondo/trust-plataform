@@ -11,7 +11,14 @@ export const openDisputeRequestSchema = z.object({
 });
 export type OpenDisputeRequest = z.infer<typeof openDisputeRequestSchema>;
 
-/** MRK-024 BR-003 — tipo e fundamentação obrigatórios. */
+/**
+ * MRK-024 BR-003 — tipo e fundamentação obrigatórios.
+ *
+ * IP-008 — `refundAmount` é OPCIONAL e em reais: a consequência financeira
+ * explícita da decisão, digitada pelo administrador (nunca calculada de
+ * `decisionType`, ver comentário de `DisputeDecision.create`). Omitido/zero
+ * significa "esta decisão não movimenta dinheiro".
+ */
 export const resolveDisputeRequestSchema = z.object({
   decisionType: z.enum(DECISION_TYPES, {
     errorMap: () => ({ message: `decisionType must be one of: ${DECISION_TYPES.join(', ')}` }),
@@ -21,6 +28,7 @@ export const resolveDisputeRequestSchema = z.object({
     .trim()
     .min(10, 'justification must have at least 10 characters')
     .max(5000),
+  refundAmount: z.number().finite().nonnegative().optional(),
 });
 export type ResolveDisputeRequest = z.infer<typeof resolveDisputeRequestSchema>;
 
@@ -47,6 +55,8 @@ export interface DisputeDecisionResponse {
   decidedBy: string;
   decisionType: string;
   justification: string;
+  /** IP-008 — reais; `null` quando a decisão não envolve reembolso. */
+  refundAmount: number | null;
   decidedAt: string;
 }
 

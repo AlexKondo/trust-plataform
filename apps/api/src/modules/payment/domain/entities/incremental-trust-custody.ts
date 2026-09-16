@@ -147,6 +147,10 @@ export class IncrementalTrustCustody {
     return this.props.status === CUSTODY_STATUS.RELEASED;
   }
 
+  isRefunded(): boolean {
+    return this.props.status === CUSTODY_STATUS.REFUNDED;
+  }
+
   canTransitionTo(target: CustodyStatus): boolean {
     return CUSTODY_TRANSITIONS[this.props.status].includes(target);
   }
@@ -160,6 +164,11 @@ export class IncrementalTrustCustody {
   markReleased(now = new Date()): void {
     this.transitionTo(CUSTODY_STATUS.RELEASED, now);
     this.props.releasedAt = now;
+  }
+
+  /** IP-008 — mesma semântica de `TrustCustody.markRefunded`, por tranche. */
+  markRefunded(now = new Date()): void {
+    this.transitionTo(CUSTODY_STATUS.REFUNDED, now);
   }
 
   private transitionTo(target: CustodyStatus, now: Date): void {

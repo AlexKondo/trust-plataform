@@ -423,6 +423,69 @@ adiciona o índice; nenhuma regra do Trust Score muda). Detalhes, decisões e
 critérios de aceite em
 [docs/Multi-Agent Implementation Doc/IPS/IP-015-COMPLETION-REPORT.md](docs/Multi-Agent%20Implementation%20Doc/IPS/IP-015-COMPLETION-REPORT.md).
 
+## IP-008 — Cancelamento, disputa e reembolso (2026-09-16)
+
+`Payment.registerRefund()` existia desde o PACK-01 mas tinha ZERO chamadores
+(confirmado no Completion Report do IP-007 §4) e a resolução de disputa
+(MRK-024) só penalizava Trust Score, sem nenhum vínculo com dinheiro
+(INCONSISTENCIAS #13). Esta IP fecha os dois gaps com o novo
+`RefundPaymentUseCase` (PAY-006, entidade `FundsRefund`, tabela
+`funds_refunds`, `UNIQUE(idempotency_key)`), reaproveitando o
+`PaymentGateway.refund()` que o port já declarava desde o PACK-01 e nunca
+tinha um chamador real:
+
+- **Cancelamento ANTES da execução** (`MarketplaceOrder.Cancelled`, só
+  alcançável de `CREATED/AWAITING_SCHEDULING/SCHEDULED/AWAITING_EXECUTION` —
+  ou seja, antes do gatilho de liberação existir) — novo consumer
+  `pay.refund-payment-on-order-cancelled` cobre os quatro estados possíveis do
+  Payment nesse ponto: nada cobrado (só cancela), autorizado mas nunca
+  custodiado (anula no gateway, não é reembolso), em custódia (reembolso
+  TOTAL, automático, sem taxa — nenhuma política de multa está configurada em
+  lugar nenhum do baseline). Cobre também tranches incrementais de Change
+  Order (IP-007) no mesmo gap que o PACK-03/IP-007 já tinham nomeado:
+  `amountAuthorizedNotInCustody` — se aprovada mas ainda sem custódia, anula;
+  se já custodiada, reembolsa.
+- **Disputa com consequência financeira** — `ResolveDisputeRequest` ganha
+  `refundAmount` (reais, opcional): o valor que o ADMIN digita, nunca um
+  percentual calculado de `decisionType` (não existe "UPHELD = 100%" aprovado
+  em documento nenhum — inventar seria exatamente o tipo de política de
+  negócio que o programa proíbe; ver Conflict Escalation abaixo). Novo
+  consumer `pay.refund-payment-on-dispute-resolved` executa esse valor com
+  segurança financeira; não decide o valor.
+- **Nunca excede o custodiado/pago**: `PaymentRepository.applyRefundIfExpected`
+  é um CAS (`UPDATE ... WHERE refunded_amount = expected`) — a mesma
+  disciplina de "nunca um `UPDATE` incondicional" que o IP-007 já aplicou à
+  liberação, aqui aplicada ao acumulador de reembolso. Prova por teste de
+  corrida GENUÍNO (`refund-payment.usecase.spec.ts`, describe "corrida real"):
+  duas chamadas concorrentes cujos valores juntos excederiam o total pago
+  nunca completam as duas.
+- **Bug real encontrado e corrigido**: `PAYMENT_TRANSITIONS` (PACK-01) só
+  permitia reembolso PARCIAL a partir de `SETTLED` — um reembolso parcial de
+  dinheiro ainda em custódia (nunca liquidado) derrubava
+  `Payment.registerRefund()` com `PaymentTransitionException`. Duas arestas
+  aditivas fecham o gap (`FUNDS_IN_CUSTODY`/`FUNDS_RELEASED ->
+  PARTIALLY_REFUNDED`, mais o auto-laço `PARTIALLY_REFUNDED ->
+  PARTIALLY_REFUNDED` que PAY-006 BR-005 exige para múltiplos reembolsos
+  parciais). Encontrado escrevendo o teste de corrida desta IP, não por
+  inspeção — mesmo padrão de honestidade que o IP-007 já seguiu (§10.4 do seu
+  relatório).
+- `TrustCustody`/`IncrementalTrustCustody` ganham o estado aditivo
+  `REFUNDED`, só alcançável a partir de `IN_CUSTODY` (nunca de
+  `READY_FOR_RELEASE`/`RELEASED` — nesse caso o reembolso é só
+  Payment-level, a custódia continua contando o fato histórico "liberada em
+  tal data").
+- **Conflict Escalation registrado, não adivinhado**: se o Trust Fee é
+  revertido proporcionalmente num reembolso parcial, e quem absorve a taxa do
+  PSP no reembolso, são perguntas sem resposta em nenhum documento lido —
+  não há sequer um ledger de taxas para ajustar hoje (`Payment` só guarda o
+  valor bruto). Esta IP reembolsa o valor bruto que um humano decidiu e para
+  por aí; ver
+  [IP-008-CONFLICT-ESCALATION-FEE-TREATMENT-ON-REFUND.md](docs/Multi-Agent%20Implementation%20Doc/IPS/IP-008-CONFLICT-ESCALATION-FEE-TREATMENT-ON-REFUND.md).
+
+Migration 0035 aditiva (`funds_refunds` + `marketplace_dispute_decisions.refund_amount`
+nullable). Detalhes, decisões e critérios de aceite em
+[docs/Multi-Agent Implementation Doc/IPS/IP-008-COMPLETION-REPORT.md](docs/Multi-Agent%20Implementation%20Doc/IPS/IP-008-COMPLETION-REPORT.md).
+
 ## Documentos-guia (ler nesta ordem)
 
 1. [PLANO-DE-MODULOS.md](PLANO-DE-MODULOS.md) — quebra em módulos, ordem de desenvolvimento, grafo de dependências

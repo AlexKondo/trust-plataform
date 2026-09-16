@@ -1,8 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { DRIZZLE, Database, DatabaseExecutor } from '../../../../shared/database/database.module';
 import { fromReais, toReaisString } from '../../../../shared/money/money';
-import { CustodyStatus, TrustCustody } from '../../domain/entities/trust-custody';
+import { CUSTODY_STATUS, CustodyStatus, TrustCustody } from '../../domain/entities/trust-custody';
 import { TrustCustodyRepository } from '../../domain/repositories/trust-custody.repository';
 import { TrustCustodyRow, trustCustodies } from './payment.schema';
 
@@ -92,6 +92,21 @@ export class DrizzleTrustCustodyRepository extends TrustCustodyRepository {
       .where(eq(trustCustodies.paymentId, paymentId))
       .limit(1);
     return Boolean(row);
+  }
+
+  /** IP-008 — CAS: só grava REFUNDED se o banco ainda disser IN_CUSTODY. */
+  async markRefundedIfInCustody(
+    id: string,
+    now: Date,
+    executor?: DatabaseExecutor,
+  ): Promise<boolean> {
+    const target = executor ?? this.db;
+    const updated = await target
+      .update(trustCustodies)
+      .set({ status: CUSTODY_STATUS.REFUNDED, updatedAt: now })
+      .where(and(eq(trustCustodies.id, id), eq(trustCustodies.status, CUSTODY_STATUS.IN_CUSTODY)))
+      .returning({ id: trustCustodies.id });
+    return updated.length > 0;
   }
 }
 

@@ -41,4 +41,15 @@ export abstract class IncrementalTrustCustodyRepository {
     releasedAt: Date,
     executor?: DatabaseExecutor,
   ): Promise<boolean>;
+
+  /**
+   * IP-008 — CAS: só grava REFUNDED se o estado no banco ainda for IN_CUSTODY.
+   * Mesma disciplina das duas fases acima — nunca marca uma tranche como
+   * reembolsada se ela já começou (ou terminou) a ser liberada.
+   */
+  abstract markRefundedIfInCustody(
+    id: string,
+    now: Date,
+    executor?: DatabaseExecutor,
+  ): Promise<boolean>;
 }

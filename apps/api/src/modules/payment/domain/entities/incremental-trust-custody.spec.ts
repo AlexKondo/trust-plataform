@@ -56,4 +56,27 @@ describe('IncrementalTrustCustody (IP-007)', () => {
     const restored = IncrementalTrustCustody.restore(original.toProps());
     expect(restored.toProps()).toEqual(original.toProps());
   });
+
+  // IP-008
+  it('IN_CUSTODY pode ir para REFUNDED (cancelamento antes da execução)', () => {
+    const tranche = IncrementalTrustCustody.create(INPUT);
+    tranche.markRefunded();
+    expect(tranche.isRefunded()).toBe(true);
+    expect(tranche.status).toBe(CUSTODY_STATUS.REFUNDED);
+  });
+
+  it('REFUNDED é terminal e READY_FOR_RELEASE/RELEASED não podem ser reembolsados', () => {
+    const refunded = IncrementalTrustCustody.create(INPUT);
+    refunded.markRefunded();
+    expect(() => refunded.markReadyForRelease()).toThrow(TrustCustodyTransitionException);
+
+    const ready = IncrementalTrustCustody.create(INPUT);
+    ready.markReadyForRelease();
+    expect(() => ready.markRefunded()).toThrow(TrustCustodyTransitionException);
+
+    const released = IncrementalTrustCustody.create(INPUT);
+    released.markReadyForRelease();
+    released.markReleased();
+    expect(() => released.markRefunded()).toThrow(TrustCustodyTransitionException);
+  });
 });

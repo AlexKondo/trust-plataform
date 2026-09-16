@@ -1729,6 +1729,14 @@ paths:
         AWAITING_EXECUTION. A partir de IN_PROGRESS exige disputa ou revisão
         administrativa (BR-002). O cancelamento devolve o anúncio para
         PUBLISHED (INCONSISTENCIAS #12) e penaliza quem cancelou no Trust Score.
+        **IP-008**: também tem consequência financeira automática, sem taxa/
+        multa (nenhuma política de cancelamento está configurada em lugar
+        nenhum do baseline — o único default seguro é reembolso integral do
+        que foi efetivamente capturado, sem desconto): dinheiro só autorizado
+        (nunca custodiado) é anulado no provedor; dinheiro em custódia
+        (tranche original e/ou tranches de Change Order aprovado) é
+        reembolsado por inteiro — ver `MarketplaceOrder.Cancelled` no
+        `event-catalog.md` e `GET /payments/by-order/{orderId}`'s `refunds[]`.
       operationId: cancelMarketplaceOrder
       parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }]
       requestBody:
@@ -2004,6 +2012,16 @@ paths:
         DISPUTE_RESOLVED. `UPHELD` e `PARTIALLY_UPHELD` reconhecem culpa da parte
         reclamada e viram penalidade no Trust Score; `REJECTED`, `SETTLED` e
         `CANCELLED` não penalizam ninguém.
+        **IP-008**: `refundAmount` (reais, opcional) é a consequência
+        FINANCEIRA explícita da decisão — o valor que o administrador decide
+        devolver ao comprador, digitado por ele, nunca calculado a partir de
+        `decisionType` (não existe uma tabela "UPHELD = 100%" aprovada em
+        nenhum documento de produto). Omitido/zero = decisão sem reembolso.
+        Limitado aqui só por sanidade (não pode exceder o valor contratado do
+        pedido, `422 MARKETPLACE_DISPUTE_INVALID`); o limite AUTORITATIVO
+        (nunca excede o saldo realmente reembolsável, incluindo reembolsos já
+        feitos) é aplicado do lado do Payments quando `MarketplaceDispute.Resolved`
+        é consumido — o reembolso em si é assíncrono, não parte desta resposta.
       operationId: resolveMarketplaceDispute
       parameters: [{ name: disputeId, in: path, required: true, schema: { type: string, format: uuid } }]
       requestBody:
@@ -2011,12 +2029,14 @@ paths:
         content:
           application/json:
             example:
-              decisionType: UPHELD
-              justification: As fotos enviadas confirmam que apenas um móvel foi montado.
+              decisionType: PARTIALLY_UPHELD
+              justification: As fotos enviadas confirmam execução parcial; reembolso parcial arbitrado.
+              refundAmount: 150
       responses:
-        '200': { description: 'RESOLVED; publica MarketplaceDispute.Resolved' }
+        '200': { description: 'RESOLVED; publica MarketplaceDispute.Resolved (com refundAmount, quando houver)' }
         '403': { description: Não é admin (ADMIN_REQUIRED) }
         '409': { description: 'Disputa já decidida (MARKETPLACE_DISPUTE_ALREADY_RESOLVED)' }
+        '422': { description: 'refundAmount negativo ou maior que o valor contratado do pedido (MARKETPLACE_DISPUTE_INVALID)' }
 
   /admin/marketplace/disputes:
     get:
@@ -2168,11 +2188,19 @@ paths:
         `amount`, `authorizationStatus`, `custodyStatus` — `null` quando o
         gateway recusou e nenhuma custódia chegou a existir). Campo omitido
         (não `null`/vazio) em pedidos sem nenhum Change Order aprovado.
+        **IP-008**: `refunds[]` é SEMPRE presente (pode ser `[]`) — o
+        histórico completo de reembolsos deste Payment (PAY-006), mais
+        recente primeiro: `{refundId, amount, currency, reason, reasonDetail,
+        requestedBy, disputeId, status, providerRefundId, requestedAt,
+        completedAt}`. Não existe endpoint para CRIAR um reembolso (PAY-006
+        §8: só processos internos/administrativos autorizados o disparam —
+        cancelamento antes da execução e resolução de disputa com valor
+        decidido, ver `event-catalog.md`); esta lista é só leitura/auditoria.
       operationId: getPaymentByOrder
       parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         '200':
-          description: Pagamento + histórico de tentativas de autorização + resumo de custódia (IP-007, quando aplicável)
+          description: Pagamento + histórico de tentativas de autorização + reembolsos + resumo de custódia (IP-007, quando aplicável)
           content:
             application/json:
               example:
@@ -2182,6 +2210,7 @@ paths:
                   status: FUNDS_IN_CUSTODY
                   amount: 150
                   authorizations: []
+                  refunds: []
                   custodySummary:
                     currency: BRL
                     originalAmount: 150

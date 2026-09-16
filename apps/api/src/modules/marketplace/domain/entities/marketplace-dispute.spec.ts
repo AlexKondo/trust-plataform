@@ -76,6 +76,66 @@ describe('DisputeDecision (MRK-024)', () => {
   });
 });
 
+// IP-008 — consequência financeira explícita da decisão.
+describe('DisputeDecision — refundAmount (IP-008)', () => {
+  it('sem refundAmount, a decisão não movimenta dinheiro (null)', () => {
+    expect(decisionOf('REJECTED').refundAmount).toBeNull();
+  });
+
+  it('0 é tratado como "sem reembolso", não como erro', () => {
+    const decision = DisputeDecision.create({
+      disputeId: 'dispute-1',
+      decidedBy: ADMIN,
+      decisionType: 'REJECTED',
+      justification: 'Sem evidência de falha na prestação do serviço.',
+      refundAmount: 0,
+    });
+    expect(decision.refundAmount).toBeNull();
+  });
+
+  it('aceita um valor positivo digitado pelo administrador', () => {
+    const decision = DisputeDecision.create({
+      disputeId: 'dispute-1',
+      decidedBy: ADMIN,
+      decisionType: 'PARTIALLY_UPHELD',
+      justification: 'Metade do serviço não foi executada, conforme evidência.',
+      refundAmount: 150.5,
+    });
+    expect(decision.refundAmount).toBe(150.5);
+  });
+
+  it('rejeita valor negativo', () => {
+    expect(() =>
+      DisputeDecision.create({
+        disputeId: 'dispute-1',
+        decidedBy: ADMIN,
+        decisionType: 'UPHELD',
+        justification: 'Evidências fotográficas confirmam a execução parcial.',
+        refundAmount: -10,
+      }),
+    ).toThrow(MarketplaceDisputeValidationException);
+  });
+
+  it('não calcula o valor a partir de decisionType — dois UPHELD com refundAmount diferente são possíveis', () => {
+    const full = DisputeDecision.create({
+      disputeId: 'dispute-1',
+      decidedBy: ADMIN,
+      decisionType: 'UPHELD',
+      justification: 'Serviço não executado; reembolso integral decidido pelo mediador.',
+      refundAmount: 500,
+    });
+    const partial = DisputeDecision.create({
+      disputeId: 'dispute-2',
+      decidedBy: ADMIN,
+      decisionType: 'UPHELD',
+      justification: 'Serviço parcialmente executado; mediador decidiu valor menor.',
+      refundAmount: 120,
+    });
+    expect(full.refundAmount).toBe(500);
+    expect(partial.refundAmount).toBe(120);
+  });
+});
+
 describe('MarketplaceDispute — resolução (MRK-024)', () => {
   it('resolve, guarda a decisão e sai dos estados ativos (BR-005)', () => {
     const dispute = newDispute();

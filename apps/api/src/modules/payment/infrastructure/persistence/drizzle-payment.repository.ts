@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { desc, eq, or, sql } from 'drizzle-orm';
+import { and, desc, eq, or, sql } from 'drizzle-orm';
 import { DRIZZLE, Database, DatabaseExecutor } from '../../../../shared/database/database.module';
-import { fromReais, toReaisString } from '../../../../shared/money/money';
+import { Cents, fromReais, toReaisString } from '../../../../shared/money/money';
 import { Payment } from '../../domain/entities/payment';
 import { PaymentStatus } from '../../domain/entities/payment-types';
 import { PaymentRepository } from '../../domain/repositories/payment.repository';
@@ -87,6 +87,38 @@ export class DrizzlePaymentRepository extends PaymentRepository {
       this.db.select({ count: sql<number>`count(*)::int` }).from(payments).where(where),
     ]);
     return { items: rows.map(toDomain), totalItems: total?.count ?? 0 };
+  }
+
+  /**
+   * IP-008 — CAS do acumulado de reembolso (ver comentário do port). O
+   * `WHERE refunded_amount = expected` é o que torna isto seguro sob corrida:
+   * se outra transação já mudou o valor entre a leitura e esta escrita, a
+   * condição falha, zero linhas são afetadas, e devolvemos `false`.
+   */
+  async applyRefundIfExpected(
+    paymentId: string,
+    expectedRefundedCents: Cents,
+    newRefundedCents: Cents,
+    newStatus: PaymentStatus,
+    now: Date,
+    executor?: DatabaseExecutor,
+  ): Promise<boolean> {
+    const target = executor ?? this.db;
+    const updated = await target
+      .update(payments)
+      .set({
+        refundedAmount: toReaisString(newRefundedCents),
+        status: newStatus,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(payments.id, paymentId),
+          eq(payments.refundedAmount, toReaisString(expectedRefundedCents)),
+        ),
+      )
+      .returning({ id: payments.id });
+    return updated.length > 0;
   }
 }
 

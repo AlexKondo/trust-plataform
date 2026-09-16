@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PaginatedResult } from '../../../../shared/api/api-envelope';
 import { PaymentNotFoundException } from '../../domain/exceptions/payment.exceptions';
+import { FundsRefundRepository } from '../../domain/repositories/funds-refund.repository';
 import { IncrementalTrustCustodyRepository } from '../../domain/repositories/incremental-trust-custody.repository';
 import { PaymentIncrementalAuthorizationRepository } from '../../domain/repositories/payment-incremental-authorization.repository';
 import { PaymentAuthorizationRepository } from '../../domain/repositories/payment-authorization.repository';
@@ -13,6 +14,7 @@ import {
   toAuthorizationResponse,
   toCustodySummaryResponse,
   toPaymentResponse,
+  toRefundResponse,
 } from '../mapper/payment.mapper';
 
 /** Consulta do pagamento — só comprador e vendedor enxergam. */
@@ -24,6 +26,7 @@ export class GetPaymentUseCase {
     private readonly custodyRepository: TrustCustodyRepository,
     private readonly incrementalAuthorizationRepository: PaymentIncrementalAuthorizationRepository,
     private readonly incrementalCustodyRepository: IncrementalTrustCustodyRepository,
+    private readonly refundRepository: FundsRefundRepository,
     private readonly changeOrderQuery: ChangeOrderCommercialQuery,
   ) {}
 
@@ -46,7 +49,10 @@ export class GetPaymentUseCase {
       throw new PaymentNotFoundException();
     }
     payment.assertParticipant(identityId);
-    const authorizations = await this.authorizationRepository.listByPayment(paymentId);
+    const [authorizations, refunds] = await Promise.all([
+      this.authorizationRepository.listByPayment(paymentId),
+      this.refundRepository.listByPayment(paymentId),
+    ]);
 
     // IP-007 — resumo de custódia (§custody-mismatch): só busca as tranches
     // incrementais quando existe pelo menos uma autorização incremental para
@@ -75,6 +81,7 @@ export class GetPaymentUseCase {
     return {
       ...toPaymentResponse(payment),
       authorizations: authorizations.map(toAuthorizationResponse),
+      refunds: refunds.map(toRefundResponse),
       ...(custodySummary ? { custodySummary } : {}),
     };
   }

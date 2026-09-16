@@ -12,6 +12,7 @@ import { ORDER_STATUS } from '../../domain/entities/marketplace-types';
 import {
   MarketplaceDisputeAlreadyOpenException,
   MarketplaceDisputeNotFoundException,
+  MarketplaceDisputeValidationException,
   MarketplaceOrderAccessDeniedException,
 } from '../../domain/exceptions/marketplace.exceptions';
 import { MarketplaceOrderRepository } from '../../domain/repositories/marketplace-order.repository';
@@ -129,11 +130,27 @@ export class ManageDisputeUseCase {
     }
     const previousStatus = order.status;
 
+    // IP-008 — limite de sanidade: o mediador não pode digitar um valor maior
+    // que o próprio contrato do pedido. Este NÃO é o limite autoritativo (o
+    // Marketplace não conhece quanto foi de fato capturado/reembolsado até
+    // agora — isso mora no Payment, módulo que o Marketplace não pode
+    // consultar, PACK-01 §10); é só uma barreira contra erro de digitação
+    // óbvio antes do evento sair. A checagem que realmente protege o
+    // dinheiro (nunca exceder o saldo reembolsável) acontece do outro lado,
+    // em `RefundPaymentUseCase`, quando o consumer do Payments processar
+    // `MarketplaceDispute.Resolved`.
+    if (body.refundAmount !== undefined && body.refundAmount > order.amount) {
+      throw new MarketplaceDisputeValidationException(
+        `refundAmount (${body.refundAmount}) cannot exceed the order's contracted amount (${order.amount}).`,
+      );
+    }
+
     const decision = DisputeDecision.create({
       disputeId,
       decidedBy: adminId,
       decisionType: body.decisionType,
       justification: body.justification,
+      refundAmount: body.refundAmount,
     });
     dispute.resolve(decision); // recusa disputa já decidida (BR-006)
     order.transitionTo(ORDER_STATUS.DISPUTE_RESOLVED);
@@ -161,6 +178,11 @@ export class ManageDisputeUseCase {
         openedBy: dispute.openedBy,
         decisionType: decision.decisionType,
         faultIdentityId,
+        // IP-008 — reais, mesma convenção de todo evento cross-módulo deste
+        // código (ex. `MarketplaceOrder.Created.amount`). `null`/ausente =
+        // esta decisão não movimenta dinheiro; o consumer do Payments só age
+        // quando este campo é um número positivo.
+        refundAmount: decision.refundAmount,
         decidedBy: adminId,
         decidedAt: decision.decidedAt.toISOString(),
       },
@@ -169,6 +191,7 @@ export class ManageDisputeUseCase {
         decisionId: decision.id,
         decisionType: decision.decisionType,
         faultIdentityId,
+        refundAmount: decision.refundAmount,
       },
       meta,
       alsoInTransaction: async (tx) => {

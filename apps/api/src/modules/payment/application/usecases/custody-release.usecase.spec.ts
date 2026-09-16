@@ -70,6 +70,7 @@ function noIncrementalTranches(): IncrementalTrustCustodyRepository {
     listByPaymentId: vi.fn().mockResolvedValue([]),
     markReadyForReleaseIfInCustody: vi.fn(),
     markReleasedIfReady: vi.fn(),
+    markRefundedIfInCustody: vi.fn(),
   };
 }
 

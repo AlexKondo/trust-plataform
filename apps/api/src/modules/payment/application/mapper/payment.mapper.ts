@@ -1,11 +1,13 @@
 import { toReais } from '../../../../shared/money/money';
 import { PaymentAuthorization } from '../../domain/entities/payment-authorization';
 import { Payment } from '../../domain/entities/payment';
+import { FundsRefund } from '../../domain/entities/funds-refund';
 import { PaymentCustodySummary } from '../../domain/services/payment-custody-summary.service';
 import {
   AuthorizationAttemptResponse,
   CustodySummaryResponse,
   PaymentResponse,
+  RefundResponse,
 } from '../dto/payment.dtos';
 
 export function toPaymentResponse(payment: Payment): PaymentResponse {
@@ -41,6 +43,22 @@ export function toCustodySummaryResponse(summary: PaymentCustodySummary): Custod
       authorizationStatus: tranche.authorizationStatus,
       custodyStatus: tranche.custodyStatus,
     })),
+  };
+}
+
+export function toRefundResponse(refund: FundsRefund): RefundResponse {
+  return {
+    refundId: refund.id,
+    amount: toReais(refund.amountCents),
+    currency: refund.currency,
+    reason: refund.reason,
+    reasonDetail: refund.reasonDetail,
+    requestedBy: refund.requestedBy,
+    disputeId: refund.disputeId,
+    status: refund.status,
+    providerRefundId: refund.providerRefundId,
+    requestedAt: refund.requestedAt.toISOString(),
+    completedAt: refund.completedAt?.toISOString() ?? null,
   };
 }
 

@@ -90,3 +90,58 @@ export class TrustCustodyInconsistentException extends StateConflictException {
     super(message);
   }
 }
+
+// ── Reembolso (IP-008 / PAY-006) ────────────────────────────────────────────
+
+/** PAY-006 BR-001: o pagamento não está num estado elegível para reembolso → 409. */
+export class RefundNotAllowedException extends StateConflictException {
+  readonly code = 'REFUND_NOT_ALLOWED';
+
+  constructor(status: string) {
+    super(`A payment in ${status} is not eligible for refund.`);
+  }
+}
+
+/**
+ * PAY-006 BR-005: a soma dos reembolsos nunca ultrapassa o valor liquidado.
+ * Esta é a mesma invariante financeira que a liberação nunca pode exceder a
+ * custódia (IP-007) — aqui protegida por um UPDATE condicional no banco, não
+ * só pela checagem em memória (ver `PaymentRepository.applyRefundIfExpected`).
+ */
+export class RefundLimitExceededException extends BusinessRuleViolationException {
+  readonly code = 'REFUND_LIMIT_EXCEEDED';
+
+  constructor(requestedCents: number, refundableCents: number) {
+    super(
+      `Refund of ${requestedCents} cents exceeds the refundable balance of ${refundableCents} cents.`,
+    );
+  }
+}
+
+/** O provedor recusou/errou o reembolso → não é erro do cliente nem nosso. */
+export class RefundFailedException extends DomainException {
+  readonly code = 'REFUND_FAILED';
+  override readonly httpStatus = 502;
+
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+/** Dados do reembolso inválidos (valor zero/negativo, motivo ausente) → 422. */
+export class RefundValidationException extends BusinessRuleViolationException {
+  readonly code = 'REFUND_INVALID';
+
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+/** Salto de estado no reembolso → 409. */
+export class RefundTransitionException extends StateConflictException {
+  readonly code = 'REFUND_INVALID_TRANSITION';
+
+  constructor(from: string, to: string) {
+    super(`Refund cannot move from ${from} to ${to}.`);
+  }
+}

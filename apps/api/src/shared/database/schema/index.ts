@@ -26,4 +26,5 @@ export * from '../../../modules/marketplace/infrastructure/persistence/order-tra
 export * from '../../../modules/notification/infrastructure/persistence/notifications.schema';
 export * from '../../../modules/payment/infrastructure/persistence/payment.schema';
 export * from '../../../modules/payment/infrastructure/persistence/payment-incremental.schema';
+export * from '../../../modules/payment/infrastructure/persistence/funds-refund.schema';
 export * from '../../../modules/privacy/infrastructure/persistence/privacy-requests.schema';

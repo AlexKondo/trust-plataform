@@ -130,6 +130,26 @@ export class DrizzleIncrementalTrustCustodyRepository extends IncrementalTrustCu
       .returning({ id: incrementalTrustCustodies.id });
     return updated.length > 0;
   }
+
+  /** IP-008 — CAS: só grava REFUNDED se o banco ainda disser IN_CUSTODY. */
+  async markRefundedIfInCustody(
+    id: string,
+    now: Date,
+    executor?: DatabaseExecutor,
+  ): Promise<boolean> {
+    const target = executor ?? this.db;
+    const updated = await target
+      .update(incrementalTrustCustodies)
+      .set({ status: CUSTODY_STATUS.REFUNDED, updatedAt: now })
+      .where(
+        and(
+          eq(incrementalTrustCustodies.id, id),
+          eq(incrementalTrustCustodies.status, CUSTODY_STATUS.IN_CUSTODY),
+        ),
+      )
+      .returning({ id: incrementalTrustCustodies.id });
+    return updated.length > 0;
+  }
 }
 
 function toDomain(row: IncrementalTrustCustodyRow): IncrementalTrustCustody {

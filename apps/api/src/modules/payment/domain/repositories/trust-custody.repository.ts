@@ -16,4 +16,16 @@ export abstract class TrustCustodyRepository {
   ): Promise<TrustCustody | null>;
   abstract findByOrderId(orderId: string, executor?: DatabaseExecutor): Promise<TrustCustody | null>;
   abstract existsByPaymentId(paymentId: string, executor?: DatabaseExecutor): Promise<boolean>;
+
+  /**
+   * IP-008 — CAS: só grava REFUNDED se o estado no banco ainda for IN_CUSTODY
+   * (mesmo padrão de `markReadyForReleaseIfInCustody` do IP-007, aplicado à
+   * custódia original). `false` quando outra operação concorrente (liberação
+   * ou outro reembolso) já mudou o estado — quem chama não reaplica o efeito.
+   */
+  abstract markRefundedIfInCustody(
+    id: string,
+    now: Date,
+    executor?: DatabaseExecutor,
+  ): Promise<boolean>;
 }

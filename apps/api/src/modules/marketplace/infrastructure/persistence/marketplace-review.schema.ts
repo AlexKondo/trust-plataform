@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import {
   boolean,
   index,
+  numeric,
   pgTable,
   primaryKey,
   smallint,
@@ -65,6 +66,8 @@ export const marketplaceDisputeDecisions = pgTable(
     /** UPHELD | PARTIALLY_UPHELD | REJECTED | SETTLED | CANCELLED */
     decisionType: varchar('decision_type', { length: 50 }).notNull(),
     justification: text('justification').notNull(),
+    /** IP-008 — reembolso decidido pelo admin, em reais; NULL = sem reembolso. */
+    refundAmount: numeric('refund_amount', { precision: 18, scale: 2 }),
     decidedAt: timestamp('decided_at', { withTimezone: true, mode: 'date' }).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
   },

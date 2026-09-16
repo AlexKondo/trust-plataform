@@ -184,6 +184,7 @@ export function toDisputeResponse(
           decidedBy: decision.decidedBy,
           decisionType: decision.decisionType,
           justification: decision.justification,
+          refundAmount: decision.refundAmount,
           decidedAt: decision.decidedAt.toISOString(),
         }
       : null,

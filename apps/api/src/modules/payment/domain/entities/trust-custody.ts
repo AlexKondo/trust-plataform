@@ -3,21 +3,36 @@ import { Cents, assertCents } from '../../../../shared/money/money';
 import { TrustCustodyTransitionException } from '../exceptions/payment.exceptions';
 
 /**
- * Estados da custódia (PACK-01 §7.2). `RELEASED` é terminal neste Pack —
- * liquidação e reembolso entram em Packs futuros.
+ * Estados da custódia (PACK-01 §7.2). `RELEASED` é terminal neste Pack.
+ *
+ * IP-008 — `REFUNDED` é aditivo: só alcançável a partir de `IN_CUSTODY`
+ * (nunca de `READY_FOR_RELEASE`/`RELEASED`). Isso não é uma limitação
+ * arbitrária: uma vez que a liberação começou (READY_FOR_RELEASE) ou terminou
+ * (RELEASED), o dinheiro já está a caminho do prestador ou já chegou — a
+ * plataforma não pode "desfazer" isso só mudando um status local, porque
+ * fisicamente o valor pode já ter saído da conta da plataforma. Reembolso
+ * NESSE caso ainda é possível (o gateway reverte a cobrança original do
+ * comprador — ver `RefundPaymentUseCase`), mas é registrado no `Payment`
+ * (`refundedCents`), não como uma transição de custódia: a custódia continua
+ * contando o fato histórico "isto foi liberado em tal data", imutável (Shared
+ * Standards §5). Só quando a custódia AINDA está com a plataforma
+ * (`IN_CUSTODY`) faz sentido dizer que ela nunca chegou a ser liberada e virou
+ * `REFUNDED` em vez disso.
  */
 export const CUSTODY_STATUS = {
   IN_CUSTODY: 'IN_CUSTODY',
   READY_FOR_RELEASE: 'READY_FOR_RELEASE',
   RELEASED: 'RELEASED',
+  REFUNDED: 'REFUNDED',
 } as const;
 
 export type CustodyStatus = (typeof CUSTODY_STATUS)[keyof typeof CUSTODY_STATUS];
 
 export const CUSTODY_TRANSITIONS: Readonly<Record<CustodyStatus, readonly CustodyStatus[]>> = {
-  IN_CUSTODY: [CUSTODY_STATUS.READY_FOR_RELEASE],
+  IN_CUSTODY: [CUSTODY_STATUS.READY_FOR_RELEASE, CUSTODY_STATUS.REFUNDED],
   READY_FOR_RELEASE: [CUSTODY_STATUS.RELEASED],
   RELEASED: [],
+  REFUNDED: [],
 };
 
 export interface TrustCustodyProps {
@@ -140,6 +155,10 @@ export class TrustCustody {
     return this.props.status === CUSTODY_STATUS.RELEASED;
   }
 
+  isRefunded(): boolean {
+    return this.props.status === CUSTODY_STATUS.REFUNDED;
+  }
+
   canTransitionTo(target: CustodyStatus): boolean {
     return CUSTODY_TRANSITIONS[this.props.status].includes(target);
   }
@@ -161,6 +180,16 @@ export class TrustCustody {
   markReleased(now = new Date()): void {
     this.transitionTo(CUSTODY_STATUS.RELEASED, now);
     this.props.releasedAt = now;
+  }
+
+  /**
+   * IP-008 — a custódia nunca chega a ser liberada porque o pedido foi
+   * cancelado (ou a disputa resolvida) antes disso: o valor volta inteiro
+   * para o comprador. Só válido a partir de `IN_CUSTODY` (ver comentário de
+   * `CUSTODY_TRANSITIONS`).
+   */
+  markRefunded(now = new Date()): void {
+    this.transitionTo(CUSTODY_STATUS.REFUNDED, now);
   }
 
   /** Porta única de mudança de estado — nenhum salto passa por aqui. */

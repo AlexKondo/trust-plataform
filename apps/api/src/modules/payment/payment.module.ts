@@ -4,7 +4,9 @@ import { AuthorizePaymentUseCase } from './application/usecases/authorize-paymen
 import { CreateIncrementalAuthorizationUseCase } from './application/usecases/create-incremental-authorization.usecase';
 import { GetPaymentUseCase } from './application/usecases/get-payment.usecase';
 import { HoldFundsUseCase } from './application/usecases/hold-funds.usecase';
+import { RefundPaymentUseCase } from './application/usecases/refund-payment.usecase';
 import { ReleaseFundsUseCase } from './application/usecases/release-funds.usecase';
+import { FundsRefundRepository } from './domain/repositories/funds-refund.repository';
 import { IncrementalTrustCustodyRepository } from './domain/repositories/incremental-trust-custody.repository';
 import { PaymentIncrementalAuthorizationRepository } from './domain/repositories/payment-incremental-authorization.repository';
 import { PaymentAuthorizationRepository } from './domain/repositories/payment-authorization.repository';
@@ -19,10 +21,13 @@ import { CreatePaymentOnOrderConsumer } from './infrastructure/consumers/create-
 import { FinalizeReleaseConsumer } from './infrastructure/consumers/finalize-release.consumer';
 import { HoldFundsOnAuthorizedConsumer } from './infrastructure/consumers/hold-funds.consumer';
 import { PrepareReleaseOnCustomerConfirmedConsumer } from './infrastructure/consumers/release-funds.consumer';
+import { RefundPaymentOnDisputeResolvedConsumer } from './infrastructure/consumers/refund-payment-on-dispute-resolved.consumer';
+import { RefundPaymentOnOrderCancelledConsumer } from './infrastructure/consumers/refund-payment-on-order-cancelled.consumer';
 import { PaymentProviderResolver } from './infrastructure/gateway/payment-provider.resolver';
 import { SandboxPaymentGateway } from './infrastructure/gateway/sandbox-payment.gateway';
 import { MarketplaceChangeOrderCommercialQuery } from './infrastructure/marketplace/change-order-commercial.query';
 import { MarketplaceOrderDisputeQuery } from './infrastructure/marketplace/marketplace-dispute.query';
+import { DrizzleFundsRefundRepository } from './infrastructure/persistence/drizzle-funds-refund.repository';
 import { DrizzleIncrementalTrustCustodyRepository } from './infrastructure/persistence/drizzle-incremental-trust-custody.repository';
 import { DrizzlePaymentIncrementalAuthorizationRepository } from './infrastructure/persistence/drizzle-payment-incremental-authorization.repository';
 import { DrizzlePaymentAuthorizationRepository } from './infrastructure/persistence/drizzle-payment-authorization.repository';
@@ -55,11 +60,16 @@ import { DrizzleTrustCustodyRepository } from './infrastructure/persistence/driz
     FinalizeReleaseConsumer,
     // IP-007 — gatilho canônico da autorização incremental.
     CreateIncrementalAuthorizationOnChangeOrderApprovedConsumer,
+    // IP-008 — consequência financeira de cancelamento antes da execução e
+    // de resolução de disputa.
+    RefundPaymentOnOrderCancelledConsumer,
+    RefundPaymentOnDisputeResolvedConsumer,
     AuthorizePaymentUseCase,
     GetPaymentUseCase,
     HoldFundsUseCase,
     ReleaseFundsUseCase,
     CreateIncrementalAuthorizationUseCase,
+    RefundPaymentUseCase,
     { provide: PaymentRepository, useClass: DrizzlePaymentRepository },
     {
       provide: PaymentAuthorizationRepository,
@@ -74,6 +84,7 @@ import { DrizzleTrustCustodyRepository } from './infrastructure/persistence/driz
       provide: IncrementalTrustCustodyRepository,
       useClass: DrizzleIncrementalTrustCustodyRepository,
     },
+    { provide: FundsRefundRepository, useClass: DrizzleFundsRefundRepository },
     { provide: OrderDisputeQuery, useClass: MarketplaceOrderDisputeQuery },
     { provide: ChangeOrderCommercialQuery, useClass: MarketplaceChangeOrderCommercialQuery },
     // O port resolve para o adapter padrão; operações que precisam voltar ao
@@ -86,6 +97,7 @@ import { DrizzleTrustCustodyRepository } from './infrastructure/persistence/driz
     TrustCustodyRepository,
     PaymentIncrementalAuthorizationRepository,
     IncrementalTrustCustodyRepository,
+    FundsRefundRepository,
     PaymentProviderResolver,
   ],
 })

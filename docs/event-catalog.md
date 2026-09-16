@@ -123,6 +123,26 @@ Para isso, dois payloads foram enriquecidos (adição retrocompatível): `Verifi
 - **Payloads**: `Approved {incrementalAuthorizationId, paymentId, changeOrderId, orderId, buyerId, sellerId, amount, currency, status: "APPROVED", authorizedAt}`; `Failed {…, status: "DECLINED"|"ERROR", failureCode, failedAt}`
 - **Idempotência**: `UNIQUE(change_order_id)` e `UNIQUE(idempotency_key)` em `payment_incremental_authorizations` — no máximo UMA autorização incremental por Change Order, para sempre, mesmo sob reentrega do evento gatilho ou corrida entre duas entregas concorrentes (prova: teste de corrida em `ip-007-incremental-payment-authorization.e2e.spec.ts`). `idempotencyKey = incremental-auth:{changeOrderId}` (determinística, mesmo padrão de `release:{custodyId}`).
 
+### IP-008 — FundsRefund.Completed (v1.0)
+
+- **Descrição**: reembolso (PAY-006), total ou parcial, confirmado pelo gateway. `Payment.registerRefund()` existia desde o PACK-01 mas não tinha NENHUM chamador até esta IP (confirmado no Completion Report do IP-007 §4) — este é o primeiro evento a sair do fluxo real de reembolso. Sem par `.Created`/`.Failed`: uma tentativa recusada/com erro é persistida como `FundsRefund` `FAILED` e auditada (`AuditLogService`), mas não publica evento — mesmo precedente de `ReleaseDenied` do PACK-01/IP-007 (Shared Standards §3, "não crie eventos para persistência trivial"; nenhum consumidor precisa reagir a uma tentativa que não moveu dinheiro nenhum).
+- **Produtor**: payment-service · **Agregado**: `FundsRefund` / id do reembolso
+- **Gatilhos**: dois, ambos automáticos (nenhum endpoint público de reembolso existe — PAY-006 §8 é explícito: "os reembolsos serão iniciados por eventos internos ou processos administrativos autorizados"):
+  1. `MarketplaceOrder.Cancelled` → `pay.refund-payment-on-order-cancelled` — reembolso integral do que estava em custódia (tranche original e/ou tranches incrementais de Change Order), sempre com `reason: "ORDER_CANCELLED_BEFORE_EXECUTION"`.
+  2. `MarketplaceDispute.Resolved` (com `refundAmount` positivo) → `pay.refund-payment-on-dispute-resolved` — reembolso do valor EXATO que o administrador digitou na decisão, sempre com `reason: "DISPUTE_UPHELD"` e `disputeId` preenchido.
+- **Consumidores**: nenhum ainda — o campo `refunds[]` de `GET /payments/:id`/`GET /payments/by-order/:orderId` é a superfície de leitura (não há um segundo consumo de evento).
+- **Payload**: `{ refundId, paymentId, orderId, buyerId, sellerId, amount, currency, reason, disputeId, paymentStatus, providerRefundId, completedAt }`
+- **Idempotência**: `UNIQUE(idempotency_key)` em `funds_refunds`, chave determinística por gatilho de negócio — `refund:cancel:{orderId}` (tranche original), `refund:cancel:incremental:{changeOrderId}` (tranche incremental), `refund:dispute:{decisionId}` — nunca fornecida livremente por um chamador, porque não existe ação humana repetível entre "decidir reembolsar" e "executar o reembolso" (mesmo raciocínio de `incremental-auth:{changeOrderId}` no IP-007).
+- **Invariante financeira**: a escrita que acumula `Payment.refundedCents` é CAS (`PaymentRepository.applyRefundIfExpected`, `UPDATE ... WHERE refunded_amount = expected`) — nunca um `UPDATE` incondicional. Prova por teste de corrida genuíno (`refund-payment.usecase.spec.ts`, describe "corrida real"): duas chamadas concorrentes cujos valores juntos excederiam o total pago nunca completam as duas ao mesmo tempo.
+
+### IP-008 — TrustCustody.Refunded (v1.0, `aggregateType` reaproveitado)
+
+- **Descrição**: a mesma custódia (`TrustCustody`/`IncrementalTrustCustody`, PACK-01/IP-007) ganha um NOVO status aditivo, `REFUNDED`, alcançável só a partir de `IN_CUSTODY` (nunca de `READY_FOR_RELEASE`/`RELEASED` — nesses casos o dinheiro já está a caminho do prestador ou já chegou; um reembolso nessa situação é registrado só no `Payment`/`FundsRefund`, a custódia continua contando o fato histórico "liberada em tal data", imutável). Publicado só pelo caminho de CANCELAMENTO (§ acima) — o reembolso por disputa é deliberadamente escopo Payment-only e não mexe no status da custódia (ver Completion Report do IP-008 §11 para o porquê).
+- **Produtor**: payment-service · **Agregado**: `TrustCustody` ou `IncrementalTrustCustody` (mesma convenção de reaproveitamento de `aggregateType` que o IP-007 já usa para `Funds.Held`/`Funds.Released`)
+- **Consumidores**: nenhum.
+- **Payload**: `{ trustCustodyId, paymentId, orderId, changeOrderId?, status: "REFUNDED" }`
+- **CAS**: `markRefundedIfInCustody(id, now)` — `UPDATE ... WHERE status = 'IN_CUSTODY' RETURNING id`, mesmo padrão de `markReadyForReleaseIfInCustody`/`markReleasedIfReady` do IP-007.
+
 
 ### IP-003 — ServiceRequest.Created (v1.0) · ServiceRequest.Matched (v1.0) · ServiceRequest.Closed (v1.0) · ServiceRequest.Cancelled (v1.0)
 
@@ -150,13 +170,14 @@ Para isso, dois payloads foram enriquecidos (adição retrocompatível): `Verifi
   { "eventId": "019fe8f0-…", "eventName": "MarketplaceReview.Created", "eventVersion": "1.0", "occurredAt": "2026-08-10T18:00:00Z", "producer": "marketplace-service", "correlationId": "019fe8f0-…", "payload": { "reviewId": "019fe8f0-…", "orderId": "019fe8f0-…", "listingId": "019fe8f0-…", "reviewerId": "019fe41e-…", "reviewedUserId": "019fe41e-…", "overallScore": 5, "recommended": true, "createdAt": "2026-08-10T18:00:00Z" } }
   ```
 
-### MarketplaceDispute.Opened (v1.0) · MarketplaceDispute.Resolved (v1.0)
+### MarketplaceDispute.Opened (v1.0) · MarketplaceDispute.Resolved (v1.1)
 
 - **Descrição**: ciclo da disputa (MRK-023/024). `Opened` leva o pedido a `DISPUTE_OPEN`; `Resolved` traz a decisão definitiva da mediação e leva o pedido a `DISPUTE_RESOLVED`.
 - **Produtor**: marketplace-service
-- **Consumidores**: `Resolved` → ✅ `trs.score-dispute-resolved` (penaliza a parte culpada: `UPHELD` −60, `PARTIALLY_UPHELD` −30). `Opened` não tem consumidores — abrir disputa não é prova de culpa e por isso não pontua.
-- **Payloads**: `Opened {disputeId, orderId, listingId, buyerId, sellerId, openedBy, category, openedAt}`; `Resolved {disputeId, decisionId, orderId, buyerId, sellerId, openedBy, decisionType, faultIdentityId, decidedBy, decidedAt}`
+- **Consumidores**: `Resolved` → ✅ `trs.score-dispute-resolved` (penaliza a parte culpada: `UPHELD` −60, `PARTIALLY_UPHELD` −30) · **IP-008** ✅ `pay.refund-payment-on-dispute-resolved` (só age quando `refundAmount` é um número positivo — reembolsa EXATAMENTE esse valor, nunca um percentual calculado de `decisionType`; `managesOwnTransaction: true`). `Opened` não tem consumidores — abrir disputa não é prova de culpa e por isso não pontua.
+- **Payloads**: `Opened {disputeId, orderId, listingId, buyerId, sellerId, openedBy, category, openedAt}`; `Resolved {disputeId, decisionId, orderId, buyerId, sellerId, openedBy, decisionType, faultIdentityId, refundAmount, decidedBy, decidedAt}`
 - **Nota**: `faultIdentityId` é `null` quando a decisão não atribui culpa (improcedente, acordo, cancelamento) — nesse caso o Trust Engine simplesmente ignora o evento.
+- **IP-008 (v1.0 → v1.1, aditivo)**: `refundAmount` é um campo NOVO, em reais, `null`/ausente quando a decisão não movimenta dinheiro (o caso mais comum — mudança retrocompatível, nenhum consumidor existente quebra por ignorá-lo). É sempre um valor DIGITADO pelo administrador em `ResolveDisputeRequest.refundAmount` — nunca inferido de `decisionType` (não existe tabela "UPHELD = 100%" em nenhum documento de produto aprovado; ver Conflict Escalation do IP-008 para a lacuna correlata — proporcionalidade de Trust Fee/PSP fee no reembolso).
 
 ### MarketplaceOrder.Scheduled (v1.0) · MarketplaceOrder.Started (v1.0) · MarketplaceOrder.ExecutionCompleted (v1.0)
 
@@ -218,9 +239,9 @@ Para isso, dois payloads foram enriquecidos (adição retrocompatível): `Verifi
 
 ### MarketplaceOrder.Cancelled (v1.0) · MarketplaceListing.Released (v1.0)
 
-- **Descrição**: cancelamento do pedido (MRK-018) e a liberação do anúncio que ele provoca. Sem o `Released`, o anúncio ficaria `RESERVED` para sempre (INCONSISTENCIAS #12).
+- **Descrição**: cancelamento do pedido (MRK-018) e a liberação do anúncio que ele provoca. Sem o `Released`, o anúncio ficaria `RESERVED` para sempre (INCONSISTENCIAS #12). `Cancelled` só é publicável a partir de `CANCELLABLE_STATUSES` (antes de `IN_PROGRESS`), o que garante, por construção, que nenhum Payment associado já está `FUNDS_RELEASED`/`SETTLED` quando este evento sai (ver IP-008 abaixo).
 - **Produtor**: marketplace-service
-- **Consumidores**: `Cancelled` → ✅ `mrk.release-listing-on-cancel` (devolve o anúncio para `PUBLISHED`) · ✅ `trs.score-order-cancelled` (penaliza **quem cancelou**, −20). `Released` não tem consumidores.
+- **Consumidores**: `Cancelled` → ✅ `mrk.release-listing-on-cancel` (devolve o anúncio para `PUBLISHED`) · ✅ `trs.score-order-cancelled` (penaliza **quem cancelou**, −20) · **IP-008** ✅ `pay.refund-payment-on-order-cancelled` (consequência financeira: cancela a autorização não-custodiada, ou reembolsa integralmente o que já estava em custódia — tranche original E tranches incrementais de Change Order, `managesOwnTransaction: true` por chamar o gateway). `Released` não tem consumidores.
 - **Payloads**: `Cancelled {orderId, listingId, conversationId, buyerId, sellerId, cancelledBy, cancelledByRole, previousStatus, reason, cancelledAt, status}`; `Released {listingId, ownerId, orderId, status: "PUBLISHED", releasedAt}`
 
 ### MarketplaceOffer.Created (v1.0) · MarketplaceOffer.Updated (v1.0) · MarketplaceOffer.Withdrawn (v1.0) · MarketplaceOffer.Rejected (v1.0)

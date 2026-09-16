@@ -1,4 +1,5 @@
 import { v7 as uuidv7 } from 'uuid';
+import { fromReais, toReais } from '../../../../shared/money/money';
 import {
   MarketplaceDisputeAlreadyResolvedException,
   MarketplaceDisputeValidationException,
@@ -70,6 +71,28 @@ export interface DisputeDecisionProps {
   decidedBy: string;
   decisionType: DecisionType;
   justification: string;
+  /**
+   * IP-008 — consequência financeira EXPLÍCITA da decisão, em REAIS (mesma
+   * convenção de `TrustChangeOrder.changeGrossAmount`: o domínio do
+   * Marketplace guarda valor em reais — a coluna é `numeric(18,2)` e o
+   * evento de domínio fala reais, como todo evento cross-módulo já fala
+   * neste código, ex. `MarketplaceOrder.Created.amount`). `null` quando a
+   * decisão não envolve reembolso (ex.: `REJECTED`).
+   *
+   * Deliberadamente um valor que o administrador DIGITA, não um percentual
+   * calculado a partir de `decisionType` (ex.: "UPHELD = 100%,
+   * PARTIALLY_UPHELD = 50%"): nenhuma tabela de percentuais de reembolso foi
+   * aprovada em nenhum documento de produto lido para esta IP (ver
+   * Completion Report §11 / Conflict Escalation) — inventar uma violaria a
+   * regra "nenhuma política de negócio nova sem decisão aprovada". Quem
+   * decide QUANTO é sempre um humano (o mediador/admin), exatamente como
+   * PAY-006 §3 pede ("solicitante" registrado); esta entidade só garante que
+   * o valor é positivo e bem formado — a checagem AUTORITATIVA contra o
+   * saldo realmente reembolsável mora no módulo Payments
+   * (`RefundPaymentUseCase`), que o Marketplace não pode consultar
+   * diretamente (PACK-01 §10: a dependência é só Payments → Marketplace).
+   */
+  refundAmount: number | null;
   decidedAt: Date;
   createdAt: Date;
 }
@@ -83,6 +106,8 @@ export class DisputeDecision {
     decidedBy: string;
     decisionType: DecisionType;
     justification: string;
+    /** IP-008 — opcional, em reais; `undefined`/`null`/`0` significa "sem reembolso". */
+    refundAmount?: number | null;
     now?: Date;
   }): DisputeDecision {
     const justification = input.justification.trim();
@@ -91,6 +116,18 @@ export class DisputeDecision {
         'A decision must be justified with at least 10 characters.',
       );
     }
+    let refundAmount: number | null = null;
+    if (input.refundAmount !== undefined && input.refundAmount !== null && input.refundAmount !== 0) {
+      if (!Number.isFinite(input.refundAmount) || input.refundAmount < 0) {
+        throw new MarketplaceDisputeValidationException(
+          'refundAmount must be a non-negative finite number.',
+        );
+      }
+      // Ida e volta por centavos só para recusar frações abaixo do centavo
+      // (ex.: 10.001) cedo, com a mesma disciplina "nunca ponto flutuante
+      // solto" do resto da plataforma — o valor armazenado continua em reais.
+      refundAmount = toReais(fromReais(input.refundAmount));
+    }
     const now = input.now ?? new Date();
     return new DisputeDecision({
       id: uuidv7(),
@@ -98,6 +135,7 @@ export class DisputeDecision {
       decidedBy: input.decidedBy,
       decisionType: input.decisionType,
       justification,
+      refundAmount,
       decidedAt: now,
       createdAt: now,
     });
@@ -125,6 +163,10 @@ export class DisputeDecision {
 
   get justification(): string {
     return this.props.justification;
+  }
+
+  get refundAmount(): number | null {
+    return this.props.refundAmount;
   }
 
   get decidedAt(): Date {
