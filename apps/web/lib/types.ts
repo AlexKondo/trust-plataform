@@ -104,6 +104,20 @@ export interface ProfileShare {
   expiresAt: string;
 }
 
+/** IP-021 — solicitação de acesso/exclusão de dados (LGPD art. 18). */
+export interface PrivacyRequest {
+  id: string;
+  type: 'DATA_EXPORT' | 'DATA_DELETION';
+  status: 'REQUESTED' | 'PROCESSING' | 'COMPLETED' | 'REJECTED';
+  requestedAt: string;
+  processedAt: string | null;
+  completedAt: string | null;
+  rejectionReason: string | null;
+  resultSummary: Record<string, number> | null;
+  /** Só presente na resposta síncrona de criação de um DATA_EXPORT; nunca recuperável depois. */
+  exportedData?: unknown;
+}
+
 // ── Marketplace: anúncios ───────────────────────────────────────────────────
 export interface MarketplaceCategory {
   code: string;

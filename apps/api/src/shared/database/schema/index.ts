@@ -1,6 +1,7 @@
 export * from './audit-logs';
 export * from './outbox-events';
 export * from './processed-events';
+export * from './legal-consents';
 // Tabelas dos módulos de negócio (cada tabela pertence a um único módulo;
 // o re-export aqui existe só para o Drizzle montar o schema completo do banco)
 export * from '../../../modules/identity/infrastructure/persistence/identities.schema';
@@ -23,3 +24,4 @@ export * from '../../../modules/marketplace/infrastructure/persistence/service-r
 export * from '../../../modules/notification/infrastructure/persistence/notifications.schema';
 export * from '../../../modules/payment/infrastructure/persistence/payment.schema';
 export * from '../../../modules/payment/infrastructure/persistence/payment-incremental.schema';
+export * from '../../../modules/privacy/infrastructure/persistence/privacy-requests.schema';

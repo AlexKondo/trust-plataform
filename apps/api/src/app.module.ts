@@ -9,6 +9,7 @@ import { JwtAuthGuard } from './shared/security/jwt-auth.guard';
 import { EventsModule } from './shared/events/events.module';
 import { AuditModule } from './shared/audit/audit.module';
 import { StorageModule } from './shared/storage/storage.module';
+import { LegalConsentModule } from './shared/privacy/legal-consent.module';
 import { ResponseEnvelopeInterceptor } from './shared/api/response-envelope.interceptor';
 import { GlobalExceptionFilter } from './shared/api/global-exception.filter';
 import { HealthModule } from './modules/health/health.module';
@@ -16,6 +17,7 @@ import { IdentityModule } from './modules/identity/identity.module';
 import { MarketplaceModule } from './modules/marketplace/marketplace.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { PaymentModule } from './modules/payment/payment.module';
+import { PrivacyModule } from './modules/privacy/privacy.module';
 import { TrustPassportModule } from './modules/trust-passport/trust-passport.module';
 import { TrustScoreModule } from './modules/trust-score/trust-score.module';
 import { VerificationModule } from './modules/verification/verification.module';
@@ -29,6 +31,7 @@ import { VerificationModule } from './modules/verification/verification.module';
     EventsModule,
     AuditModule,
     StorageModule,
+    LegalConsentModule,
     HealthModule,
     IdentityModule,
     TrustPassportModule,
@@ -37,6 +40,7 @@ import { VerificationModule } from './modules/verification/verification.module';
     MarketplaceModule,
     NotificationModule,
     PaymentModule,
+    PrivacyModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

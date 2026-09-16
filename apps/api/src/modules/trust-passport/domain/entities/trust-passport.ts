@@ -203,6 +203,27 @@ export class TrustPassport {
     return true;
   }
 
+  /**
+   * IP-021 — anonimiza os campos de contato (Shared Standards §7: minimizar
+   * dados; deleção/retenção nunca apaga o registro financeiro/histórico,
+   * mas a Identity é dona da PII de contato aqui). Os booleanos
+   * `*Verified`/`profileCompletion` são PRESERVADOS deliberadamente: eles
+   * representam o FATO histórico "esta pessoa foi verificada", não o dado de
+   * contato em si — apagar esse fato apagaria histórico de Trust Score sem
+   * necessidade (a completude do perfil deixa de refletir os campos nulados,
+   * o que é uma inconsistência aceitável e documentada, não um bug).
+   */
+  anonymizeProfile(now = new Date()): void {
+    this.props.profile = {
+      phone: null,
+      addressCountry: null,
+      addressState: null,
+      addressCity: null,
+    };
+    this.props.deletedAt = now;
+    this.props.updatedAt = now;
+  }
+
   private recalculateCompletion(): void {
     const verified = [
       this.props.emailVerified,

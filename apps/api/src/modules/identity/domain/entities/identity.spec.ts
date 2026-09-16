@@ -38,3 +38,35 @@ describe('Identity — preferredLocale (IP-002)', () => {
     expect(identity.preferredLocale).toBe('pt-BR');
   });
 });
+
+describe('Identity — anonymize (IP-021)', () => {
+  it('substitui nome/e-mail/hash de senha e marca deletedAt (soft-delete)', () => {
+    const identity = makeIdentity();
+    const id = identity.id;
+    const now = new Date(identity.updatedAt.getTime() + 1000);
+
+    identity.anonymize(now);
+
+    expect(identity.fullName).toBe('Usuário anonimizado');
+    expect(identity.email).toContain(id);
+    expect(identity.email).toMatch(/^anonimizado\+.+@anonimizado\.trust\.invalid$/);
+    expect(identity.passwordHash).not.toBe('$argon2id$secret-hash');
+    expect(identity.deletedAt).toEqual(now);
+    expect(identity.updatedAt).toEqual(now);
+  });
+
+  it('é idempotente: chamar duas vezes produz o MESMO e-mail pseudônimo (nunca colide)', () => {
+    const identity = makeIdentity();
+    identity.anonymize(new Date());
+    const firstEmail = identity.email;
+    identity.anonymize(new Date());
+    expect(identity.email).toBe(firstEmail);
+  });
+
+  it('nunca produz um e-mail igual ao original', () => {
+    const identity = makeIdentity();
+    const originalEmail = identity.email;
+    identity.anonymize(new Date());
+    expect(identity.email).not.toBe(originalEmail);
+  });
+});

@@ -89,20 +89,22 @@ export class DrizzleMarketplaceOrderRepository extends MarketplaceOrderRepositor
     identityId: string,
     page: number,
     pageSize: number,
+    executor?: DatabaseExecutor,
   ): Promise<{ items: MarketplaceOrder[]; totalItems: number }> {
+    const target = executor ?? this.db;
     const where = or(
       eq(marketplaceOrders.buyerId, identityId),
       eq(marketplaceOrders.sellerId, identityId),
     );
     const [rows, [total]] = await Promise.all([
-      this.db
+      target
         .select()
         .from(marketplaceOrders)
         .where(where)
         .orderBy(desc(marketplaceOrders.createdAt))
         .limit(pageSize)
         .offset((page - 1) * pageSize),
-      this.db.select({ count: sql<number>`count(*)::int` }).from(marketplaceOrders).where(where),
+      target.select({ count: sql<number>`count(*)::int` }).from(marketplaceOrders).where(where),
     ]);
     return { items: rows.map(toOrder), totalItems: total?.count ?? 0 };
   }

@@ -41,6 +41,12 @@ export class DrizzleIdentityRepository extends IdentityRepository {
           target: identities.id,
           set: {
             fullName: identity.fullName,
+            // IP-021: e-mail normalmente é imutável após o cadastro (nenhum
+            // outro caminho de código muda este valor) — incluído aqui só
+            // para que `Identity.anonymize()` (IP-021) persista o e-mail
+            // pseudônimo através deste mesmo `save()`, sem duplicar um
+            // segundo caminho de escrita para a mesma linha.
+            email: identity.email,
             passwordHash: identity.passwordHash,
             status: identity.status,
             lastLoginAt: identity.lastLoginAt,

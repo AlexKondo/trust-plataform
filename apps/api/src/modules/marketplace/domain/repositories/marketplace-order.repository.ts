@@ -10,10 +10,19 @@ export abstract class MarketplaceOrderRepository {
   abstract save(order: MarketplaceOrder, executor?: DatabaseExecutor): Promise<void>;
   abstract findById(id: string, executor?: DatabaseExecutor): Promise<MarketplaceOrder | null>;
   abstract findByOfferId(offerId: string): Promise<MarketplaceOrder | null>;
+  /**
+   * IP-021 — `executor` opcional: `DeletionEligibilityService` chama isto
+   * de DENTRO da transação de anonimização (via `RequestDataDeletionUseCase`)
+   * para que a checagem de elegibilidade leia o estado mais fresco possível
+   * pela MESMA conexão que vai efetivar a mutação, e não uma leitura
+   * separada e potencialmente desatualizada por uma segunda conexão do pool
+   * (mesmo cuidado de `IdentityRepository.findById`, IP-002).
+   */
   abstract listForParticipant(
     identityId: string,
     page: number,
     pageSize: number,
+    executor?: DatabaseExecutor,
   ): Promise<{ items: MarketplaceOrder[]; totalItems: number }>;
 
   // ── Agendamento (MRK-019) ──────────────────────────────────────────────────

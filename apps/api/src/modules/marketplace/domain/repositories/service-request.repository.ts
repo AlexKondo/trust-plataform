@@ -23,10 +23,12 @@ export interface ServiceRequestEngagementRecord {
 export abstract class ServiceRequestRepository {
   abstract save(request: ServiceRequest, executor?: DatabaseExecutor): Promise<void>;
   abstract findById(id: string): Promise<ServiceRequest | null>;
+  /** IP-021 — `executor` opcional, mesmo motivo de `MarketplaceOrderRepository.listForParticipant`. */
   abstract findByOwner(
     memberId: string,
     page: number,
     pageSize: number,
+    executor?: DatabaseExecutor,
   ): Promise<{ items: ServiceRequest[]; totalItems: number }>;
 
   /**

@@ -54,4 +54,30 @@ describe('TrustPassport aggregate (TPS-001..003)', () => {
     passport.markVerified('address');
     expect(passport.profileCompletion).toBe(100);
   });
+
+  describe('anonymizeProfile (IP-021)', () => {
+    it('nula phone/address e marca deletedAt, preservando os booleanos *Verified (fato histórico)', () => {
+      const passport = TrustPassport.createNew('identity-1');
+      passport.updateProfile({
+        phone: '+55 11 99999-9999',
+        address: { country: 'BR', state: 'SP', city: 'Valinhos' },
+      });
+      passport.markVerified('phone');
+      passport.markVerified('document');
+      const now = new Date(passport.updatedAt.getTime() + 1000);
+
+      passport.anonymizeProfile(now);
+
+      expect(passport.profile).toEqual({
+        phone: null,
+        addressCountry: null,
+        addressState: null,
+        addressCity: null,
+      });
+      expect(passport.phoneVerified).toBe(true);
+      expect(passport.documentVerified).toBe(true);
+      expect(passport.deletedAt).toEqual(now);
+      expect(passport.updatedAt).toEqual(now);
+    });
+  });
 });

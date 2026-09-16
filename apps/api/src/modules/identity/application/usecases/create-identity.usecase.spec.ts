@@ -35,6 +35,9 @@ function makeUseCase(overrides: { emailExists?: boolean } = {}) {
   const generateEmailVerification = {
     issueAndSend: vi.fn().mockResolvedValue(undefined),
   } as unknown as GenerateEmailVerificationUseCase;
+  const legalConsentService = {
+    recordAcceptance: vi.fn().mockResolvedValue(undefined),
+  } as unknown as import('../../../../shared/privacy/legal-consent.service').LegalConsentService;
   const fakeTx = Symbol('tx');
   const db = {
     transaction: vi.fn(async (fn: (tx: unknown) => Promise<void>) => fn(fakeTx)),
@@ -52,6 +55,7 @@ function makeUseCase(overrides: { emailExists?: boolean } = {}) {
       passwordBreachService,
       auditLogService,
       generateEmailVerification,
+      legalConsentService,
       db,
       logger,
     ),
@@ -59,6 +63,7 @@ function makeUseCase(overrides: { emailExists?: boolean } = {}) {
     passwordHashService,
     auditLogService,
     generateEmailVerification,
+    legalConsentService,
     fakeTx,
   };
 }

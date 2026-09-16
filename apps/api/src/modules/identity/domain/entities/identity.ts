@@ -170,4 +170,29 @@ export class Identity {
     this.props.preferredLocale = locale;
     this.props.updatedAt = now;
   }
+
+  /**
+   * IP-021 — anonimiza a PII identificadora e marca a Identity como
+   * soft-deleted (`deleted_at`, coluna já prevista no schema desde a
+   * baseline: "identities NUNCA é excluída fisicamente — soft delete via
+   * deleted_at"). `findById`/`findByEmail` já filtram `deleted_at IS NULL`,
+   * então a partir daqui a conta some de login/autenticação sem precisar de
+   * nenhuma mudança adicional nesses caminhos.
+   *
+   * O e-mail anonimizado é determinístico a partir do próprio id (que já é
+   * único) — garante que a coluna `email` (UNIQUE no banco) nunca colida,
+   * mesmo que a mesma pessoa peça exclusão mais de uma vez (idempotente:
+   * chamar de novo sobre uma Identity já anonimizada produz o mesmo valor).
+   * O hash de senha é substituído por um valor que nenhuma senha em texto
+   * puro jamais produz (nenhum caractere de um hash Argon2id válido),
+   * invalidando login por senha mesmo que o filtro de `deleted_at` seja
+   * contornado por algum caminho de código futuro (defesa em profundidade).
+   */
+  anonymize(now = new Date()): void {
+    this.props.fullName = 'Usuário anonimizado';
+    this.props.email = `anonimizado+${this.props.id}@anonimizado.trust.invalid`;
+    this.props.passwordHash = `ANONYMIZED:${this.props.id}`;
+    this.props.deletedAt = now;
+    this.props.updatedAt = now;
+  }
 }

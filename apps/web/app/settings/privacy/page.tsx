@@ -1,12 +1,15 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { AppShell } from '../../../components/app-shell';
 import { Card, Loading, PageHeader, Pill, SectionTitle } from '../../../components/layout';
 import { Banner, Icon, PrimaryButton } from '../../../components/ui';
-import { ApiError, authApi } from '../../../lib/api';
+import { ApiError, authApi, logout } from '../../../lib/api';
+import { formatDateTime } from '../../../lib/i18n/format';
+import { useLocale } from '../../../lib/i18n/LocaleProvider';
 import { formatDate } from '../../../lib/labels';
-import type { ProfileShare, VisibilityPolicy } from '../../../lib/types';
+import type { PrivacyRequest, ProfileShare, VisibilityPolicy } from '../../../lib/types';
 
 const TOGGLES: Array<{ key: keyof VisibilityPolicy; label: string; hint: string }> = [
   { key: 'showScore', label: 'Mostrar meu Trust Score', hint: 'O número exato da sua pontuação.' },
@@ -18,6 +21,173 @@ const TOGGLES: Array<{ key: keyof VisibilityPolicy; label: string; hint: string 
     hint: 'Documento, endereço, telefone e e-mail.',
   },
 ];
+
+const REJECTION_KEYS: Record<string, 'deleteRejected_ACTIVE_ORDERS' | 'deleteRejected_ACTIVE_CUSTODY' | 'deleteRejected_ACTIVE_SERVICE_REQUEST'> = {
+  ACTIVE_ORDERS: 'deleteRejected_ACTIVE_ORDERS',
+  ACTIVE_CUSTODY: 'deleteRejected_ACTIVE_CUSTODY',
+  ACTIVE_SERVICE_REQUEST: 'deleteRejected_ACTIVE_SERVICE_REQUEST',
+};
+
+/**
+ * IP-021 — workflow de acesso/exclusão de dados (LGPD art. 18). Todo conteúdo
+ * NOVO desta seção passa por `t()` (Shared Standards §8/tarefa desta IP);
+ * o resto da tela permanece como estava (decisão já tomada pela IP-002).
+ */
+function DataLifecycleSection() {
+  const router = useRouter();
+  const { t, locale } = useLocale();
+  const [requests, setRequests] = useState<PrivacyRequest[]>([]);
+  const [busy, setBusy] = useState<'export' | 'delete' | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [message, setMessage] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
+
+  const reload = async () => {
+    const list = await authApi<PrivacyRequest[]>('/privacy/requests').catch(() => [] as PrivacyRequest[]);
+    setRequests(list);
+  };
+
+  useEffect(() => {
+    void reload();
+  }, []);
+
+  const statusLabel = (status: PrivacyRequest['status']) =>
+    ({
+      REQUESTED: t('privacy.statusRequested'),
+      PROCESSING: t('privacy.statusProcessing'),
+      COMPLETED: t('privacy.statusCompleted'),
+      REJECTED: t('privacy.statusRejected'),
+    })[status];
+
+  const handleExport = async () => {
+    setBusy('export');
+    setMessage(null);
+    try {
+      const result = await authApi<PrivacyRequest>('/privacy/requests', {
+        method: 'POST',
+        body: { type: 'DATA_EXPORT' },
+      });
+      const blob = new Blob([JSON.stringify(result.exportedData, null, 2)], {
+        type: 'application/json',
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `trust-platform-meus-dados-${result.id}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      setMessage({ kind: 'success', text: t('privacy.exportSuccess') });
+      await reload();
+    } catch (error) {
+      setMessage({
+        kind: 'error',
+        text: error instanceof ApiError ? error.message : t('privacy.exportError'),
+      });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleDelete = async () => {
+    setBusy('delete');
+    setMessage(null);
+    try {
+      const result = await authApi<PrivacyRequest>('/privacy/requests', {
+        method: 'POST',
+        body: { type: 'DATA_DELETION' },
+      });
+      if (result.status === 'REJECTED') {
+        const key = result.rejectionReason ? REJECTION_KEYS[result.rejectionReason] : undefined;
+        setMessage({
+          kind: 'error',
+          text: `${t('privacy.deleteRejectedPrefix')} ${key ? t(`privacy.${key}`) : result.rejectionReason}`,
+        });
+        setConfirmDelete(false);
+        await reload();
+        return;
+      }
+      setMessage({ kind: 'success', text: t('privacy.deleteSuccess') });
+      await logout();
+      router.replace('/login');
+    } catch (error) {
+      setMessage({
+        kind: 'error',
+        text: error instanceof ApiError ? error.message : t('privacy.exportError'),
+      });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <Card>
+      <SectionTitle icon="download" title={t('privacy.dataSectionTitle')} hint={t('privacy.dataSectionHint')} />
+
+      {message ? (
+        <Banner kind={message.kind === 'success' ? 'success' : 'error'}>{message.text}</Banner>
+      ) : null}
+
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+        <PrimaryButton type="button" loading={busy === 'export'} onClick={() => void handleExport()}>
+          {t('privacy.exportButton')}
+        </PrimaryButton>
+      </div>
+
+      <div className="mt-6 rounded-lg border border-error/30 p-4">
+        <label className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            checked={confirmDelete}
+            onChange={(event) => setConfirmDelete(event.target.checked)}
+            className="mt-1"
+          />
+          <span className="body-sm text-on-surface-variant">{t('privacy.deleteConfirmLabel')}</span>
+        </label>
+        <button
+          type="button"
+          disabled={!confirmDelete || busy === 'delete'}
+          onClick={() => void handleDelete()}
+          className="btn-text mt-3 rounded-xl bg-error px-4 py-2 text-sm font-medium text-on-error disabled:opacity-50"
+        >
+          {t('privacy.deleteButton')}
+        </button>
+      </div>
+
+      <div className="mt-6">
+        <p className="body-sm mb-2 font-medium text-on-surface">{t('privacy.historyTitle')}</p>
+        {requests.length === 0 ? (
+          <p className="body-sm text-on-surface-variant">{t('privacy.historyEmpty')}</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {requests.map((item) => (
+              <li
+                key={item.id}
+                className="flex items-center justify-between gap-3 rounded-lg border border-outline-variant p-3"
+              >
+                <div>
+                  <p className="body-sm text-on-surface">
+                    {item.type === 'DATA_EXPORT' ? t('privacy.typeExport') : t('privacy.typeDeletion')}
+                  </p>
+                  <p className="body-sm text-on-surface-variant">{formatDateTime(item.requestedAt, locale)}</p>
+                </div>
+                <Pill
+                  tone={
+                    item.status === 'COMPLETED'
+                      ? 'success'
+                      : item.status === 'REJECTED'
+                        ? 'error'
+                        : 'neutral'
+                  }
+                >
+                  {statusLabel(item.status)}
+                </Pill>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </Card>
+  );
+}
 
 function PrivacyContent() {
   const [policy, setPolicy] = useState<VisibilityPolicy | null>(null);
@@ -206,6 +376,8 @@ function PrivacyContent() {
           </ul>
         )}
       </Card>
+
+      <DataLifecycleSection />
     </div>
   );
 }

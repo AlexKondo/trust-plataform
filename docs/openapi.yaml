@@ -26,6 +26,7 @@ tags:
   - name: Marketplace
   - name: Notification
   - name: Payment
+  - name: Privacy
 
 paths:
   /health:
@@ -2092,6 +2093,87 @@ paths:
         '404': { description: Pagamento não encontrado }
         '409': { description: 'Estado não permite autorizar (PAYMENT_INVALID_TRANSITION)' }
         '502': { description: 'Falha do provedor (PAYMENT_GATEWAY_ERROR)' }
+
+  /privacy/requests:
+    post:
+      tags: [Privacy]
+      summary: IP-021 — Solicitar exportação ou exclusão dos próprios dados (LGPD art. 18)
+      description: >
+        Sempre auto-serviço, escopado ao token do próprio titular (nenhuma rota
+        administrativa em nome de outra Identity nesta fundação). Processado de
+        forma SÍNCRONA: a resposta já vem com o resultado final.
+
+        `DATA_EXPORT` devolve um retrato dos dados do titular em
+        `exportedData` — NÃO é persistido (privacy-by-design: menos cópias de
+        PII em repouso); não é re-baixável depois via GET.
+
+        `DATA_DELETION` anonimiza `identities`/`trust_passports` (nome,
+        e-mail, telefone, endereço) e revoga todas as sessões — NUNCA apaga
+        `payments`/`trust_custodies`/`audit_logs`/eventos de execução (só
+        referenciam a Identity por UUID, nunca guardam PII denormalizada).
+        Bloqueada (mas registrada como `REJECTED`, não como erro) enquanto a
+        Identity tiver pedido/custódia/pedido de serviço NÃO-terminal — trava
+        de engenharia para proteger uma máquina de estados em andamento, não
+        uma alegação jurídica de retenção.
+      operationId: createPrivacyRequest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example: { type: DATA_DELETION }
+      responses:
+        '201':
+          description: Solicitação processada (ver `status`/`rejectionReason` no corpo)
+          content:
+            application/json:
+              examples:
+                exportCompleted:
+                  value:
+                    success: true
+                    data:
+                      id: '019fe415-6318-7bfb-a184-3f47c3f0b7e2'
+                      type: DATA_EXPORT
+                      status: COMPLETED
+                      requestedAt: '2026-09-16T10:00:00.000Z'
+                      completedAt: '2026-09-16T10:00:01.000Z'
+                      rejectionReason: null
+                      resultSummary: { verifications: 1, orders: 2, payments: 2, reviewsReceived: 1, serviceRequests: 0, legalConsents: 1 }
+                      exportedData: { identity: { fullName: John Doe, email: john@email.com } }
+                deletionRejected:
+                  value:
+                    success: true
+                    data:
+                      id: '019fe415-6318-7bfb-a184-3f47c3f0b7e3'
+                      type: DATA_DELETION
+                      status: REJECTED
+                      requestedAt: '2026-09-16T10:00:00.000Z'
+                      completedAt: '2026-09-16T10:00:00.000Z'
+                      rejectionReason: ACTIVE_ORDERS
+                      resultSummary: null
+        '400': { description: 'type ausente/fora do catálogo (VALIDATION_ERROR)' }
+        '401': { description: Sem token ou token inválido/expirado (INVALID_TOKEN) }
+    get:
+      tags: [Privacy]
+      summary: IP-021 — Listar as próprias solicitações de privacidade
+      operationId: listMyPrivacyRequests
+      responses:
+        '200':
+          description: Solicitações do próprio titular, mais recentes primeiro
+        '401': { description: Sem token ou token inválido/expirado (INVALID_TOKEN) }
+
+  /privacy/requests/{requestId}:
+    get:
+      tags: [Privacy]
+      summary: IP-021 — Consultar uma solicitação de privacidade
+      description: Dono apenas — nenhuma visão administrativa nesta fundação (403 se não for o titular).
+      operationId: getPrivacyRequest
+      parameters:
+        - { name: requestId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Solicitação encontrada }
+        '401': { description: Sem token ou token inválido/expirado (INVALID_TOKEN) }
+        '403': { description: 'Não é o titular (PRIVACY_REQUEST_ACCESS_DENIED)' }
+        '404': { description: 'Solicitação não encontrada (PRIVACY_REQUEST_NOT_FOUND)' }
 
 components:
   securitySchemes:

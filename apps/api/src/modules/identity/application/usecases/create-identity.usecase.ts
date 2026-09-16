@@ -3,6 +3,11 @@ import { PinoLogger } from 'nestjs-pino';
 import { AuditLogService } from '../../../../shared/audit/audit-log.service';
 import { DRIZZLE, Database } from '../../../../shared/database/database.module';
 import { resolveLocale } from '../../../../shared/i18n/locale-resolver';
+import { LegalConsentService } from '../../../../shared/privacy/legal-consent.service';
+import {
+  CURRENT_LEGAL_DOCUMENT_VERSION,
+  LEGAL_DOCUMENT_TYPES,
+} from '../../../../shared/privacy/legal-documents';
 import { Identity } from '../../domain/entities/identity';
 import { BreachedPasswordException } from '../../domain/exceptions/breached-password.exception';
 import { EmailAlreadyExistsException } from '../../domain/exceptions/email-already-exists.exception';
@@ -37,6 +42,7 @@ export class CreateIdentityUseCase {
     private readonly passwordBreachService: PasswordBreachService,
     private readonly auditLogService: AuditLogService,
     private readonly generateEmailVerification: GenerateEmailVerificationUseCase,
+    private readonly legalConsentService: LegalConsentService,
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly logger: PinoLogger,
   ) {
@@ -83,6 +89,18 @@ export class CreateIdentityUseCase {
           requestId: metadata.requestId,
         },
         tx,
+      );
+      // IP-021 — captura de consentimento/versão da Política de Privacidade
+      // no mesmo instante em que `terms_accepted_at` já registra o aceite dos
+      // Termos de Uso (BR-005 pré-existente). Aditivo: não muda nenhum
+      // comportamento de cadastro, só grava o fato em `legal_consents`.
+      await this.legalConsentService.recordAcceptance(
+        identity.id,
+        LEGAL_DOCUMENT_TYPES.PRIVACY_POLICY,
+        CURRENT_LEGAL_DOCUMENT_VERSION.PRIVACY_POLICY,
+        identity.preferredLocale,
+        tx,
+        identity.termsAcceptedAt,
       );
     });
 

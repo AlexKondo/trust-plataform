@@ -77,17 +77,19 @@ export class DrizzleServiceRequestRepository extends ServiceRequestRepository {
     memberId: string,
     page: number,
     pageSize: number,
+    executor?: DatabaseExecutor,
   ): Promise<{ items: ServiceRequest[]; totalItems: number }> {
+    const target = executor ?? this.db;
     const where = eq(serviceRequests.memberId, memberId);
     const [rows, [total]] = await Promise.all([
-      this.db
+      target
         .select()
         .from(serviceRequests)
         .where(where)
         .orderBy(desc(serviceRequests.createdAt))
         .limit(pageSize)
         .offset((page - 1) * pageSize),
-      this.db.select({ count: sql<number>`count(*)::int` }).from(serviceRequests).where(where),
+      target.select({ count: sql<number>`count(*)::int` }).from(serviceRequests).where(where),
     ]);
     return { items: rows.map(toDomain), totalItems: total?.count ?? 0 };
   }

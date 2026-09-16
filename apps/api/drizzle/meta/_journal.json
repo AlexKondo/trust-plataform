@@ -225,6 +225,13 @@
       "when": 1793000000000,
       "tag": "0031_ip013_notification_communication_completion",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1794000000000,
+      "tag": "0032_ip021_privacy_lgpd_data_lifecycle",
+      "breakpoints": true
     }
   ]
 }
