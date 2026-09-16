@@ -13,6 +13,7 @@ import { OutboxService } from '../../../../shared/events/outbox.service';
 import { Payment } from '../../domain/entities/payment';
 import { PAYMENT_STATUS } from '../../domain/entities/payment-types';
 import { CUSTODY_STATUS, TrustCustody } from '../../domain/entities/trust-custody';
+import { IncrementalTrustCustodyRepository } from '../../domain/repositories/incremental-trust-custody.repository';
 import { PaymentRepository } from '../../domain/repositories/payment.repository';
 import { TrustCustodyRepository } from '../../domain/repositories/trust-custody.repository';
 import { OrderDisputeQuery } from '../../domain/services/order-dispute.query';
@@ -51,6 +52,25 @@ function custodyFor(payment: Payment): TrustCustody {
     amountCents: payment.amountCents,
     currency: payment.currency,
   });
+}
+
+/**
+ * IP-007 — nenhum destes testes cria Trust Change Order/tranche incremental,
+ * então `listByOrderId` sempre devolve `[]` (mantém a resposta de `prepare`
+ * byte-idêntica à do PACK-01, ver `prepareIncrementalTranches`) e `findById`
+ * devolve `null` (mantém `finalize()` caindo no caminho original, nunca no
+ * incremental, para os ids reais usados aqui).
+ */
+function noIncrementalTranches(): IncrementalTrustCustodyRepository {
+  return {
+    create: vi.fn(),
+    findById: vi.fn().mockResolvedValue(null),
+    findByChangeOrderId: vi.fn().mockResolvedValue(null),
+    listByOrderId: vi.fn().mockResolvedValue([]),
+    listByPaymentId: vi.fn().mockResolvedValue([]),
+    markReadyForReleaseIfInCustody: vi.fn(),
+    markReleasedIfReady: vi.fn(),
+  };
 }
 
 function approvedRelease(amountCents: number): ReleaseResult {
@@ -282,6 +302,7 @@ describe('ReleaseFundsUseCase (PAY-004)', () => {
     useCase = new ReleaseFundsUseCase(
       paymentRepository,
       custodyRepository,
+      noIncrementalTranches(),
       disputeQuery,
       gateway,
       outbox,
@@ -440,6 +461,7 @@ describe('ReleaseFundsUseCase — confirmação sem custódia (desvio D2)', () =
         save: vi.fn(),
       } as unknown as PaymentRepository,
       { findByOrderId: vi.fn().mockResolvedValue(null) } as unknown as TrustCustodyRepository,
+      noIncrementalTranches(),
       { hasActiveDispute: vi.fn() },
       { release: vi.fn() } as unknown as PaymentGateway,
       { enqueue: vi.fn() } as unknown as OutboxService,

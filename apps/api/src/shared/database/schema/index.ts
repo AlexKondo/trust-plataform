@@ -21,3 +21,4 @@ export * from '../../../modules/marketplace/infrastructure/persistence/trust-cha
 export * from '../../../modules/marketplace/infrastructure/persistence/service-execution.schema';
 export * from '../../../modules/notification/infrastructure/persistence/notifications.schema';
 export * from '../../../modules/payment/infrastructure/persistence/payment.schema';
+export * from '../../../modules/payment/infrastructure/persistence/payment-incremental.schema';

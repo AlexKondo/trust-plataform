@@ -1635,6 +1635,13 @@ paths:
         do §9: a custódia segura o valor da contratação, e o que foi aprovado
         depois está autorizado mas não custodiado. Trust Fee e líquido do
         prestador só aparecem na visão do prestador.
+        **Nota (IP-007)**: estes dois campos continuam sendo o corte
+        **comercial-only** (quanto o Member aprovou), calculado sem consultar o
+        módulo Payments — não foram alterados por esta IP. Quando existe pelo
+        menos um Change Order aprovado, `GET /payments/by-order/{orderId}`'s
+        `custodySummary` é a fonte que sabe, de fato, quanto entrou em custódia
+        tranche por tranche (inclusive quando o gateway recusou a autorização
+        incremental de um Change Order já aprovado pelo Member).
       operationId: getServiceSummary
       parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
@@ -1844,11 +1851,47 @@ paths:
     get:
       tags: [Payment]
       summary: Pagamento de um pedido
-      description: 'Pagamentos nascem do aceite da proposta (PAY-001): não há criação manual.'
+      description: >
+        Pagamentos nascem do aceite da proposta (PAY-001): não há criação
+        manual. IP-007: quando o pedido tem pelo menos um Trust Change Order
+        aprovado, a resposta ganha o campo aditivo `custodySummary`
+        (`{currency, originalAmount, originalCustodyStatus,
+        totalCommerciallyAuthorized, totalHeld, amountAuthorizedNotInCustody,
+        incrementalTranches[]}`) — resolve o gap `amountAuthorizedNotInCustody`
+        autorreportado pelo PACK-03 (§9.1): agora é um valor computável, não
+        apenas o corte comercial-only do Service Summary do Marketplace.
+        `incrementalTranches[]` lista cada Change Order aprovado com sua
+        autorização incremental (`changeOrderId`, `incrementalAuthorizationId`,
+        `amount`, `authorizationStatus`, `custodyStatus` — `null` quando o
+        gateway recusou e nenhuma custódia chegou a existir). Campo omitido
+        (não `null`/vazio) em pedidos sem nenhum Change Order aprovado.
       operationId: getPaymentByOrder
       parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
-        '200': { description: Pagamento + histórico de tentativas de autorização }
+        '200':
+          description: Pagamento + histórico de tentativas de autorização + resumo de custódia (IP-007, quando aplicável)
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  paymentId: 019fe8f0-0000-7000-8000-000000000040
+                  status: FUNDS_IN_CUSTODY
+                  amount: 150
+                  authorizations: []
+                  custodySummary:
+                    currency: BRL
+                    originalAmount: 150
+                    originalCustodyStatus: IN_CUSTODY
+                    totalCommerciallyAuthorized: 220.5
+                    totalHeld: 220.5
+                    amountAuthorizedNotInCustody: 0
+                    incrementalTranches:
+                      - changeOrderId: 019fe8f0-0000-7000-8000-0000000000c1
+                        incrementalAuthorizationId: 019fe8f0-0000-7000-8000-0000000000c2
+                        amount: 70.5
+                        authorizationStatus: APPROVED
+                        custodyStatus: IN_CUSTODY
         '403': { description: Não é participante (PAYMENT_FORBIDDEN) }
         '404': { description: Sem pagamento para este pedido (PAYMENT_NOT_FOUND) }
 
@@ -1856,10 +1899,13 @@ paths:
     get:
       tags: [Payment]
       summary: Consultar pagamento (comprador ou vendedor)
+      description: >
+        IP-007: mesmo campo aditivo `custodySummary` de
+        `/payments/by-order/{orderId}` — ver descrição lá.
       operationId: getPayment
       parameters: [{ name: paymentId, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
-        '200': { description: Pagamento + autorizações }
+        '200': { description: Pagamento + autorizações + resumo de custódia (IP-007, quando aplicável) }
         '403': { description: Não é participante }
         '404': { description: Não encontrado }
 

@@ -45,8 +45,36 @@ export interface PaymentResponse {
   updatedAt: string;
 }
 
+/** IP-007 — uma tranche incremental (Change Order aprovado) e seu status. */
+export interface IncrementalTrancheResponse {
+  changeOrderId: string;
+  incrementalAuthorizationId: string;
+  amount: number;
+  authorizationStatus: string;
+  /** null quando a autorização foi recusada/errou — nunca chegou a existir custódia. */
+  custodyStatus: string | null;
+}
+
+/**
+ * IP-007 — resolve o gap `amountAuthorizedNotInCustody` (PACK-03 §9.1): agora
+ * é um valor computado e exposto aqui, não só no Service Summary do
+ * Marketplace (que continua mostrando o corte comercial-only, sem saber se o
+ * delta foi de fato custodiado — ver Completion Report §16 para a razão).
+ */
+export interface CustodySummaryResponse {
+  currency: string;
+  originalAmount: number;
+  originalCustodyStatus: string | null;
+  totalCommerciallyAuthorized: number;
+  totalHeld: number;
+  amountAuthorizedNotInCustody: number;
+  incrementalTranches: IncrementalTrancheResponse[];
+}
+
 export interface PaymentDetailsResponse extends PaymentResponse {
   authorizations: AuthorizationAttemptResponse[];
+  /** IP-007 — omitido quando o pedido não tem nenhum Change Order aprovado. */
+  custodySummary?: CustodySummaryResponse;
 }
 
 /** Resultado da tentativa de pagar — o front usa `authorized` para decidir a tela. */

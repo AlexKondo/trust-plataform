@@ -139,6 +139,30 @@ teste sobre uma fatia representativa de telas — não é uma tradução complet
 produto (fora de escopo do IP-002). Detalhes, decisões e critérios de aceite em
 [docs/Multi-Agent Implementation Doc/IPS/IP-002-COMPLETION-REPORT.md](docs/Multi-Agent%20Implementation%20Doc/IPS/IP-002-COMPLETION-REPORT.md).
 
+## IP-007 — Autorização de pagamento incremental (2026-09-15)
+
+Resolve o item PARADO do PACK-03 §9 (acima): um Trust Change Order aprovado
+agora gera, em sandbox, uma **autorização financeira incremental**
+(`PaymentIncrementalAuthorization`, tabela `payment_incremental_authorizations`,
+`UNIQUE(change_order_id)`) pelo MESMO port `PaymentGateway` da autorização
+original, disparada automaticamente por `TrustChangeOrder.Approved` — nunca por
+`Rejected`/`Cancelled`/`EXPIRED`, que não publicam esse evento. Quando o
+gateway aprova, o valor entra em custódia própria (`IncrementalTrustCustody`,
+tabela `incremental_trust_custodies`) — uma tabela nova, não uma segunda linha
+em `trust_custodies`, porque aquela tem `UNIQUE(payment_id)` (garantia do
+PACK-01 que esta IP não altera). A confirmação do cliente
+(`MarketplaceOrder.CustomerConfirmed`) continua sendo o único gatilho de
+liberação, agora aplicado a TODAS as tranches do pedido (original +
+incrementais), cada uma com sua própria máquina de duas fases e proteção CAS
+(`UPDATE ... WHERE status = <esperado> RETURNING`, mesmo padrão da IP-001) —
+uma tranche negada ou já liberada nunca bloqueia nem duplica outra.
+`GET /payments/by-order/{orderId}` ganhou o campo aditivo `custodySummary`:
+`amountAuthorizedNotInCustody` deixa de ser um número estático do Service
+Summary e passa a ser **computado** a partir do que de fato está em custódia,
+tranche por tranche. Migration 0029 aditiva (2 tabelas novas). Detalhes,
+decisões e critérios de aceite em
+[docs/Multi-Agent Implementation Doc/IPS/IP-007-COMPLETION-REPORT.md](docs/Multi-Agent%20Implementation%20Doc/IPS/IP-007-COMPLETION-REPORT.md).
+
 ## Documentos-guia (ler nesta ordem)
 
 1. [PLANO-DE-MODULOS.md](PLANO-DE-MODULOS.md) — quebra em módulos, ordem de desenvolvimento, grafo de dependências

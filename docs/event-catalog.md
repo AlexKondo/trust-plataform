@@ -71,6 +71,7 @@ Para isso, dois payloads foram enriquecidos (adição retrocompatível): `Verifi
 - **Produtor**: payment-service · **Agregado**: `TrustCustody` / id da custódia
 - **Consumidores**: nenhum hoje.
 - **Payload**: `trustCustodyId`, `paymentId`, `orderId`, `buyerId`, `sellerId`, `amount`, `currency`, `status`, `startedAt`
+- **IP-007 — reaproveitado para tranches incrementais**: o mesmo `eventType` é publicado com `aggregateType: 'IncrementalTrustCustody'` e `aggregateId` = id da tranche (não da custódia original) quando uma autorização incremental é aprovada — ver "IP-007" abaixo. Reaproveitar o tipo em vez de criar `IncrementalTrustCustody.Created` foi deliberado: o FATO é idêntico (um agregado de custódia nasceu), só o agregado muda; nenhum consumidor hoje assume cardinalidade "um por pagamento" para este evento (confirmado por grep em `notification-rules.ts`).
 
 ### Funds.Held (v1.0)
 
@@ -78,6 +79,7 @@ Para isso, dois payloads foram enriquecidos (adição retrocompatível): `Verifi
 - **Produtor**: payment-service · **Agregado**: `TrustCustody` / id da custódia
 - **Consumidores**: nenhum hoje; o Ledger (PAY-008) consumirá.
 - **Payload**: o mesmo de `TrustCustody.Created` + `paymentStatus`, `heldAt`
+- **IP-007**: mesmo reaproveitamento de `TrustCustody.Created` acima — `aggregateType: 'IncrementalTrustCustody'`, payload adicional `changeOrderId`/`incrementalAuthorizationId`, sem `paymentStatus` (a tranche não pilota o status do `Payment`, ver nota de `Funds.Released`).
 
 ### Funds.ReadyForRelease (v1.0)
 
@@ -85,6 +87,7 @@ Para isso, dois payloads foram enriquecidos (adição retrocompatível): `Verifi
 - **Produtor**: payment-service · **Agregado**: `TrustCustody` / id da custódia
 - **Consumidores**: `pay.finalize-release` — executa a liberação no gateway FORA de transação (§17).
 - **Payload**: `trustCustodyId`, `paymentId`, `orderId`, `buyerId`, `sellerId`, `amount`, `currency`, `status`
+- **IP-007**: publicado também para cada tranche incremental pronta para liberar (`aggregateType: 'IncrementalTrustCustody'`), a partir do MESMO `prepare()` que libera a custódia original — a confirmação do cliente (`MarketplaceOrder.CustomerConfirmed`) continua sendo o único gatilho de liberação, agora aplicado a TODAS as tranches do pedido, não só à original. `pay.finalize-release` já cobre este caso sem alteração de assinatura: `ReleaseFundsUseCase.finalize(custodyId, ...)` tenta a tabela original primeiro e cai para a tabela de tranches incrementais quando o id não é encontrado lá (mesmo espaço de ids, tabelas diferentes).
 
 ### Funds.Released (v1.0)
 
@@ -92,6 +95,7 @@ Para isso, dois payloads foram enriquecidos (adição retrocompatível): `Verifi
 - **Produtor**: payment-service · **Agregado**: `TrustCustody` / id da custódia
 - **Consumidores**: nenhum hoje; a Liquidação (PAY-005) e o Ledger (PAY-008) consumirão.
 - **Payload**: o de `Funds.ReadyForRelease` + `paymentStatus`, `providerTransactionId`, `releasedAt`
+- **IP-007**: mesmo reaproveitamento para tranches incrementais, SEM `paymentStatus` — a liberação de uma tranche incremental nunca transiciona `Payment.status` (essa transição já aconteceu, uma única vez, quando a tranche ORIGINAL liberou; `PAYMENT_TRANSITIONS` não tem `FUNDS_RELEASED -> FUNDS_RELEASED`). "Tudo foi liberado" é uma pergunta que se responde consultando todas as tranches (`GET /payments/by-order/{orderId}`'s `custodySummary`), não o status escalar do `Payment`.
 
 ### Payment.Created (v1.0)
 
@@ -107,6 +111,15 @@ Para isso, dois payloads foram enriquecidos (adição retrocompatível): `Verifi
 - **Consumidores**: `Authorized` será consumido pela custódia (Bloco 3). `AuthorizationFailed` não tem consumidor: a falha permite nova tentativa (BR-005) e não muda nada fora do pagamento.
 - **Payloads**: `Authorized {paymentId, orderId, buyerId, sellerId, authorizationId, providerId, amount, currency, status, authorizedAt}`; `AuthorizationFailed {…, failureCode, failedAt}`
 - **Nota de idempotência**: repetir a requisição com a mesma `Idempotency-Key` **não** republica o evento — a tentativa anterior é devolvida sem tocar no provedor.
+
+### IP-007 — PaymentIncrementalAuthorization.Approved (v1.0) · PaymentIncrementalAuthorization.Failed (v1.0)
+
+- **Descrição**: desfecho, em sandbox, da tentativa de autorizar o DELTA de um Trust Change Order aprovado (PACK-03 §9.1, gap `amountAuthorizedNotInCustody`). É o par `Payment.Authorized`/`Payment.AuthorizationFailed` aplicado a uma autorização incremental — mesmo port `PaymentGateway`, mesma convenção determinística do sandbox (final `.13` → DECLINED, `.99` → ERROR), tipo de evento NOVO porque o agregado é novo (`PaymentIncrementalAuthorization`, não `Payment` — o `Payment` original nunca muda de valor nem de status por causa disto).
+- **Produtor**: payment-service · **Agregado**: `PaymentIncrementalAuthorization` / id da autorização incremental
+- **Gatilho**: `TrustChangeOrder.Approved` → `pay.create-incremental-authorization-on-change-order-approved` → `CreateIncrementalAuthorizationUseCase`. Só `Approved` dispara — `Rejected`/`Cancelled`/o estado derivado `EXPIRED` nunca publicam este evento (ver nota em `TrustChangeOrder.Approved` acima).
+- **Consumidores**: nenhum externo hoje. Internamente, uma autorização `Approved` é seguida, na MESMA transação, pela criação da tranche de custódia (`TrustCustody.Created`/`Funds.Held` reaproveitados, ver acima) — não por um segundo consumer/evento, ao contrário do par PAY-002/PAY-003 original (ver justificativa na doc do use case: aqui não há ação do usuário entre autorizar e custodiar).
+- **Payloads**: `Approved {incrementalAuthorizationId, paymentId, changeOrderId, orderId, buyerId, sellerId, amount, currency, status: "APPROVED", authorizedAt}`; `Failed {…, status: "DECLINED"|"ERROR", failureCode, failedAt}`
+- **Idempotência**: `UNIQUE(change_order_id)` e `UNIQUE(idempotency_key)` em `payment_incremental_authorizations` — no máximo UMA autorização incremental por Change Order, para sempre, mesmo sob reentrega do evento gatilho ou corrida entre duas entregas concorrentes (prova: teste de corrida em `ip-007-incremental-payment-authorization.e2e.spec.ts`). `idempotencyKey = incremental-auth:{changeOrderId}` (determinística, mesmo padrão de `release:{custodyId}`).
 
 
 ### MarketplaceReview.Created (v1.0)
@@ -140,10 +153,10 @@ Para isso, dois payloads foram enriquecidos (adição retrocompatível): `Verifi
 
 - **Descrição**: mudança comercial proposta pelo Trust Partner e decidida pelo Trust Member (PACK-03 §6/§22). O fato que importa é a **decisão**: só `Approved` altera o valor autorizado do contrato.
 - **Produtor**: marketplace-service · **Agregado**: `TrustChangeOrder`
-- **Consumidores**: ✅ `ntf.change-order-submitted` (avisa o cliente que há mudança aguardando aprovação) · ✅ `ntf.change-order-approved` / ✅ `ntf.change-order-rejected` (avisam o prestador da decisão). Nenhum consumidor financeiro — ver a nota do §9 abaixo.
+- **Consumidores**: ✅ `ntf.change-order-submitted` (avisa o cliente que há mudança aguardando aprovação) · ✅ `ntf.change-order-approved` / ✅ `ntf.change-order-rejected` (avisam o prestador da decisão) · ✅ `pay.create-incremental-authorization-on-change-order-approved` (IP-007 — **novo**, único consumidor financeiro de `Approved`; ver seção "IP-007" abaixo).
 - **Payloads**: `Submitted {changeOrderId, orderId, buyerId, sellerId, proposedBy, type, additionalMinutes, changeGrossAmount, currency, reason, submittedAt, status}`; `Approved {changeOrderId, orderId, buyerId, sellerId, approvedBy, type, additionalMinutes, changeGrossAmount, changeTrustFeeAmount, currency, currentAuthorizedGrossAmount, amountAuthorizedNotInCustody, approvedAt, status}`; `Rejected {changeOrderId, orderId, buyerId, sellerId, rejectedBy, type, changeGrossAmount, currency, reason, rejectedAt, status}`
-- **Nota (PACK-03 §9 — item parado)**: `amountAuthorizedNotInCustody` existe porque o `Payment`/`TrustCustody` do PACK-01 congela o valor da contratação e não admite autorização incremental. O delta aprovado é **comercialmente autorizado, mas não custodiado** — quem for cobrá-lo (PACK-05/Asaas) recebe esse número no próprio fato.
-- **Sem evento**: `DRAFT` e `CANCELLED` não publicam nada — rascunho e retirada não mudam valor autorizado nenhum (§22: nada de evento por escrita de banco).
+- **Nota (PACK-03 §9 — item resolvido pela IP-007)**: `amountAuthorizedNotInCustody`, neste payload, continua sendo o corte **comercial-only** calculado pelo Marketplace no instante da aprovação (não é reescrito por esta IP — `TrustChangeOrder`/`authorized-commercial.service.ts` continuam sem saber nada de `Payment`). O que a IP-007 resolveu é que agora esse número deixa de ser permanente/definitivo: `pay.create-incremental-authorization-on-change-order-approved` reage a este mesmo evento e, em sandbox, autoriza e custodia o delta — a visão ATUALIZADA e verdadeira de quanto está custodiado (por tranche, não só o total) vive em `GET /payments/by-order/{orderId}`'s `custodySummary`, não neste payload nem no Service Summary do Marketplace (ver `docs/openapi.yaml`).
+- **Sem evento**: `DRAFT` e `CANCELLED` não publicam nada — rascunho e retirada não mudam valor autorizado nenhum (§22: nada de evento por escrita de banco); por construção, portanto, `Rejected`/`Cancelled`/o estado `EXPIRED` (que também nunca gravou uma transição própria, ver TrustChangeOrder.isExpiredAt()) **nunca disparam `pay.create-incremental-authorization-on-change-order-approved`** — o único gatilho é `Approved`.
 
 ### ServiceExecution.Paused (v1.0) · ServiceExecution.Resumed (v1.0)
 

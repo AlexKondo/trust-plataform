@@ -1,7 +1,12 @@
 import { toReais } from '../../../../shared/money/money';
 import { PaymentAuthorization } from '../../domain/entities/payment-authorization';
 import { Payment } from '../../domain/entities/payment';
-import { AuthorizationAttemptResponse, PaymentResponse } from '../dto/payment.dtos';
+import { PaymentCustodySummary } from '../../domain/services/payment-custody-summary.service';
+import {
+  AuthorizationAttemptResponse,
+  CustodySummaryResponse,
+  PaymentResponse,
+} from '../dto/payment.dtos';
 
 export function toPaymentResponse(payment: Payment): PaymentResponse {
   return {
@@ -18,6 +23,24 @@ export function toPaymentResponse(payment: Payment): PaymentResponse {
     paymentProviderId: payment.paymentProviderId,
     createdAt: payment.createdAt.toISOString(),
     updatedAt: payment.updatedAt.toISOString(),
+  };
+}
+
+export function toCustodySummaryResponse(summary: PaymentCustodySummary): CustodySummaryResponse {
+  return {
+    currency: summary.currency,
+    originalAmount: toReais(summary.originalAmountCents),
+    originalCustodyStatus: summary.originalCustodyStatus,
+    totalCommerciallyAuthorized: toReais(summary.totalCommerciallyAuthorizedCents),
+    totalHeld: toReais(summary.totalHeldCents),
+    amountAuthorizedNotInCustody: toReais(summary.amountAuthorizedNotInCustodyCents),
+    incrementalTranches: summary.incrementalTranches.map((tranche) => ({
+      changeOrderId: tranche.changeOrderId,
+      incrementalAuthorizationId: tranche.incrementalAuthorizationId,
+      amount: toReais(tranche.amountCents),
+      authorizationStatus: tranche.authorizationStatus,
+      custodyStatus: tranche.custodyStatus,
+    })),
   };
 }
 
