@@ -105,4 +105,17 @@ export class AppConfigService {
   get passwordBreachCheckEnabled(): boolean {
     return this.config.get('PASSWORD_BREACH_CHECK_ENABLED', { infer: true });
   }
+
+  /** IP-009 — nunca configurada em nenhum ambiente até uma conta Asaas real existir. */
+  get asaasApiKey(): string | undefined {
+    return this.config.get('ASAAS_API_KEY', { infer: true });
+  }
+
+  get asaasEnvironment(): Env['ASAAS_ENVIRONMENT'] {
+    return this.config.get('ASAAS_ENVIRONMENT', { infer: true });
+  }
+
+  get asaasWebhookToken(): string | undefined {
+    return this.config.get('ASAAS_WEBHOOK_TOKEN', { infer: true });
+  }
 }

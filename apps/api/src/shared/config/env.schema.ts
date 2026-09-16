@@ -49,6 +49,14 @@ export const envSchema = z.object({
     .enum(['true', 'false'])
     .default('true')
     .transform((value) => value === 'true'),
+
+  // --- Asaas (IP-009 — adapter contrato/esqueleto; ver Conflict Escalation) ---
+  // Nenhuma destas variáveis existe em nenhum ambiente hoje. Todas opcionais
+  // para não quebrar nenhum .env existente — sua ausência é o estado
+  // esperado até uma conta Asaas real ser provisionada.
+  ASAAS_API_KEY: z.string().optional(),
+  ASAAS_ENVIRONMENT: z.enum(['sandbox', 'production']).default('sandbox'),
+  ASAAS_WEBHOOK_TOKEN: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
