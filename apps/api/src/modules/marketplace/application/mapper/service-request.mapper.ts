@@ -1,9 +1,14 @@
+import { MarketplaceListing } from '../../domain/entities/marketplace-listing';
+import { MarketplaceOffer } from '../../domain/entities/marketplace-offer';
+import { PRICING_MODEL } from '../../domain/entities/marketplace-types';
 import { ServiceRequest } from '../../domain/entities/service-request';
 import { MarketplaceCategory, ListingSearchRow } from '../../domain/repositories/marketplace-listing.repository';
 import { ServiceRequestEngagementRecord } from '../../domain/repositories/service-request.repository';
 import {
+  OfferComparisonTerms,
   ServiceRequestEngagementResponse,
   ServiceRequestMatchResponse,
+  ServiceRequestOfferComparisonItem,
   ServiceRequestResponse,
   ServiceRequestSummaryResponse,
 } from '../dto/service-request.dtos';
@@ -90,5 +95,65 @@ export function toEngagementResponse(
     partnerId: record.partnerId,
     conversationId: record.conversationId,
     engagedAt: record.engagedAt.toISOString(),
+  };
+}
+
+// ── Competitive Quotes & Comparison Map (IP-004) ────────────────────────────
+
+/**
+ * `amount` é sempre o valor literal do `MarketplaceOffer` (nunca recalculado
+ * por esta IP). Para HOURLY, `amount` já É o mínimo contratado derivado
+ * (`calculateInitialHourlyAmount`, PACK-02) — `estimatedTotalBasis` só rotula
+ * explicitamente o que esse número significa, para a UI nunca apresentar um
+ * valor HOURLY como se fosse um total fechado equivalente a um FIXED_PRICE.
+ */
+export function toOfferComparisonTerms(offer: MarketplaceOffer, roundCount: number, now: Date): OfferComparisonTerms {
+  return {
+    offerId: offer.id,
+    status: offer.effectiveStatus(now),
+    createdBy: offer.createdBy,
+    pricingModel: offer.pricingModel,
+    currency: offer.currency,
+    quantity: offer.quantity,
+    amount: offer.amount,
+    estimatedTotalBasis:
+      offer.pricingModel === PRICING_MODEL.HOURLY ? 'HOURLY_MINIMUM_COMMITMENT' : 'FIXED_TOTAL',
+    hourlyRateAmount: offer.hourlyRateAmount,
+    minimumMinutes: offer.minimumMinutes,
+    billingIncrementMinutes: offer.billingIncrementMinutes,
+    notes: offer.notes,
+    expiresAt: offer.expiresAt.toISOString(),
+    createdAt: offer.createdAt.toISOString(),
+    roundCount,
+  };
+}
+
+export function toOfferComparisonItem(
+  engagement: ServiceRequestEngagementRecord,
+  listing: MarketplaceListing | null,
+  conversationStatus: string | null,
+  offers: MarketplaceOffer[],
+  trustScore: { score: number; level: string } | null,
+  now: Date,
+): ServiceRequestOfferComparisonItem {
+  // A cadeia (`findByConversation`, mais antiga -> mais nova) tem, no máximo,
+  // uma proposta "viva" por vez (MRK-009 §6.3 `assertNoLiveOffer`): cada
+  // `counter()` fecha o pai como COUNTERED e nasce no fim da lista (MRK-012
+  // BR-004). O último item é sempre a rodada atual da negociação.
+  const current = offers.length > 0 ? offers[offers.length - 1] : null;
+  return {
+    engagementId: engagement.id,
+    listingId: engagement.listingId,
+    listingTitle: listing?.title ?? null,
+    partner: {
+      identityId: engagement.partnerId,
+      trustScore: trustScore?.score ?? null,
+      trustLevel: trustScore?.level ?? null,
+    },
+    conversationId: engagement.conversationId,
+    conversationStatus,
+    engagedAt: engagement.engagedAt.toISOString(),
+    hasOffer: current !== null,
+    offer: current ? toOfferComparisonTerms(current, offers.length, now) : null,
   };
 }

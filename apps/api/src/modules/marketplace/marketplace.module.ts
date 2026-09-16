@@ -14,6 +14,7 @@ import { CreateServiceRequestUseCase } from './application/usecases/create-servi
 import { GetServiceRequestUseCase } from './application/usecases/get-service-request.usecase';
 import { DiscoverServiceRequestMatchesUseCase } from './application/usecases/discover-service-request-matches.usecase';
 import { EngageServiceRequestUseCase } from './application/usecases/engage-service-request.usecase';
+import { CompareServiceRequestOffersUseCase } from './application/usecases/compare-service-request-offers.usecase';
 import {
   CancelServiceRequestUseCase,
   CloseServiceRequestUseCase,
@@ -107,6 +108,7 @@ import { DrizzleTrustChangeOrderRepository } from './infrastructure/persistence/
     EngageServiceRequestUseCase,
     CloseServiceRequestUseCase,
     CancelServiceRequestUseCase,
+    CompareServiceRequestOffersUseCase,
     MarketplaceOfferService,
     CreateOfferUseCase,
     UpdateOfferUseCase,

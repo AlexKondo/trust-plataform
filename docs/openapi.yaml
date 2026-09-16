@@ -1189,6 +1189,36 @@ paths:
         '409': { description: 'Pedido CLOSED/CANCELLED/EXPIRED não aceita novo engajamento (SERVICE_REQUEST_NOT_ENGAGEABLE)' }
         '422': { description: 'Engajar o próprio anúncio (CANNOT_CONTACT_OWN_LISTING, herdado do MRK-006)' }
 
+  /marketplace/service-requests/{serviceRequestId}/offers:
+    get:
+      tags: [Marketplace]
+      summary: IP-004 — Comparação lado a lado das propostas concorrentes deste pedido
+      description: >
+        Uma linha por Partner engajado (`ServiceRequestEngagement`, IP-003),
+        cada um com a rodada VIVA da sua própria negociação (última entrada de
+        `GET /marketplace/conversations/{id}/offers`, MRK-012 §6.2) — a
+        máquina de estados de proposta/aceite (MRK-009..014) é lida, nunca
+        alterada por esta rota. `pricingModel` nunca é convertido entre
+        FIXED_PRICE e HOURLY: `amount` é sempre o valor literal da proposta
+        (para HOURLY, o mínimo contratado já derivado por
+        `calculateInitialHourlyAmount`, PACK-02 §4.2) e `estimatedTotalBasis`
+        rotula explicitamente o que esse número significa
+        (`FIXED_TOTAL` | `HOURLY_MINIMUM_COMMITMENT`). Sem ranking oculto/paid
+        placement e sem vencedor automático (IP-004 §4): os itens vêm
+        ordenados por `engagedAt` (ordem de contato). `hasOffer: false`
+        significa que o Partner foi engajado mas ainda não existe proposta na
+        conversa (MRK-009 BR-001: quem abre a negociação é sempre o
+        comprador/Member). Aceitar uma proposta continua sendo
+        `POST /marketplace/offers/{offerId}/accept` (MRK-013, intocado) — o
+        aceite só encerra as concorrentes da MESMA negociação (BR-004); a
+        proposta de outro Partner (outra conversa) permanece PENDING até o
+        Member decidir por ela também.
+      operationId: compareServiceRequestOffers
+      parameters: [{ name: serviceRequestId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: '{serviceRequestId, serviceRequestStatus, items: [{engagementId, listingId, listingTitle, partner: {identityId, trustScore, trustLevel}, conversationId, conversationStatus, engagedAt, hasOffer, offer}]}' }
+        '404': { description: 'Inexistente ou de outro Member (SERVICE_REQUEST_NOT_FOUND)' }
+
   /marketplace/service-requests/{serviceRequestId}/close:
     post:
       tags: [Marketplace]

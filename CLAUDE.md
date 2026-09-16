@@ -260,6 +260,40 @@ serializada. Dinheiro sempre em centavos inteiros
 flutuante. Detalhes, decisões e critérios de aceite em
 [docs/Multi-Agent Implementation Doc/IPS/IP-020-COMPLETION-REPORT.md](docs/Multi-Agent%20Implementation%20Doc/IPS/IP-020-COMPLETION-REPORT.md).
 
+## IP-004 — Competitive Quotes & Comparison Map (2026-09-16)
+
+Confirmado em código (não assumido) que um `ServiceRequest` (IP-003) já
+suportava N Partners engajados antes desta IP: `OPEN -> MATCHED` é
+idempotente por design ("pelo menos um contato já foi feito", não
+exclusividade) e `ServiceRequestEngagement` tem `UNIQUE(service_request_id,
+listing_id)` — um engajamento por Partner, cada um com sua PRÓPRIA
+`MarketplaceConversation`/cadeia de `MarketplaceOffer` (MRK-006..014). Não foi
+preciso reabrir `EngageServiceRequestUseCase`: a cardinalidade 1:N já existia;
+faltava só a camada de LEITURA que junta as negociações paralelas lado a lado.
+
+`GET /marketplace/service-requests/{id}/offers` (novo, só-leitura, dono do
+pedido apenas — 404 para qualquer outro `identityId`, mesma postura do resto
+do agregado) devolve uma linha por Partner engajado com a rodada viva da sua
+negociação (`Trust Score`/nível do Partner, `hasOffer: false` quando o Partner
+foi contatado mas ainda não existe proposta — MRK-009 BR-001: quem abre é
+sempre o Member). FIXED_PRICE e HOURLY nunca são convertidos um no outro:
+`amount` é sempre o valor literal da proposta (para HOURLY, o mínimo
+contratado já derivado por `calculateInitialHourlyAmount`, PACK-02 §4.2), e
+`estimatedTotalBasis` (`FIXED_TOTAL` | `HOURLY_MINIMUM_COMMITMENT`) rotula
+explicitamente o que esse número significa — tempo além do mínimo só vira
+dinheiro através de um Trust Change Order aprovado (PACK-03), nunca
+automaticamente aqui. Sem ranking oculto/paid placement e sem vencedor
+automático: os itens vêm ordenados por `engagedAt` (ordem de contato).
+
+A máquina de estados de aceite (MRK-013, `AcceptOfferUseCase`) não foi tocada:
+aceitar uma proposta continua fechando só as concorrentes da MESMA negociação
+(BR-004); a proposta de outro Partner (outra conversa) permanece PENDING até
+o Member decidir por ela também — provado por e2e dedicado. Nenhuma
+migration/evento novo: é pura leitura sobre entidades já persistidas
+(`ServiceRequestEngagement`, `MarketplaceOffer`, `MarketplaceConversation`,
+`TrustScore`). Detalhes, decisões e critérios de aceite em
+[docs/Multi-Agent Implementation Doc/IPS/IP-004-COMPLETION-REPORT.md](docs/Multi-Agent%20Implementation%20Doc/IPS/IP-004-COMPLETION-REPORT.md).
+
 ## Documentos-guia (ler nesta ordem)
 
 1. [PLANO-DE-MODULOS.md](PLANO-DE-MODULOS.md) — quebra em módulos, ordem de desenvolvimento, grafo de dependências

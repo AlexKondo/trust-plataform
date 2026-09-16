@@ -143,3 +143,67 @@ export interface ServiceRequestEngagementResponse {
   conversationId: string;
   engagedAt: string;
 }
+
+// ── Competitive Quotes & Comparison Map (IP-004) ────────────────────────────
+
+/**
+ * Termos normalizados da proposta viva de uma negociação, para comparação
+ * lado a lado. `amount` é sempre o valor LITERAL da proposta (MRK-009/PACK-02):
+ * para FIXED_PRICE é o total fechado; para HOURLY é o valor MÍNIMO contratado
+ * (`hourlyRateAmount × minimumMinutes`, já derivado pelo domínio — ver
+ * `hourly-pricing.service.ts`), nunca um total "equivalente" inventado por
+ * esta IP. `estimatedTotalBasis` é o rótulo explícito que distingue os dois
+ * significados — nenhum dos dois é silenciosamente convertido no outro. Tempo
+ * além de `minimumMinutes` só se torna dinheiro através de um Trust Change
+ * Order aprovado (PACK-03), nunca automaticamente aqui.
+ */
+export interface OfferComparisonTerms {
+  offerId: string;
+  /** Status efetivo (`MarketplaceOffer.effectiveStatus`) — PENDING vencida já aparece como EXPIRED. */
+  status: string;
+  createdBy: string;
+  /** FIXED_PRICE | HOURLY — nunca traduzido/convertido entre si. */
+  pricingModel: string;
+  currency: string;
+  quantity: number;
+  /** Valor literal da proposta — ver comentário da interface. */
+  amount: number;
+  /** FIXED_TOTAL (amount = total fechado) | HOURLY_MINIMUM_COMMITMENT (amount = mínimo contratado, não um teto). */
+  estimatedTotalBasis: 'FIXED_TOTAL' | 'HOURLY_MINIMUM_COMMITMENT';
+  hourlyRateAmount: number | null;
+  minimumMinutes: number | null;
+  billingIncrementMinutes: number | null;
+  notes: string | null;
+  expiresAt: string;
+  createdAt: string;
+  /** Quantas rodadas (proposta + contrapropostas) essa negociação já teve — sinal de transparência, não ranking. */
+  roundCount: number;
+}
+
+/**
+ * Um Partner engajado neste pedido, com a proposta viva (se houver) da sua
+ * própria negociação (conversa). Cada Partner tem sua PRÓPRIA conversa/cadeia
+ * de ofertas (`ServiceRequestEngagement`, IP-003) — esta IP não funde nem
+ * reordena essas negociações, só as lista lado a lado. Sem ranking oculto e
+ * sem vencedor automático (IP-004 §4): a ordem é sempre por `engagedAt`
+ * (ordem de contato), nunca por preço/score.
+ */
+export interface ServiceRequestOfferComparisonItem {
+  engagementId: string;
+  listingId: string;
+  listingTitle: string | null;
+  partner: { identityId: string; trustScore: number | null; trustLevel: string | null };
+  conversationId: string;
+  /** OPEN | CLOSED — sinal de disponibilidade/condição comercial (conversa encerrada = negociação não segue). */
+  conversationStatus: string | null;
+  engagedAt: string;
+  /** false quando o Partner foi engajado mas ainda não existe proposta na conversa (MRK-009: quem abre é o comprador/Member). */
+  hasOffer: boolean;
+  offer: OfferComparisonTerms | null;
+}
+
+export interface ServiceRequestOfferComparisonResponse {
+  serviceRequestId: string;
+  serviceRequestStatus: string;
+  items: ServiceRequestOfferComparisonItem[];
+}

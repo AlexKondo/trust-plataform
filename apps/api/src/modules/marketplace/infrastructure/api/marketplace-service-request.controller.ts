@@ -19,6 +19,7 @@ import {
   engageServiceRequestRequestSchema,
 } from '../../application/dto/service-request.dtos';
 import { CancelServiceRequestUseCase, CloseServiceRequestUseCase } from '../../application/usecases/resolve-service-request.usecase';
+import { CompareServiceRequestOffersUseCase } from '../../application/usecases/compare-service-request-offers.usecase';
 import { CreateServiceRequestUseCase } from '../../application/usecases/create-service-request.usecase';
 import { DiscoverServiceRequestMatchesUseCase } from '../../application/usecases/discover-service-request-matches.usecase';
 import { EngageServiceRequestUseCase } from '../../application/usecases/engage-service-request.usecase';
@@ -43,6 +44,7 @@ export class MarketplaceServiceRequestController {
     private readonly engageUseCase: EngageServiceRequestUseCase,
     private readonly closeUseCase: CloseServiceRequestUseCase,
     private readonly cancelUseCase: CancelServiceRequestUseCase,
+    private readonly compareOffersUseCase: CompareServiceRequestOffersUseCase,
   ) {}
 
   /** IP-003 — Member descreve a necessidade. */
@@ -106,6 +108,21 @@ export class MarketplaceServiceRequestController {
     const result = await this.engageUseCase.execute(identity.identityId, serviceRequestId, body, this.meta(request));
     reply.status(result.created ? HttpStatus.CREATED : HttpStatus.OK);
     return result;
+  }
+
+  /**
+   * IP-004 — comparação lado a lado das propostas concorrentes deste pedido:
+   * uma linha por Partner engajado, com a rodada viva da sua própria
+   * negociação (MRK-009..014, inalterada) normalizada (FIXED_PRICE/HOURLY
+   * nunca convertidos entre si). Só leitura; aceite continua sendo
+   * `POST /marketplace/offers/{offerId}/accept` (MRK-013, intocado).
+   */
+  @Get(':serviceRequestId/offers')
+  async offers(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('serviceRequestId', new ZodValidationPipe(serviceRequestIdSchema)) serviceRequestId: string,
+  ) {
+    return this.compareOffersUseCase.execute(identity.identityId, serviceRequestId);
   }
 
   @Post(':serviceRequestId/close')
