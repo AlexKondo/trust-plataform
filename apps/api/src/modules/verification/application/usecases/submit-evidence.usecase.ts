@@ -6,6 +6,7 @@ import { AuditLogService } from '../../../../shared/audit/audit-log.service';
 import { AppConfigService } from '../../../../shared/config/app-config.service';
 import { DRIZZLE, Database } from '../../../../shared/database/database.module';
 import { OutboxService } from '../../../../shared/events/outbox.service';
+import { RateLimitService } from '../../../../shared/safety/rate-limit.service';
 import {
   EvidenceFileTooLargeException,
   EvidenceTypeNotRequiredException,
@@ -39,6 +40,7 @@ export class SubmitEvidenceUseCase {
     private readonly outboxService: OutboxService,
     private readonly auditLogService: AuditLogService,
     private readonly config: AppConfigService,
+    private readonly rateLimitService: RateLimitService,
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly logger: PinoLogger,
   ) {
@@ -50,6 +52,31 @@ export class SubmitEvidenceUseCase {
     input: SubmitEvidenceInput,
     meta: RequestMeta = {},
   ): Promise<{ verificationId: string; status: string }> {
+    // IP-014: upload de evidência já tem limite de tamanho/MIME (VRF-002
+    // BR-003/004) — o que faltava era limitar a FREQUÊNCIA de tentativas,
+    // que é o vetor de abuso de armazenamento/custo (reenviar lixo repetidas
+    // vezes). Antes de qualquer leitura de negócio, mesmo padrão do login.
+    try {
+      await this.rateLimitService.assertWithinLimit(identityId, 'SubmitVerificationEvidence', {
+        maxAttempts: this.config.sensitiveActionRateLimitMaxAttempts,
+        windowMinutes: this.config.sensitiveActionRateLimitWindowMinutes,
+      });
+    } catch (error) {
+      await this.auditLogService.recordSafe({
+        identityId,
+        operation: 'SubmitVerificationEvidence',
+        resource: 'Verification',
+        resourceId: input.verificationId,
+        result: 'DENIED',
+        ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
+        correlationId: meta.correlationId,
+        requestId: meta.requestId,
+        metadata: { reason: 'RATE_LIMIT_EXCEEDED' },
+      });
+      throw error;
+    }
+
     const verification = await this.repository.findById(input.verificationId);
     if (!verification) {
       throw new VerificationNotFoundException();

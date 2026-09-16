@@ -1,7 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { AuditLogService } from '../../../../shared/audit/audit-log.service';
+import { AppConfigService } from '../../../../shared/config/app-config.service';
 import { DRIZZLE, Database } from '../../../../shared/database/database.module';
+import { RateLimitService } from '../../../../shared/safety/rate-limit.service';
 import { IdentityRepository } from '../../../identity/domain/repositories/identity.repository';
 import { SessionRepository } from '../../../identity/domain/repositories/session.repository';
 import { TrustPassportRepository } from '../../../trust-passport/domain/repositories/trust-passport.repository';
@@ -63,6 +65,8 @@ export class RequestDataDeletionUseCase {
     private readonly sessionRepository: SessionRepository,
     private readonly eligibilityService: DeletionEligibilityService,
     private readonly auditLogService: AuditLogService,
+    private readonly rateLimitService: RateLimitService,
+    private readonly config: AppConfigService,
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly logger: PinoLogger,
   ) {
@@ -74,6 +78,31 @@ export class RequestDataDeletionUseCase {
     const identity = await this.identityRepository.findById(identityId);
     if (!identity) {
       throw new PrivacyRequestNotFoundException();
+    }
+
+    // IP-014: uma conta destrutiva demais rápido é o padrão clássico de abuso
+    // (conta comprometida tentando repetidas exclusões, ou script de
+    // automação). O rate limit é canônico (RateLimitService); a negativa é
+    // auditada explicitamente aqui, como o lockout de login já faz, porque o
+    // GlobalExceptionFilter não grava audit_logs sozinho.
+    try {
+      await this.rateLimitService.assertWithinLimit(identityId, 'RequestDataDeletion', {
+        maxAttempts: this.config.sensitiveActionRateLimitMaxAttempts,
+        windowMinutes: this.config.sensitiveActionRateLimitWindowMinutes,
+      });
+    } catch (error) {
+      await this.auditLogService.recordSafe({
+        identityId,
+        operation: 'RequestDataDeletion',
+        resource: 'PrivacyRequest',
+        result: 'DENIED',
+        ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
+        correlationId: meta.correlationId,
+        requestId: meta.requestId,
+        metadata: { reason: 'RATE_LIMIT_EXCEEDED' },
+      });
+      throw error;
     }
 
     // Lido ANTES da transação — não é o que decide se a exclusão prossegue

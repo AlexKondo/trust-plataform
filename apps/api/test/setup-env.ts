@@ -32,6 +32,13 @@ if (process.env.TEST_DATABASE_URL) {
   process.env.SUPABASE_SERVICE_ROLE_KEY = '';
   // Loops de polling dos e2e não devem esbarrar no rate limit
   process.env.RATE_LIMIT_MAX_PER_MINUTE = '100000';
+  // IP-014 — e2e/integration exercitam vários fluxos sensíveis (Change
+  // Order, disputa, exclusão de conta, evidência) repetidamente na mesma
+  // Identity dentro de uma suíte; o limite canônico não deve interferir
+  // nesses testes (a suíte dedicada de rate limit configura seu próprio
+  // limite baixo por teste).
+  process.env.SENSITIVE_ACTION_RATE_LIMIT_MAX_ATTEMPTS = '100000';
+  process.env.SENSITIVE_ACTION_RATE_LIMIT_WINDOW_MINUTES = '60';
 } else {
   // IP-001 — DX/CI-hygiene: sem TEST_DATABASE_URL (ex.: `pnpm test` puro,
   // sem Postgres disponível), os specs e2e/integration ficam corretamente

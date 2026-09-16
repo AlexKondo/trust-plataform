@@ -4,6 +4,7 @@ import { AuditLogService } from '../../../../shared/audit/audit-log.service';
 import { AppConfigService } from '../../../../shared/config/app-config.service';
 import { Database } from '../../../../shared/database/database.module';
 import { OutboxService } from '../../../../shared/events/outbox.service';
+import { RateLimitService } from '../../../../shared/safety/rate-limit.service';
 import { Identity } from '../../domain/entities/identity';
 import { PasswordResetToken } from '../../domain/entities/password-reset-token';
 import { Session } from '../../domain/entities/session';
@@ -51,6 +52,8 @@ const hashMock = () =>
   }) as unknown as PasswordHashService;
 const breachMock = () =>
   ({ isBreached: vi.fn().mockResolvedValue(false) }) as unknown as PasswordBreachService;
+const rateLimitMock = () =>
+  ({ assertWithinLimit: vi.fn().mockResolvedValue(undefined) }) as unknown as RateLimitService;
 
 function makeIdentity(): Identity {
   const identity = Identity.createNew({
@@ -82,7 +85,13 @@ describe('ForgotPasswordUseCase (IDN-007)', () => {
       emailService,
       outboxService,
       auditMock(),
-      { passwordResetTtlMinutes: 30, appBaseUrl: 'http://localhost:3000' } as AppConfigService,
+      {
+        passwordResetTtlMinutes: 30,
+        appBaseUrl: 'http://localhost:3000',
+        sensitiveActionRateLimitMaxAttempts: 5,
+        sensitiveActionRateLimitWindowMinutes: 60,
+      } as AppConfigService,
+      rateLimitMock(),
       dbMock(),
       logger(),
     );

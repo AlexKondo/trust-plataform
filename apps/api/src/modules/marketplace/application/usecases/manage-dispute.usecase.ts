@@ -2,8 +2,10 @@ import { Inject, Injectable } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { PaginatedResult } from '../../../../shared/api/api-envelope';
 import { AuditLogService } from '../../../../shared/audit/audit-log.service';
+import { AppConfigService } from '../../../../shared/config/app-config.service';
 import { DRIZZLE, Database } from '../../../../shared/database/database.module';
 import { OutboxService } from '../../../../shared/events/outbox.service';
+import { RateLimitService } from '../../../../shared/safety/rate-limit.service';
 import {
   DisputeDecision,
   MarketplaceDispute,
@@ -39,6 +41,8 @@ export class ManageDisputeUseCase {
     private readonly lifecycle: OrderLifecycleService,
     private readonly outboxService: OutboxService,
     private readonly auditLogService: AuditLogService,
+    private readonly rateLimitService: RateLimitService,
+    private readonly config: AppConfigService,
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly logger: PinoLogger,
   ) {
@@ -52,6 +56,30 @@ export class ManageDisputeUseCase {
     body: OpenDisputeRequest,
     meta: RequestMeta = {},
   ): Promise<DisputeResponse> {
+    // IP-014: disputa é uma ferramenta séria (trava o pedido) — limitar
+    // quantas uma mesma Identity abre por janela desestimula abuso de
+    // disputa como alavanca de negociação sem travar o caso legítimo.
+    try {
+      await this.rateLimitService.assertWithinLimit(identityId, 'OpenMarketplaceDispute', {
+        maxAttempts: this.config.sensitiveActionRateLimitMaxAttempts,
+        windowMinutes: this.config.sensitiveActionRateLimitWindowMinutes,
+      });
+    } catch (error) {
+      await this.auditLogService.recordSafe({
+        identityId,
+        operation: 'OpenMarketplaceDispute',
+        resource: 'MarketplaceOrder',
+        resourceId: orderId,
+        result: 'DENIED',
+        ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
+        correlationId: meta.correlationId,
+        requestId: meta.requestId,
+        metadata: { reason: 'RATE_LIMIT_EXCEEDED' },
+      });
+      throw error;
+    }
+
     const { order } = await this.lifecycle.loadForParticipant(orderId, identityId);
     const previousStatus = order.status;
 

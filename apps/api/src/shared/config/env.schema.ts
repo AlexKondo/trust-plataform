@@ -38,6 +38,17 @@ export const envSchema = z.object({
   LOGIN_LOCKOUT_MINUTES: z.coerce.number().int().min(1).default(15),
   RATE_LIMIT_MAX_PER_MINUTE: z.coerce.number().int().min(1).default(100),
 
+  // IP-014 — rate limit canônico por Identity+operação para endpoints sensíveis
+  // (forgot-password, exclusão de conta, abertura de disputa, criação de Change
+  // Order). Configurável, nunca hardcoded (DOC-002).
+  SENSITIVE_ACTION_RATE_LIMIT_MAX_ATTEMPTS: z.coerce.number().int().min(1).default(5),
+  SENSITIVE_ACTION_RATE_LIMIT_WINDOW_MINUTES: z.coerce.number().int().min(1).default(60),
+  // IP-014 — padrão determinístico e explicável de Change Order suspeito
+  // (§6 acceptance: "flags are explainable"). Nunca bloqueia — só sinaliza
+  // para revisão manual.
+  CHANGE_ORDER_SUSPICIOUS_COUNT_THRESHOLD: z.coerce.number().int().min(1).default(5),
+  CHANGE_ORDER_SUSPICIOUS_AMOUNT_RATIO_BPS: z.coerce.number().int().min(1).default(5000),
+
   BREVO_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().email().default('no-reply@trustplatform.com'),
   /** Base do frontend para montar links de e-mail (verify, reset). */

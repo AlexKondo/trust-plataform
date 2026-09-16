@@ -8,6 +8,7 @@ import { SecurityModule } from './shared/security/security.module';
 import { JwtAuthGuard } from './shared/security/jwt-auth.guard';
 import { EventsModule } from './shared/events/events.module';
 import { AuditModule } from './shared/audit/audit.module';
+import { SafetyModule } from './shared/safety/safety.module';
 import { StorageModule } from './shared/storage/storage.module';
 import { LegalConsentModule } from './shared/privacy/legal-consent.module';
 import { ResponseEnvelopeInterceptor } from './shared/api/response-envelope.interceptor';
@@ -31,6 +32,7 @@ import { VerificationModule } from './modules/verification/verification.module';
     SecurityModule,
     EventsModule,
     AuditModule,
+    SafetyModule,
     StorageModule,
     LegalConsentModule,
     HealthModule,

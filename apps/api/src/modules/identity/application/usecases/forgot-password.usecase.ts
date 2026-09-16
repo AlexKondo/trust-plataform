@@ -4,6 +4,8 @@ import { AuditLogService } from '../../../../shared/audit/audit-log.service';
 import { AppConfigService } from '../../../../shared/config/app-config.service';
 import { DRIZZLE, Database } from '../../../../shared/database/database.module';
 import { OutboxService } from '../../../../shared/events/outbox.service';
+import { RateLimitService } from '../../../../shared/safety/rate-limit.service';
+import { SensitiveActionRateLimitExceededException } from '../../../../shared/safety/safety.exceptions';
 import { PasswordResetToken } from '../../domain/entities/password-reset-token';
 import { IdentityRepository } from '../../domain/repositories/identity.repository';
 import { PasswordResetTokenRepository } from '../../domain/repositories/password-reset-token.repository';
@@ -35,6 +37,7 @@ export class ForgotPasswordUseCase {
     private readonly outboxService: OutboxService,
     private readonly auditLogService: AuditLogService,
     private readonly config: AppConfigService,
+    private readonly rateLimitService: RateLimitService,
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly logger: PinoLogger,
   ) {
@@ -48,6 +51,31 @@ export class ForgotPasswordUseCase {
     try {
       const identity = await this.identityRepository.findByEmail(request.email);
       if (identity) {
+        // IP-014: limite por Identity — não pelo e-mail digitado, que o
+        // chamador não prova possuir. BR-003 continua intacto: a resposta
+        // pública é sempre a mesma mesmo quando o limite já foi atingido.
+        try {
+          await this.rateLimitService.assertWithinLimit(identity.id, 'ForgotPassword', {
+            maxAttempts: this.config.sensitiveActionRateLimitMaxAttempts,
+            windowMinutes: this.config.sensitiveActionRateLimitWindowMinutes,
+          });
+        } catch (error) {
+          if (error instanceof SensitiveActionRateLimitExceededException) {
+            await this.auditLogService.recordSafe({
+              identityId: identity.id,
+              operation: 'ForgotPassword',
+              resource: 'Identity',
+              result: 'DENIED',
+              ipAddress: metadata.ipAddress,
+              userAgent: metadata.userAgent,
+              correlationId: metadata.correlationId,
+              requestId: metadata.requestId,
+              metadata: { reason: 'RATE_LIMIT_EXCEEDED' },
+            });
+            return { message: PUBLIC_MESSAGE };
+          }
+          throw error;
+        }
         await this.issueAndSend(identity.id, identity.email, identity.fullName, metadata);
       } else {
         // Auditoria interna sem expor nada ao cliente (log não revela existência)

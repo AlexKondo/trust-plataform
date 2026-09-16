@@ -6,6 +6,8 @@ import { AuditLogService } from '../../../../shared/audit/audit-log.service';
 import { AppConfigService } from '../../../../shared/config/app-config.service';
 import { DRIZZLE, Database } from '../../../../shared/database/database.module';
 import { OutboxService } from '../../../../shared/events/outbox.service';
+import { RateLimitService } from '../../../../shared/safety/rate-limit.service';
+import { RiskFlagService } from '../../../../shared/safety/risk-flag.service';
 import { EvidenceStorageService } from '../../../../shared/storage/evidence-storage.service';
 import { MarketplaceCommercialSnapshot } from '../../domain/entities/marketplace-commercial-snapshot';
 import { MarketplaceOrder } from '../../domain/entities/marketplace-order';
@@ -74,6 +76,8 @@ export class ManageChangeOrderUseCase {
     private readonly outboxService: OutboxService,
     private readonly auditLogService: AuditLogService,
     private readonly config: AppConfigService,
+    private readonly rateLimitService: RateLimitService,
+    private readonly riskFlagService: RiskFlagService,
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly logger: PinoLogger,
   ) {
@@ -92,6 +96,32 @@ export class ManageChangeOrderUseCase {
     this.assertOrderAcceptsChanges(order);
     const snapshot = await this.loadSnapshot(orderId);
 
+    // IP-014: criar Change Order é uma ferramenta de renegociação de preço —
+    // limitar a frequência por Identity desestimula abuso (pressionar o
+    // cliente com propostas repetidas).
+    try {
+      await this.rateLimitService.assertWithinLimit(identityId, 'CreateTrustChangeOrder', {
+        maxAttempts: this.config.sensitiveActionRateLimitMaxAttempts,
+        windowMinutes: this.config.sensitiveActionRateLimitWindowMinutes,
+      });
+    } catch (error) {
+      await this.auditLogService.recordSafe({
+        identityId,
+        operation: 'CreateTrustChangeOrder',
+        resource: 'MarketplaceOrder',
+        resourceId: orderId,
+        result: 'DENIED',
+        ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
+        correlationId: meta.correlationId,
+        requestId: meta.requestId,
+        metadata: { reason: 'RATE_LIMIT_EXCEEDED' },
+      });
+      throw error;
+    }
+
+    const existingOnOrder = await this.changeOrderRepository.listByOrder(orderId);
+
     const changeOrder = TrustChangeOrder.create({
       orderId,
       proposedBy: identityId,
@@ -106,10 +136,31 @@ export class ManageChangeOrderUseCase {
       expiresAt: body.expiresAt,
     });
 
+    // IP-014 — padrão suspeito determinístico e explicável (nunca ML/score
+    // opaco): muitos Change Orders no mesmo pedido, ou um delta grande demais
+    // em relação ao valor original congelado no snapshot. Isso NUNCA bloqueia
+    // a criação — só levanta um risk flag para a fila do admin decidir
+    // (§4 out-of-scope: "no black-box blocking without reason/audit").
+    const suspicion = this.detectSuspiciousPattern(existingOnOrder.length, snapshot, changeOrder);
+
     // §6.1: DRAFT não muda valor autorizado nenhum — por isso não há evento
     // aqui, só auditoria. Evento só quando o fato interessa a outro módulo.
     await this.db.transaction(async (tx) => {
       await this.changeOrderRepository.create(changeOrder, tx);
+      if (suspicion) {
+        await this.riskFlagService.raise(
+          {
+            entityType: 'TrustChangeOrder',
+            entityId: changeOrder.id,
+            subjectIdentityId: identityId,
+            signal: suspicion.signal,
+            reason: suspicion.reason,
+            severity: 'MEDIUM',
+            metadata: { orderId, ...suspicion.metadata },
+          },
+          tx,
+        );
+      }
       await this.auditLogService.record(
         {
           identityId,
@@ -355,6 +406,30 @@ export class ManageChangeOrderUseCase {
     input: UploadChangeOrderEvidenceInput,
     meta: RequestMeta = {},
   ): Promise<ChangeOrderResponse> {
+    // IP-014: mesmo limite de frequência do VRF-002 — tamanho/MIME já eram
+    // validados abaixo, faltava limitar quantas tentativas de upload por
+    // janela.
+    try {
+      await this.rateLimitService.assertWithinLimit(identityId, 'SubmitTrustChangeOrderEvidence', {
+        maxAttempts: this.config.sensitiveActionRateLimitMaxAttempts,
+        windowMinutes: this.config.sensitiveActionRateLimitWindowMinutes,
+      });
+    } catch (error) {
+      await this.auditLogService.recordSafe({
+        identityId,
+        operation: 'SubmitTrustChangeOrderEvidence',
+        resource: 'TrustChangeOrder',
+        resourceId: input.changeOrderId,
+        result: 'DENIED',
+        ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
+        correlationId: meta.correlationId,
+        requestId: meta.requestId,
+        metadata: { reason: 'RATE_LIMIT_EXCEEDED' },
+      });
+      throw error;
+    }
+
     const { changeOrder } = await this.loadForProposer(input.changeOrderId, identityId);
 
     // §6.1: aprovado é imutável — anexar prova depois da decisão mudaria o que
@@ -429,6 +504,57 @@ export class ManageChangeOrderUseCase {
   }
 
   // ── Infra interna ──────────────────────────────────────────────────────────
+
+  /**
+   * IP-014 — regra determinística e explicável (não ML):
+   * 1. `HIGH_CHANGE_ORDER_COUNT`: o pedido já acumula
+   *    `changeOrderSuspiciousCountThreshold` ou mais Change Orders (excesso
+   *    de renegociações no mesmo contrato é o padrão clássico de "morte por
+   *    mil cortes" para escapar do valor originalmente acordado).
+   * 2. `HIGH_CHANGE_ORDER_AMOUNT_RATIO`: o valor bruto deste Change Order
+   *    sozinho já ultrapassa `changeOrderSuspiciousAmountRatioBps` (em bps)
+   *    do valor bruto original do snapshot — um aumento desproporcional ao
+   *    contrato original.
+   * As duas condições são independentes; a primeira que bater decide o
+   * `signal` (cada uma explica um risco diferente para quem revisa).
+   */
+  private detectSuspiciousPattern(
+    existingCountOnOrder: number,
+    snapshot: MarketplaceCommercialSnapshot,
+    changeOrder: TrustChangeOrder,
+  ): { signal: string; reason: string; metadata: Record<string, unknown> } | null {
+    const countAfterThisOne = existingCountOnOrder + 1;
+    if (countAfterThisOne >= this.config.changeOrderSuspiciousCountThreshold) {
+      return {
+        signal: 'HIGH_CHANGE_ORDER_COUNT',
+        reason: `Order has reached ${countAfterThisOne} change orders, at or above the configured threshold of ${this.config.changeOrderSuspiciousCountThreshold}.`,
+        metadata: {
+          changeOrderCount: countAfterThisOne,
+          threshold: this.config.changeOrderSuspiciousCountThreshold,
+        },
+      };
+    }
+
+    if (snapshot.grossAmount > 0) {
+      const ratioBps = Math.round(
+        (Math.abs(changeOrder.changeGrossAmount) / snapshot.grossAmount) * 10_000,
+      );
+      if (ratioBps >= this.config.changeOrderSuspiciousAmountRatioBps) {
+        return {
+          signal: 'HIGH_CHANGE_ORDER_AMOUNT_RATIO',
+          reason: `Change order gross amount is ${(ratioBps / 100).toFixed(2)}% of the order's original snapshot amount, at or above the configured threshold of ${(this.config.changeOrderSuspiciousAmountRatioBps / 100).toFixed(2)}%.`,
+          metadata: {
+            changeGrossAmount: changeOrder.changeGrossAmount,
+            originalGrossAmount: snapshot.grossAmount,
+            ratioBps,
+            thresholdBps: this.config.changeOrderSuspiciousAmountRatioBps,
+          },
+        };
+      }
+    }
+
+    return null;
+  }
 
   private async load(changeOrderId: string): Promise<TrustChangeOrder> {
     const changeOrder = await this.changeOrderRepository.findById(changeOrderId);

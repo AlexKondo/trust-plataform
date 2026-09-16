@@ -74,6 +74,22 @@ export class AppConfigService {
     return this.config.get('EVIDENCE_MAX_FILE_MB', { infer: true }) * 1024 * 1024;
   }
 
+  get sensitiveActionRateLimitMaxAttempts(): number {
+    return this.config.get('SENSITIVE_ACTION_RATE_LIMIT_MAX_ATTEMPTS', { infer: true });
+  }
+
+  get sensitiveActionRateLimitWindowMinutes(): number {
+    return this.config.get('SENSITIVE_ACTION_RATE_LIMIT_WINDOW_MINUTES', { infer: true });
+  }
+
+  get changeOrderSuspiciousCountThreshold(): number {
+    return this.config.get('CHANGE_ORDER_SUSPICIOUS_COUNT_THRESHOLD', { infer: true });
+  }
+
+  get changeOrderSuspiciousAmountRatioBps(): number {
+    return this.config.get('CHANGE_ORDER_SUSPICIOUS_AMOUNT_RATIO_BPS', { infer: true });
+  }
+
   get supabaseUrl(): string | undefined {
     return this.config.get('SUPABASE_URL', { infer: true });
   }
