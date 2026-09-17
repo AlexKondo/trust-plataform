@@ -16,6 +16,7 @@ import {
 } from '../../../components/layout';
 import { Banner, Field, Icon, PrimaryButton, SecondaryButton } from '../../../components/ui';
 import { ApiError, authApi } from '../../../lib/api';
+import { useLocale } from '../../../lib/i18n/LocaleProvider';
 import {
   CHANGE_ORDER_STATUS_LABEL,
   CHANGE_ORDER_TYPE_LABEL,
@@ -34,17 +35,22 @@ import {
 } from '../../../lib/labels';
 import type {
   ChangeOrder,
+  CreateChangeOrderRequest,
   Dispute,
   ExecutionEvidence,
   OrderDetails,
   PaymentDetails,
   Review,
   ServiceNote,
+  ServiceSummary,
   TravelStatus,
 } from '../../../lib/types';
 
 const CRITERIA = ['quality', 'communication', 'punctuality', 'costBenefit', 'organization'];
 const REVIEWABLE = ['COMPLETED', 'CLOSED', 'DISPUTE_RESOLVED'];
+const PAUSE_REASONS = ['PERSONAL_BREAK', 'PERSONAL_CALL', 'MEAL', 'OTHER_NON_BILLABLE'] as const;
+const EXECUTION_EVIDENCE_TYPES = ['BEFORE', 'AFTER', 'OTHER'] as const;
+const CHANGE_ORDER_TYPES = ['ADDITIONAL_TIME', 'SCOPE_CHANGE', 'MATERIAL', 'MIXED'] as const;
 
 /** Início padrão do agendamento: amanhã às 9h. */
 function defaultStart(): string {
@@ -56,11 +62,22 @@ function defaultStart(): string {
   )}:${pad(date.getMinutes())}`;
 }
 
-type Panel = 'schedule' | 'cancel' | 'review' | 'dispute' | null;
+type Panel =
+  | 'schedule'
+  | 'cancel'
+  | 'review'
+  | 'dispute'
+  | 'travel'
+  | 'pause'
+  | 'evidence'
+  | 'note'
+  | 'changeOrder'
+  | null;
 
 function OrderContent() {
   const params = useParams<{ orderId: string }>();
   const identity = useIdentity();
+  const { t } = useLocale();
   const [order, setOrder] = useState<OrderDetails | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [disputes, setDisputes] = useState<Dispute[]>([]);
@@ -69,6 +86,7 @@ function OrderContent() {
   const [travelStatus, setTravelStatus] = useState<TravelStatus | null>(null);
   const [evidences, setEvidences] = useState<ExecutionEvidence[]>([]);
   const [serviceNotes, setServiceNotes] = useState<ServiceNote[]>([]);
+  const [serviceSummary, setServiceSummary] = useState<ServiceSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [changeOrderBusyId, setChangeOrderBusyId] = useState<string | null>(null);
@@ -84,31 +102,62 @@ function OrderContent() {
   const [recommended, setRecommended] = useState(true);
   const [disputeCategory, setDisputeCategory] = useState('SERVICE_NOT_COMPLETED');
 
+  // IP-017 — Trust Partner Experience: estado dos formulários novos do prestador.
+  const [etaMinutes, setEtaMinutes] = useState('30');
+  const [pauseReason, setPauseReason] = useState<(typeof PAUSE_REASONS)[number]>('PERSONAL_BREAK');
+  const [pauseNote, setPauseNote] = useState('');
+  const [evidenceType, setEvidenceType] = useState<(typeof EXECUTION_EVIDENCE_TYPES)[number]>('BEFORE');
+  const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
+  const [noteBody, setNoteBody] = useState('');
+  const [changeOrderType, setChangeOrderType] =
+    useState<(typeof CHANGE_ORDER_TYPES)[number]>('ADDITIONAL_TIME');
+  const [changeOrderMinutes, setChangeOrderMinutes] = useState('30');
+  const [changeOrderServiceDelta, setChangeOrderServiceDelta] = useState('0');
+  const [changeOrderMaterialCost, setChangeOrderMaterialCost] = useState('0');
+  const [changeOrderMaterialMarkup, setChangeOrderMaterialMarkup] = useState('0');
+  const [changeOrderReason, setChangeOrderReason] = useState('');
+  const [changeOrderDescription, setChangeOrderDescription] = useState('');
+
   const load = useCallback(async () => {
     try {
-      const [details, reviewList, disputeList, changeOrderList, paymentDetails, travel, evidenceList, noteList] =
-        await Promise.all([
-          authApi<OrderDetails>(`/marketplace/orders/${params.orderId}`),
-          authApi<Review[]>(`/marketplace/orders/${params.orderId}/reviews`).catch(() => [] as Review[]),
-          authApi<Dispute[]>(`/marketplace/orders/${params.orderId}/disputes`).catch(
-            () => [] as Dispute[],
-          ),
-          // PACK-03 — Trust Change Order: rascunhos, pendentes de aprovação e decididos.
-          authApi<ChangeOrder[]>(`/marketplace/orders/${params.orderId}/change-orders`).catch(
-            () => [] as ChangeOrder[],
-          ),
-          // IP-007 — autorizações incrementais + custódia (breakdown original + mudanças aprovadas).
-          authApi<PaymentDetails>(`/payments/by-order/${params.orderId}`).catch(() => null),
-          // IP-005 — status de deslocamento / ETA do Partner.
-          authApi<TravelStatus>(`/marketplace/orders/${params.orderId}/travel-status`).catch(() => null),
-          // IP-006 — evidência de execução e notas de serviço (Trust Evidence).
-          authApi<ExecutionEvidence[]>(`/marketplace/orders/${params.orderId}/execution-evidences`).catch(
-            () => [] as ExecutionEvidence[],
-          ),
-          authApi<ServiceNote[]>(`/marketplace/orders/${params.orderId}/service-notes`).catch(
-            () => [] as ServiceNote[],
-          ),
-        ]);
+      const [
+        details,
+        reviewList,
+        disputeList,
+        changeOrderList,
+        paymentDetails,
+        travel,
+        evidenceList,
+        noteList,
+        summary,
+      ] = await Promise.all([
+        authApi<OrderDetails>(`/marketplace/orders/${params.orderId}`),
+        authApi<Review[]>(`/marketplace/orders/${params.orderId}/reviews`).catch(() => [] as Review[]),
+        authApi<Dispute[]>(`/marketplace/orders/${params.orderId}/disputes`).catch(
+          () => [] as Dispute[],
+        ),
+        // PACK-03 — Trust Change Order: rascunhos, pendentes de aprovação e decididos.
+        authApi<ChangeOrder[]>(`/marketplace/orders/${params.orderId}/change-orders`).catch(
+          () => [] as ChangeOrder[],
+        ),
+        // IP-007 — autorizações incrementais + custódia (breakdown original + mudanças aprovadas).
+        authApi<PaymentDetails>(`/payments/by-order/${params.orderId}`).catch(() => null),
+        // IP-005 — status de deslocamento / ETA do Partner.
+        authApi<TravelStatus>(`/marketplace/orders/${params.orderId}/travel-status`).catch(() => null),
+        // IP-006 — evidência de execução e notas de serviço (Trust Evidence).
+        authApi<ExecutionEvidence[]>(`/marketplace/orders/${params.orderId}/execution-evidences`).catch(
+          () => [] as ExecutionEvidence[],
+        ),
+        authApi<ServiceNote[]>(`/marketplace/orders/${params.orderId}/service-notes`).catch(
+          () => [] as ServiceNote[],
+        ),
+        // IP-017 — Service Summary: execução (status de pausa) + economia do Partner
+        // (`currentTrustFeeAmount`/`currentProviderNetBeforePspFees`, só preenchidos
+        // pela API quando quem chama é o prestador — PACK-03 §15).
+        authApi<ServiceSummary>(`/marketplace/orders/${params.orderId}/service-summary`).catch(
+          () => null,
+        ),
+      ]);
       setOrder(details);
       setReviews(reviewList);
       setDisputes(disputeList);
@@ -117,6 +166,7 @@ function OrderContent() {
       setTravelStatus(travel);
       setEvidences(evidenceList);
       setServiceNotes(noteList);
+      setServiceSummary(summary);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Não foi possível carregar o pedido.');
     }
@@ -207,6 +257,163 @@ function OrderContent() {
     }
   };
 
+  // IP-017 — declara "a caminho" com ETA (minutos), sem geolocalização (IP-005 §fonte-de-verdade).
+  const declareEnRoute = async () => {
+    setBusy(true);
+    setFeedback(null);
+    try {
+      await authApi(`/marketplace/orders/${params.orderId}/travel-status/en-route`, {
+        method: 'POST',
+        body: { declaredEtaMinutes: Number(etaMinutes) },
+      });
+      setPanel(null);
+      await load();
+      setFeedback({ kind: 'success', text: t('partner.travelEnRouteSuccess') });
+    } catch (err) {
+      setFeedback({ kind: 'error', text: err instanceof ApiError ? err.message : t('common.genericError') });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const declareArrived = async () => {
+    setBusy(true);
+    setFeedback(null);
+    try {
+      await authApi(`/marketplace/orders/${params.orderId}/travel-status/arrived`, { method: 'POST' });
+      await load();
+      setFeedback({ kind: 'success', text: t('partner.travelArrivedSuccess') });
+    } catch (err) {
+      setFeedback({ kind: 'error', text: err instanceof ApiError ? err.message : t('common.genericError') });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** §10.2 — Trust Pause: o relógio faturável para até o Partner retomar. */
+  const pauseExecution = async () => {
+    setBusy(true);
+    setFeedback(null);
+    try {
+      await authApi(`/marketplace/orders/${params.orderId}/pause`, {
+        method: 'POST',
+        body: { reasonCode: pauseReason, note: pauseNote.trim() || undefined },
+      });
+      setPanel(null);
+      setPauseNote('');
+      await load();
+      setFeedback({ kind: 'success', text: t('partner.pauseSuccess') });
+    } catch (err) {
+      setFeedback({ kind: 'error', text: err instanceof ApiError ? err.message : t('common.genericError') });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resumeExecution = async () => {
+    setBusy(true);
+    setFeedback(null);
+    try {
+      await authApi(`/marketplace/orders/${params.orderId}/resume`, { method: 'POST' });
+      await load();
+      setFeedback({ kind: 'success', text: t('partner.resumeSuccess') });
+    } catch (err) {
+      setFeedback({ kind: 'error', text: err instanceof ApiError ? err.message : t('common.genericError') });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** IP-006 — evidência opcional (multipart: campo `type` + arquivo `file`). */
+  const uploadEvidence = async () => {
+    if (!evidenceFile) return;
+    setBusy(true);
+    setFeedback(null);
+    try {
+      const form = new FormData();
+      form.append('type', evidenceType);
+      form.append('file', evidenceFile);
+      await authApi(`/marketplace/orders/${params.orderId}/execution-evidences`, {
+        method: 'POST',
+        form,
+      });
+      setPanel(null);
+      setEvidenceFile(null);
+      await load();
+      setFeedback({ kind: 'success', text: t('partner.evidenceUploadSuccess') });
+    } catch (err) {
+      setFeedback({
+        kind: 'error',
+        text: err instanceof ApiError ? err.message : t('partner.evidenceUploadError'),
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const addServiceNote = async () => {
+    setBusy(true);
+    setFeedback(null);
+    try {
+      await authApi(`/marketplace/orders/${params.orderId}/service-notes`, {
+        method: 'POST',
+        body: { body: noteBody.trim() },
+      });
+      setPanel(null);
+      setNoteBody('');
+      await load();
+      setFeedback({ kind: 'success', text: t('partner.noteAddSuccess') });
+    } catch (err) {
+      setFeedback({ kind: 'error', text: err instanceof ApiError ? err.message : t('common.genericError') });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /**
+   * PACK-03 §7/§6.1 — o Trust Partner só RASCUNHA e ENVIA a mudança; o valor
+   * autorizado só sobe quando o Trust Member aprova (`decideChangeOrder`,
+   * exclusivo do Member, ver acima). Não existe nem pode existir um caminho
+   * aqui que aprove a própria proposta.
+   */
+  const createChangeOrder = async () => {
+    setBusy(true);
+    setFeedback(null);
+    try {
+      const body: CreateChangeOrderRequest = {
+        type: changeOrderType,
+        reason: changeOrderReason.trim(),
+        description: changeOrderDescription.trim() || undefined,
+      };
+      if (changeOrderType === 'ADDITIONAL_TIME') {
+        body.additionalMinutes = Number(changeOrderMinutes);
+      } else {
+        if (Number(changeOrderServiceDelta) > 0) body.serviceDeltaAmount = Number(changeOrderServiceDelta);
+        if (Number(changeOrderMaterialCost) > 0) body.materialCostDeltaAmount = Number(changeOrderMaterialCost);
+        if (Number(changeOrderMaterialMarkup) > 0)
+          body.materialMarkupDeltaAmount = Number(changeOrderMaterialMarkup);
+      }
+      const created = await authApi<ChangeOrder>(`/marketplace/orders/${params.orderId}/change-orders`, {
+        method: 'POST',
+        body,
+      });
+      // §6.1 — vai direto para a mesa do Member; sem isso ficaria em DRAFT, invisível para ele.
+      await authApi(`/marketplace/change-orders/${created.changeOrderId}/submit`, { method: 'POST' });
+      setPanel(null);
+      setChangeOrderReason('');
+      setChangeOrderDescription('');
+      await load();
+      setFeedback({ kind: 'success', text: t('partner.changeOrderSubmitSuccess') });
+    } catch (err) {
+      setFeedback({
+        kind: 'error',
+        text: err instanceof ApiError ? err.message : t('partner.changeOrderSubmitError'),
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const openDispute = async () => {
     setBusy(true);
     setFeedback(null);
@@ -246,6 +453,15 @@ function OrderContent() {
   const canCancel = ['CREATED', 'AWAITING_SCHEDULING', 'SCHEDULED', 'AWAITING_EXECUTION'].includes(
     order.status,
   );
+
+  // IP-017 — condições das novas ações do Trust Partner (leitura, não regra de negócio:
+  // a API é quem decide de verdade e devolve 4xx se o estado não permitir).
+  const canDeclareTravel =
+    isSeller && ['SCHEDULED', 'AWAITING_EXECUTION'].includes(order.status) && travelStatus?.status !== 'ARRIVED';
+  const isExecutionPaused = serviceSummary?.execution?.status === 'PAUSED';
+  const canPauseOrResume = isSeller && order.status === 'IN_PROGRESS';
+  const canProposeChangeOrder = isSeller && ['IN_PROGRESS', 'AWAITING_EXECUTION', 'SCHEDULED'].includes(order.status);
+  const canAddEvidenceOrNote = isSeller && ['IN_PROGRESS', 'AWAITING_CUSTOMER_CONFIRMATION'].includes(order.status);
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6">
@@ -302,24 +518,41 @@ function OrderContent() {
             </ol>
           </Card>
 
-          {/* IP-005 — status de deslocamento / ETA do Partner */}
-          {travelStatus && travelStatus.status !== 'NOT_STARTED' ? (
+          {/* IP-005 — status de deslocamento / ETA do Partner (+ ações do prestador, IP-017) */}
+          {(travelStatus && travelStatus.status !== 'NOT_STARTED') || canDeclareTravel ? (
             <Card>
               <SectionTitle icon="local_shipping" title="Chegada do prestador" />
-              <div className="flex items-center justify-between">
-                <Pill tone={toneForStatus(travelStatus.status)}>
-                  {TRAVEL_STATUS_LABEL[travelStatus.status] ?? travelStatus.status}
-                </Pill>
-                {travelStatus.estimatedArrivalAt ? (
-                  <p className="body-sm text-on-surface-variant">
-                    Previsão de chegada: {formatDateTime(travelStatus.estimatedArrivalAt)}
-                  </p>
-                ) : null}
-              </div>
-              {travelStatus.declaredEtaMinutes !== null && travelStatus.status === 'EN_ROUTE' ? (
-                <p className="body-sm mt-2 text-on-surface-variant">
-                  ETA declarado pelo prestador: {travelStatus.declaredEtaMinutes} min
-                </p>
+              {travelStatus && travelStatus.status !== 'NOT_STARTED' ? (
+                <>
+                  <div className="flex items-center justify-between">
+                    <Pill tone={toneForStatus(travelStatus.status)}>
+                      {TRAVEL_STATUS_LABEL[travelStatus.status] ?? travelStatus.status}
+                    </Pill>
+                    {travelStatus.estimatedArrivalAt ? (
+                      <p className="body-sm text-on-surface-variant">
+                        Previsão de chegada: {formatDateTime(travelStatus.estimatedArrivalAt)}
+                      </p>
+                    ) : null}
+                  </div>
+                  {travelStatus.declaredEtaMinutes !== null && travelStatus.status === 'EN_ROUTE' ? (
+                    <p className="body-sm mt-2 text-on-surface-variant">
+                      ETA declarado pelo prestador: {travelStatus.declaredEtaMinutes} min
+                    </p>
+                  ) : null}
+                </>
+              ) : null}
+              {canDeclareTravel ? (
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                  {travelStatus?.status !== 'EN_ROUTE' ? (
+                    <SecondaryButton onClick={() => setPanel('travel')}>
+                      {t('partner.travelDeclareEnRoute')}
+                    </SecondaryButton>
+                  ) : (
+                    <PrimaryButton type="button" loading={busy} onClick={() => void declareArrived()}>
+                      {t('partner.travelDeclareArrived')}
+                    </PrimaryButton>
+                  )}
+                </div>
               ) : null}
             </Card>
           ) : null}
@@ -377,21 +610,33 @@ function OrderContent() {
                         </p>
                       ) : null}
 
-                      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                        <PrimaryButton
-                          type="button"
-                          loading={changeOrderBusyId === changeOrder.changeOrderId}
-                          onClick={() => void decideChangeOrder(changeOrder.changeOrderId, 'approve')}
-                        >
-                          Aprovar alteração
-                        </PrimaryButton>
-                        <SecondaryButton
-                          disabled={changeOrderBusyId === changeOrder.changeOrderId}
-                          onClick={() => void decideChangeOrder(changeOrder.changeOrderId, 'reject')}
-                        >
-                          Recusar
-                        </SecondaryButton>
-                      </div>
+                      {/*
+                        Out-of-scope §"no self-approve": quem propôs a mudança (o Partner) NUNCA
+                        vê botão de decisão na própria proposta — só o Trust Member decide
+                        (`decideChangeOrder`/PACK-03 §6.1/§12). O estruturalmente correto é não
+                        renderizar o caminho, não apenas escondê-lo por convenção de UI.
+                      */}
+                      {changeOrder.proposedBy !== me ? (
+                        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                          <PrimaryButton
+                            type="button"
+                            loading={changeOrderBusyId === changeOrder.changeOrderId}
+                            onClick={() => void decideChangeOrder(changeOrder.changeOrderId, 'approve')}
+                          >
+                            Aprovar alteração
+                          </PrimaryButton>
+                          <SecondaryButton
+                            disabled={changeOrderBusyId === changeOrder.changeOrderId}
+                            onClick={() => void decideChangeOrder(changeOrder.changeOrderId, 'reject')}
+                          >
+                            Recusar
+                          </SecondaryButton>
+                        </div>
+                      ) : (
+                        <p className="body-sm mt-4 text-on-surface-variant">
+                          {t('partner.changeOrderNoSelfApprove')}
+                        </p>
+                      )}
                     </li>
                   ))}
               </ul>
@@ -620,6 +865,45 @@ function OrderContent() {
             </Card>
           ) : null}
 
+          {/*
+            IP-017 — economia do Partner. `currentTrustFeeAmount`/`currentProviderNetBeforePspFees`
+            só vêm preenchidos pela API quando quem chama é o prestador (PACK-03 §15) — a
+            condição `isSeller` aqui é só uma checagem de UI redundante com essa regra de
+            servidor, nunca a única barreira: o Member nunca recebe esses campos na resposta.
+          */}
+          {isSeller && serviceSummary && serviceSummary.currentProviderNetBeforePspFees !== undefined ? (
+            <Card>
+              <SectionTitle
+                icon="payments"
+                title={t('partner.earningsTitle')}
+                hint={t('partner.earningsHint')}
+              />
+              <dl className="flex flex-col gap-3">
+                <div className="flex justify-between">
+                  <dt className="body-sm text-on-surface-variant">{t('partner.earningsGross')}</dt>
+                  <dd className="body-sm text-on-surface">
+                    {formatCurrency(serviceSummary.currentAuthorizedGrossAmount, serviceSummary.currency)}
+                  </dd>
+                </div>
+                {serviceSummary.currentTrustFeeAmount !== undefined ? (
+                  <div className="flex justify-between">
+                    <dt className="body-sm text-on-surface-variant">{t('partner.earningsTrustFee')}</dt>
+                    <dd className="body-sm text-on-surface">
+                      - {formatCurrency(serviceSummary.currentTrustFeeAmount, serviceSummary.currency)}
+                    </dd>
+                  </div>
+                ) : null}
+                <div className="flex justify-between border-t border-outline-variant pt-3">
+                  <dt className="body-md font-medium text-on-surface">{t('partner.earningsNet')}</dt>
+                  <dd className="body-lg font-semibold text-on-surface">
+                    {formatCurrency(serviceSummary.currentProviderNetBeforePspFees, serviceSummary.currency)}
+                  </dd>
+                </div>
+              </dl>
+              <p className="body-sm mt-3 text-on-surface-variant">{t('partner.earningsNetHint')}</p>
+            </Card>
+          ) : null}
+
           <Card>
             <SectionTitle icon="bolt" title="Ações" />
             <div className="flex flex-col gap-3">
@@ -647,6 +931,38 @@ function OrderContent() {
                 >
                   Concluir serviço (check-out)
                 </PrimaryButton>
+              ) : null}
+
+              {/* IP-017 — Trust Pause: o relógio faturável para até o Partner retomar (§10.2/§10.3). */}
+              {canPauseOrResume ? (
+                isExecutionPaused ? (
+                  <PrimaryButton type="button" loading={busy} onClick={() => void resumeExecution()}>
+                    {t('partner.resumeButton')}
+                  </PrimaryButton>
+                ) : (
+                  <SecondaryButton onClick={() => setPanel('pause')}>{t('partner.pauseButton')}</SecondaryButton>
+                )
+              ) : null}
+
+              {/* IP-006 — evidência e nota de serviço, sempre opcionais. */}
+              {canAddEvidenceOrNote ? (
+                <SecondaryButton onClick={() => setPanel('evidence')}>
+                  {t('partner.evidenceUploadTitle')}
+                </SecondaryButton>
+              ) : null}
+              {canAddEvidenceOrNote ? (
+                <SecondaryButton onClick={() => setPanel('note')}>{t('partner.noteAddTitle')}</SecondaryButton>
+              ) : null}
+
+              {/*
+                PACK-03 §7 — o Partner só propõe; o valor autorizado só muda quando o Member
+                aprova (ver o card "Alterações aguardando sua aprovação" e `decideChangeOrder`,
+                exclusivos do Member). Nenhum caminho aqui aplica o valor sem essa aprovação.
+              */}
+              {canProposeChangeOrder ? (
+                <SecondaryButton onClick={() => setPanel('changeOrder')}>
+                  {t('partner.proposeChangeOrderButton')}
+                </SecondaryButton>
               ) : null}
 
               {!isSeller && order.status === 'AWAITING_CUSTOMER_CONFIRMATION' ? (
@@ -841,6 +1157,251 @@ function OrderContent() {
                   Abrir disputa
                 </PrimaryButton>
                 <SecondaryButton onClick={() => setPanel(null)}>Cancelar</SecondaryButton>
+              </div>
+            </Card>
+          ) : null}
+
+          {/* IP-017 — declarar "a caminho" com ETA (IP-005, sem geolocalização). */}
+          {panel === 'travel' ? (
+            <Card>
+              <SectionTitle icon="local_shipping" title={t('partner.travelDeclareEnRoute')} />
+              <div className="flex flex-col gap-4">
+                <Field id="eta" label={t('partner.travelEtaLabel')}>
+                  <input
+                    id="eta"
+                    type="number"
+                    min="1"
+                    max="480"
+                    className="tds-input"
+                    value={etaMinutes}
+                    onChange={(event) => setEtaMinutes(event.target.value)}
+                  />
+                </Field>
+                <PrimaryButton type="button" loading={busy} onClick={() => void declareEnRoute()}>
+                  {t('partner.travelDeclareEnRoute')}
+                </PrimaryButton>
+                <SecondaryButton onClick={() => setPanel(null)}>{t('common.cancel')}</SecondaryButton>
+              </div>
+            </Card>
+          ) : null}
+
+          {/* IP-017 — Trust Pause: motivo obrigatório, nota opcional (§10.2). */}
+          {panel === 'pause' ? (
+            <Card>
+              <SectionTitle icon="pause_circle" title={t('partner.pauseButton')} />
+              <div className="flex flex-col gap-4">
+                <Field id="pauseReason" label={t('partner.pauseReasonLabel')}>
+                  <select
+                    id="pauseReason"
+                    className="tds-input"
+                    value={pauseReason}
+                    onChange={(event) =>
+                      setPauseReason(event.target.value as (typeof PAUSE_REASONS)[number])
+                    }
+                  >
+                    {PAUSE_REASONS.map((code) => (
+                      <option key={code} value={code}>
+                        {t(`partner.pauseReason.${code}` as Parameters<typeof t>[0])}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field id="pauseNote" label={t('partner.pauseNoteLabel')}>
+                  <textarea
+                    id="pauseNote"
+                    className="tds-input min-h-20 resize-y"
+                    value={pauseNote}
+                    maxLength={500}
+                    onChange={(event) => setPauseNote(event.target.value)}
+                  />
+                </Field>
+                <PrimaryButton type="button" loading={busy} onClick={() => void pauseExecution()}>
+                  {t('partner.pauseConfirm')}
+                </PrimaryButton>
+                <SecondaryButton onClick={() => setPanel(null)}>{t('common.cancel')}</SecondaryButton>
+              </div>
+            </Card>
+          ) : null}
+
+          {/* IP-006 — evidência de execução, sempre opcional (multipart type+file). */}
+          {panel === 'evidence' ? (
+            <Card>
+              <SectionTitle icon="photo_camera" title={t('partner.evidenceUploadTitle')} />
+              <div className="flex flex-col gap-4">
+                <Field id="evidenceType" label={t('partner.evidenceTypeLabel')}>
+                  <select
+                    id="evidenceType"
+                    className="tds-input"
+                    value={evidenceType}
+                    onChange={(event) =>
+                      setEvidenceType(event.target.value as (typeof EXECUTION_EVIDENCE_TYPES)[number])
+                    }
+                  >
+                    {EXECUTION_EVIDENCE_TYPES.map((type) => (
+                      <option key={type} value={type}>
+                        {EXECUTION_EVIDENCE_TYPE_LABEL[type] ?? type}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field id="evidenceFile" label={t('partner.evidenceFileLabel')}>
+                  <input
+                    id="evidenceFile"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,application/pdf"
+                    className="tds-input"
+                    onChange={(event) => setEvidenceFile(event.target.files?.[0] ?? null)}
+                  />
+                </Field>
+                <PrimaryButton
+                  type="button"
+                  loading={busy}
+                  disabled={!evidenceFile}
+                  onClick={() => void uploadEvidence()}
+                >
+                  {t('partner.evidenceUploadButton')}
+                </PrimaryButton>
+                <SecondaryButton onClick={() => setPanel(null)}>{t('common.cancel')}</SecondaryButton>
+              </div>
+            </Card>
+          ) : null}
+
+          {/* IP-006 — nota de serviço: texto livre do Partner, separado de disputa/avaliação. */}
+          {panel === 'note' ? (
+            <Card>
+              <SectionTitle icon="edit_note" title={t('partner.noteAddTitle')} />
+              <div className="flex flex-col gap-4">
+                <Field id="noteBody" label={t('partner.noteBodyLabel')}>
+                  <textarea
+                    id="noteBody"
+                    className="tds-input min-h-24 resize-y"
+                    value={noteBody}
+                    maxLength={2000}
+                    onChange={(event) => setNoteBody(event.target.value)}
+                  />
+                </Field>
+                <PrimaryButton
+                  type="button"
+                  loading={busy}
+                  disabled={noteBody.trim().length < 1}
+                  onClick={() => void addServiceNote()}
+                >
+                  {t('partner.noteAddButton')}
+                </PrimaryButton>
+                <SecondaryButton onClick={() => setPanel(null)}>{t('common.cancel')}</SecondaryButton>
+              </div>
+            </Card>
+          ) : null}
+
+          {/*
+            PACK-03 §7 — propor Change Order. Só cria + envia (submit); a aprovação/rejeição
+            é exclusiva do Trust Member (`decideChangeOrder`, card acima). Nenhum valor
+            autorizado muda aqui.
+          */}
+          {panel === 'changeOrder' ? (
+            <Card>
+              <SectionTitle icon="fact_check" title={t('partner.changeOrderProposeTitle')} />
+              <div className="flex flex-col gap-4">
+                <Banner kind="info">{t('partner.changeOrderProposeHint')}</Banner>
+                <Field id="changeOrderType" label={t('partner.changeOrderTypeLabel')}>
+                  <select
+                    id="changeOrderType"
+                    className="tds-input"
+                    value={changeOrderType}
+                    onChange={(event) =>
+                      setChangeOrderType(event.target.value as (typeof CHANGE_ORDER_TYPES)[number])
+                    }
+                  >
+                    {CHANGE_ORDER_TYPES.map((type) => (
+                      <option key={type} value={type}>
+                        {
+                          {
+                            ADDITIONAL_TIME: t('partner.changeOrderTypeAdditionalTime'),
+                            SCOPE_CHANGE: t('partner.changeOrderTypeScopeChange'),
+                            MATERIAL: t('partner.changeOrderTypeMaterial'),
+                            MIXED: t('partner.changeOrderTypeMixed'),
+                          }[type]
+                        }
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                {changeOrderType === 'ADDITIONAL_TIME' ? (
+                  <Field id="changeOrderMinutes" label={t('partner.changeOrderAdditionalMinutesLabel')}>
+                    <input
+                      id="changeOrderMinutes"
+                      type="number"
+                      min="1"
+                      max="1440"
+                      className="tds-input"
+                      value={changeOrderMinutes}
+                      onChange={(event) => setChangeOrderMinutes(event.target.value)}
+                    />
+                  </Field>
+                ) : (
+                  <>
+                    <Field id="changeOrderServiceDelta" label={t('partner.changeOrderServiceDeltaLabel')}>
+                      <input
+                        id="changeOrderServiceDelta"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        className="tds-input"
+                        value={changeOrderServiceDelta}
+                        onChange={(event) => setChangeOrderServiceDelta(event.target.value)}
+                      />
+                    </Field>
+                    <Field id="changeOrderMaterialCost" label={t('partner.changeOrderMaterialCostLabel')}>
+                      <input
+                        id="changeOrderMaterialCost"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        className="tds-input"
+                        value={changeOrderMaterialCost}
+                        onChange={(event) => setChangeOrderMaterialCost(event.target.value)}
+                      />
+                    </Field>
+                    <Field id="changeOrderMaterialMarkup" label={t('partner.changeOrderMaterialMarkupLabel')}>
+                      <input
+                        id="changeOrderMaterialMarkup"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        className="tds-input"
+                        value={changeOrderMaterialMarkup}
+                        onChange={(event) => setChangeOrderMaterialMarkup(event.target.value)}
+                      />
+                    </Field>
+                  </>
+                )}
+                <Field id="changeOrderReason" label={t('partner.changeOrderReasonLabel')}>
+                  <textarea
+                    id="changeOrderReason"
+                    className="tds-input min-h-20 resize-y"
+                    value={changeOrderReason}
+                    maxLength={1000}
+                    onChange={(event) => setChangeOrderReason(event.target.value)}
+                  />
+                </Field>
+                <Field id="changeOrderDescription" label={t('partner.changeOrderDescriptionLabel')}>
+                  <textarea
+                    id="changeOrderDescription"
+                    className="tds-input min-h-20 resize-y"
+                    value={changeOrderDescription}
+                    maxLength={2000}
+                    onChange={(event) => setChangeOrderDescription(event.target.value)}
+                  />
+                </Field>
+                <PrimaryButton
+                  type="button"
+                  loading={busy}
+                  disabled={changeOrderReason.trim().length < 3}
+                  onClick={() => void createChangeOrder()}
+                >
+                  {t('partner.changeOrderSubmitButton')}
+                </PrimaryButton>
+                <SecondaryButton onClick={() => setPanel(null)}>{t('common.cancel')}</SecondaryButton>
               </div>
             </Card>
           ) : null}

@@ -183,9 +183,16 @@ export const TRAVEL_STATUS_LABEL: Record<string, string> = {
 };
 
 // ── PACK-03: Trust Change Order ─────────────────────────────────────────────
+/**
+ * IP-017 fix: os valores reais do enum (`CHANGE_ORDER_TYPE` em
+ * `marketplace-types.ts`) são `MATERIAL`/`MIXED`, não `ADDITIONAL_MATERIAL` —
+ * a IP-016 havia cadastrado uma chave que nunca bate com a API (o fallback
+ * `?? type` escondia o problema mostrando o código cru). Corrigido aqui.
+ */
 export const CHANGE_ORDER_TYPE_LABEL: Record<string, string> = {
   ADDITIONAL_TIME: 'Tempo adicional',
-  ADDITIONAL_MATERIAL: 'Material adicional',
+  MATERIAL: 'Material adicional',
+  MIXED: 'Tempo, material e escopo',
   SCOPE_CHANGE: 'Mudança de escopo',
 };
 
@@ -198,13 +205,27 @@ export const CHANGE_ORDER_STATUS_LABEL: Record<string, string> = {
   EXPIRED: 'Expirado',
 };
 
-// ── IP-006: evidência de execução ───────────────────────────────────────────
+/**
+ * IP-017 fix: o enum real (`EXECUTION_EVIDENCE_TYPE`) usa `BEFORE`/`AFTER`,
+ * não `BEFORE_PHOTO`/`AFTER_PHOTO`/`DOCUMENT` — mesmo problema do dicionário
+ * acima, corrigido junto por tocar a mesma tela.
+ */
 export const EXECUTION_EVIDENCE_TYPE_LABEL: Record<string, string> = {
-  BEFORE_PHOTO: 'Foto de antes',
-  AFTER_PHOTO: 'Foto de depois',
-  DOCUMENT: 'Documento',
+  BEFORE: 'Foto de antes',
+  AFTER: 'Foto de depois',
   OTHER: 'Outro',
 };
+
+/**
+ * IP-017: `PAUSE_REASON_LABEL`/`CHANGE_ORDER_EVIDENCE_TYPE_LABEL` — vocabulário
+ * NOVO introduzido por este IP — foi propositalmente colocado em
+ * `lib/i18n/messages/{pt-BR,en-US}.ts` (chaves `partner.pauseReason.*` /
+ * `partner.changeOrderEvidenceType.*`) em vez de aqui, seguindo a decisão
+ * corretiva registrada no IP-016 Diff Review (MAJOR não bloqueante): a IP-016
+ * havia posto vocabulário novo em `labels.ts`; este IP usa o catálogo
+ * `lib/i18n/` para tudo que é novo, mesmo dentro de um arquivo que já importa
+ * de `labels.ts` para os dicionários pré-existentes.
+ */
 
 // ── IP-007: status de autorização/custódia incremental ──────────────────────
 export const AUTHORIZATION_STATUS_LABEL: Record<string, string> = {

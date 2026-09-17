@@ -446,7 +446,9 @@ export interface ChangeOrderEvidence {
  * Campos de economia interna do Partner (`trustFeeRateBps`, `changeTrustFeeAmount`,
  * `changeProviderNetBeforePspFees`) existem no DTO da API mas são OPCIONAIS e
  * só preenchidos para quem chama como Partner/admin. O frontend do Trust
- * Member nunca deve ler nem renderizar esses campos.
+ * Member nunca deve ler nem renderizar esses campos. IP-017 (Partner
+ * Experience) É quem lê esses campos, exclusivamente na tela do prestador
+ * (`isSeller`), para mostrar o ganho líquido dessa mudança.
  */
 export interface ChangeOrder {
   changeOrderId: string;
@@ -460,6 +462,10 @@ export interface ChangeOrder {
   materialCostDeltaAmount: number;
   materialMarkupDeltaAmount: number;
   changeGrossAmount: number;
+  trustFeeRateBps?: number;
+  changeTrustFeeBaseAmount?: number;
+  changeTrustFeeAmount?: number;
+  changeProviderNetBeforePspFees?: number;
   reason: string;
   description: string | null;
   expiresAt: string | null;
@@ -470,6 +476,17 @@ export interface ChangeOrder {
   evidences: ChangeOrderEvidence[];
   createdAt: string;
   updatedAt: string;
+}
+
+/** IP-017 — criação de Change Order pelo Trust Partner (PACK-03 §7). */
+export interface CreateChangeOrderRequest {
+  type: 'ADDITIONAL_TIME' | 'SCOPE_CHANGE' | 'MATERIAL' | 'MIXED';
+  additionalMinutes?: number;
+  serviceDeltaAmount?: number;
+  materialCostDeltaAmount?: number;
+  materialMarkupDeltaAmount?: number;
+  reason: string;
+  description?: string;
 }
 
 export interface ExecutionEvidence {
@@ -489,6 +506,34 @@ export interface ServiceNote {
   createdAt: string;
 }
 
+export interface ExecutionPause {
+  pauseId: string;
+  reasonCode: string;
+  note: string | null;
+  pausedAt: string;
+  resumedAt: string | null;
+  durationMinutes: number | null;
+}
+
+export interface ExecutionSession {
+  sessionId: string;
+  status: string;
+  checkInAt: string | null;
+  checkOutAt: string | null;
+  elapsedMinutes: number | null;
+  pausedMinutes: number;
+  rawActiveMinutes: number | null;
+  billableMinutes: number | null;
+  authorizedMinutes: number | null;
+  pauses: ExecutionPause[];
+}
+
+/**
+ * `currentTrustFeeAmount`/`currentProviderNetBeforePspFees` só vêm preenchidos
+ * quando quem chama é o Trust Partner (`isSeller`) ou admin (PACK-03 §15) —
+ * é exatamente a economia (Trust Fee + repasse líquido) que este IP mostra na
+ * tela "Meus ganhos" do prestador. Nunca renderizar para o Trust Member.
+ */
 export interface ServiceSummary {
   orderId: string;
   listingTitle: string | null;
@@ -497,6 +542,7 @@ export interface ServiceSummary {
   pricingModel: string;
   currency: string;
   status: string;
+  execution: ExecutionSession | null;
   initialAuthorizedAmount: number;
   approvedChangesAmount: number;
   currentAuthorizedGrossAmount: number;
@@ -505,11 +551,31 @@ export interface ServiceSummary {
   currentMaterialMarkupAmount: number;
   amountInCustody: number;
   amountAuthorizedNotInCustody: number;
+  currentTrustFeeAmount?: number;
+  currentProviderNetBeforePspFees?: number;
   approvedChangeOrders: ChangeOrder[];
   pendingChangeOrders: ChangeOrder[];
   rejectedChangeOrders: ChangeOrder[];
   customerConfirmedAt: string | null;
   completedAt: string | null;
+  evidences: ExecutionEvidence[];
+  notes: ServiceNote[];
+}
+
+// ── IP-005: disponibilidade semanal do Partner ─────────────────────────────
+export interface PartnerAvailabilityWindow {
+  windowId: string;
+  dayOfWeek: number;
+  startMinute: number;
+  endMinute: number;
+  timezone: string;
+}
+
+export interface AvailabilityWindowInput {
+  dayOfWeek: number;
+  startMinute: number;
+  endMinute: number;
+  timezone: string;
 }
 
 // ── IP-007: pagamento / custódia incremental ────────────────────────────────

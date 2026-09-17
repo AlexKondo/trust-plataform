@@ -27,6 +27,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     { href: '/service-requests', icon: 'assignment_add', label: t('nav.serviceRequests') },
     { href: '/conversations', icon: 'forum', label: t('nav.conversations') },
     { href: '/orders', icon: 'receipt_long', label: t('nav.orders') },
+    { href: '/partner/availability', icon: 'event_available', label: t('nav.myAvailability') },
   ];
 
   useEffect(() => {
