@@ -62,7 +62,7 @@ describe.runIf(Boolean(testDatabaseUrl))('PAY-001 — Pagamento nasce com o pedi
   async function waitForScore(identityId: string, expected: number): Promise<void> {
     const startedAt = Date.now();
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const [score] = await db
         .select()
         .from(trustScores)
@@ -127,7 +127,7 @@ describe.runIf(Boolean(testDatabaseUrl))('PAY-001 — Pagamento nasce com o pedi
   async function waitForPayment(orderId: string) {
     const startedAt = Date.now();
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const [row] = await db.select().from(payments).where(eq(payments.orderId, orderId));
       if (row) {
         return row;
@@ -184,9 +184,9 @@ describe.runIf(Boolean(testDatabaseUrl))('PAY-001 — Pagamento nasce com o pedi
     await waitForPayment(orderId);
 
     // Vários ticks do relay não podem gerar um segundo pagamento
-    await relay.tick();
-    await relay.tick();
-    await relay.tick();
+    await relay.drainOnce();
+    await relay.drainOnce();
+    await relay.drainOnce();
 
     const rows = await db.select().from(payments).where(eq(payments.orderId, orderId));
     expect(rows).toHaveLength(1);

@@ -76,7 +76,7 @@ describe.runIf(Boolean(testDatabaseUrl))('PACK-02 — Commercial Amount & Fee Fo
   async function waitFor<T>(check: () => Promise<T | undefined>, what: string): Promise<T> {
     const startedAt = Date.now();
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const value = await check();
       if (value !== undefined) {
         return value;
@@ -96,7 +96,7 @@ describe.runIf(Boolean(testDatabaseUrl))('PACK-02 — Commercial Amount & Fee Fo
   async function waitForBronze(identityId: string): Promise<void> {
     const startedAt = Date.now();
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const [score] = await db
         .select()
         .from(trustScores)

@@ -33,6 +33,13 @@ export const envSchema = z.object({
   OUTBOX_BATCH_SIZE: z.coerce.number().int().min(1).default(50),
   OUTBOX_MAX_ATTEMPTS: z.coerce.number().int().min(1).default(10),
 
+  // Migração Render → Vercel (2026-09-17): segredo M2M exigido pelo endpoint
+  // POST /api/v1/internal/jobs/outbox-relay (gatilho externo do drain, sem o
+  // qual não havia mais setInterval residente para publicar eventos).
+  // Opcional no schema para não quebrar ambientes de teste que não usam a
+  // rota; o controller nega a chamada se estiver ausente.
+  INTERNAL_JOB_SECRET: z.string().min(16).optional(),
+
   // Lockout e rate limiting (DOC-002: configuráveis, nunca hardcoded)
   LOGIN_MAX_FAILED_ATTEMPTS: z.coerce.number().int().min(1).default(5),
   LOGIN_LOCKOUT_MINUTES: z.coerce.number().int().min(1).default(15),

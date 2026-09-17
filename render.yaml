@@ -1,6 +1,14 @@
 # Blueprint do Render para a API da Trust Platform.
 # No Render: New + → Blueprint → conectar este repositório → ele lê este arquivo.
 # As variáveis marcadas sync:false são preenchidas no painel (valores do seu .env).
+#
+# SUPERSEDED (2026-09-17): a conta Render usada para hospedar esta API foi
+# suspensa por um problema de cobrança não relacionado ao código. O founder
+# decidiu migrar o backend para Vercel Serverless Functions (ver
+# apps/api/vercel.json, apps/api/api/index.ts e o Completion Report em
+# docs/Multi-Agent Implementation Doc/IPS/MIGRATION-RENDER-TO-VERCEL-COMPLETION-REPORT.md).
+# Este arquivo é mantido como referência/fallback caso o Render volte a ser
+# usado no futuro — NÃO é o deploy ativo.
 services:
   - type: web
     name: trust-api

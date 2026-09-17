@@ -63,7 +63,7 @@ describe.runIf(Boolean(testDatabaseUrl))('PAY-002 — Autorização de pagamento
   async function waitForScore(identityId: string, expected: number): Promise<void> {
     const startedAt = Date.now();
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const [score] = await db
         .select()
         .from(trustScores)
@@ -126,7 +126,7 @@ describe.runIf(Boolean(testDatabaseUrl))('PAY-002 — Autorização de pagamento
 
     const startedAt = Date.now();
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const [row] = await db.select().from(payments).where(eq(payments.orderId, orderId));
       if (row) {
         return { paymentId: row.id, orderId };

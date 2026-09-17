@@ -58,6 +58,11 @@ export class AppConfigService {
     return this.config.get('OUTBOX_MAX_ATTEMPTS', { infer: true });
   }
 
+  /** Segredo compartilhado do gatilho M2M do outbox relay (rota /internal/jobs). */
+  get internalJobSecret(): string | undefined {
+    return this.config.get('INTERNAL_JOB_SECRET', { infer: true });
+  }
+
   get loginMaxFailedAttempts(): number {
     return this.config.get('LOGIN_MAX_FAILED_ATTEMPTS', { infer: true });
   }

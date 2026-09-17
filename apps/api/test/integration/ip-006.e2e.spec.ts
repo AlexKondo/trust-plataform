@@ -86,7 +86,7 @@ describe.runIf(Boolean(testDatabaseUrl))('IP-006 — Field Execution & Trust Evi
   async function waitForBronze(identityId: string): Promise<void> {
     const startedAt = Date.now();
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const [score] = await db.select().from(trustScores).where(eq(trustScores.identityId, identityId));
       if (score && score.score >= 25) return;
       await new Promise((sleep) => setTimeout(sleep, 500));

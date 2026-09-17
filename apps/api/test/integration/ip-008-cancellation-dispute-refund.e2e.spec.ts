@@ -70,7 +70,7 @@ describe.runIf(Boolean(testDatabaseUrl))('IP-008 — Cancelamento, disputa e ree
   async function waitForScore(identityId: string, expected: number): Promise<void> {
     const startedAt = Date.now();
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const [score] = await db.select().from(trustScores).where(eq(trustScores.identityId, identityId));
       if (score?.score === expected) {
         return;
@@ -90,7 +90,7 @@ describe.runIf(Boolean(testDatabaseUrl))('IP-008 — Cancelamento, disputa e ree
   async function waitFor<T>(check: () => Promise<T | undefined>, what: string): Promise<T> {
     const startedAt = Date.now();
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const value = await check();
       if (value !== undefined) {
         return value;

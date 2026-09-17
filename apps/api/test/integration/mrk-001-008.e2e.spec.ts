@@ -63,7 +63,7 @@ describe.runIf(Boolean(testDatabaseUrl))('MRK-001..008 — Marketplace e2e', () 
   async function waitForBronze(identityId: string): Promise<void> {
     const startedAt = Date.now();
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const [score] = await db
         .select()
         .from(trustScores)

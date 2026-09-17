@@ -486,6 +486,63 @@ Migration 0035 aditiva (`funds_refunds` + `marketplace_dispute_decisions.refund_
 nullable). Detalhes, decisões e critérios de aceite em
 [docs/Multi-Agent Implementation Doc/IPS/IP-008-COMPLETION-REPORT.md](docs/Multi-Agent%20Implementation%20Doc/IPS/IP-008-COMPLETION-REPORT.md).
 
+## MIGRAÇÃO Render → Vercel: backend serverless + outbox sem pg-boss (2026-09-17)
+
+A conta Render que hospedava `apps/api` foi **suspensa por um problema de
+cobrança** (não relacionado a código/segurança). O founder decidiu mover o
+backend para **Vercel Serverless Functions** (o frontend já roda lá), em vez
+de esperar o Render voltar. Não é uma IP numerada do Pack — segue o mesmo
+rigor (leitura de `02_SHARED_ENGINEERING_STANDARDS.md`, testes completos,
+Completion Report), documentado em
+[docs/Multi-Agent Implementation Doc/IPS/MIGRATION-RENDER-TO-VERCEL-COMPLETION-REPORT.md](docs/Multi-Agent%20Implementation%20Doc/IPS/MIGRATION-RENDER-TO-VERCEL-COMPLETION-REPORT.md).
+
+- **Nova entrada serverless** `apps/api/api/index.ts`: chama `createApp()`
+  (já existia, separado de `bootstrap()`/`.listen()` desde o Módulo 0) uma
+  vez por container "quente" (cache em variável de módulo, best-effort — cold
+  start reconstrói) e faz a ponte Fastify→handler `(req,res)` da Vercel via
+  `server.emit('request', req, res)` depois de `.ready()` — padrão
+  documentado para rodar Fastify em Lambda/Vercel sem abrir porta.
+  `apps/api/vercel.json` configura o projeto (raiz `apps/api/`, build do
+  monorepo, `maxDuration: 60` na function).
+- **`OutboxRelayService` reescrito, pg-boss removido inteiramente** (fila
+  persistente + `boss.work()` contínuo eram incompatíveis com função
+  serverless sem processo residente). Era duas camadas (outbox → pg-boss →
+  consumer); agora é uma: `drainOnce()` lê o batch PENDING
+  (`FOR UPDATE SKIP LOCKED`, preservado — ainda protege contra invocações
+  concorrentes), descobre os `EventConsumer` registrados via
+  `DiscoveryService` (inalterado) e chama `consumer.handle()` diretamente,
+  **dentro da mesma invocação HTTP**, sem broker no meio. `tick()` foi
+  removido; os ~50 call sites em `apps/api/test/**` que chamavam
+  `relay.tick()` para forçar entrega síncrona nos testes passaram a chamar
+  `relay.drainOnce()`.
+  - **Semântica de status por linha** (decisão de design, ver Completion
+    Report para os detalhes e o risco documentado): uma linha do outbox só
+    vira `PUBLISHED` quando TODOS os consumers atualmente registrados para
+    seu `eventType` têm dedupe gravado em `processed_events`; se algum
+    falhar, a linha fica `PENDING` (retry na próxima invocação) até
+    `OUTBOX_MAX_ATTEMPTS`. Isso é estritamente mais seguro que o
+    comportamento antigo (que marcava `PUBLISHED` assim que o `boss.publish`
+    enfileirava — antes mesmo do consumer rodar).
+  - `drainOnce()` respeita um orçamento de tempo (`maxDurationMs`, default
+    50s) para caber no limite de execução serverless; linhas restantes ficam
+    `PENDING` e são pegas na próxima invocação.
+- **Gatilho substitui o `setInterval` do worker residente**: novo endpoint
+  interno `POST /api/v1/internal/jobs/outbox-relay`
+  (`apps/api/src/modules/internal-jobs/`), protegido por segredo
+  compartilhado (`INTERNAL_JOB_SECRET`, header `x-internal-job-secret`,
+  comparação em tempo constante via `crypto.timingSafeEqual` — nunca logado),
+  `@Public()` no sentido do guard JWT (não usa identidade de usuário — é
+  M2M). Disparado por `.github/workflows/outbox-relay.yml`
+  (`schedule: cron: '*/5 * * * *'`), que exige os repository secrets
+  `INTERNAL_JOB_SECRET` e `API_BASE_URL` no GitHub (o founder precisa
+  cadastrar).
+- `render.yaml` **mantido como referência/fallback**, não apagado — comentário
+  no topo marca como superseded.
+- Manual do founder (Vercel dashboard: criar projeto raiz `apps/api/`, env
+  vars — mesma lista do `render.yaml` + `INTERNAL_JOB_SECRET`; GitHub
+  Actions: cadastrar os 2 secrets acima) e testes completos rodados
+  (unit + e2e Postgres embutido) estão detalhados no Completion Report.
+
 ## Documentos-guia (ler nesta ordem)
 
 1. [PLANO-DE-MODULOS.md](PLANO-DE-MODULOS.md) — quebra em módulos, ordem de desenvolvimento, grafo de dependências

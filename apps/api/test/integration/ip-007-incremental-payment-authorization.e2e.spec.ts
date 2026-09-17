@@ -78,7 +78,7 @@ describe.runIf(Boolean(testDatabaseUrl))('IP-007 — Incremental Payment Authori
   async function waitForScore(identityId: string, expected: number): Promise<void> {
     const startedAt = Date.now();
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const [score] = await db.select().from(trustScores).where(eq(trustScores.identityId, identityId));
       if (score?.score === expected) {
         return;
@@ -91,7 +91,7 @@ describe.runIf(Boolean(testDatabaseUrl))('IP-007 — Incremental Payment Authori
   async function waitFor<T>(check: () => Promise<T | undefined>, what: string): Promise<T> {
     const startedAt = Date.now();
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const value = await check();
       if (value !== undefined) {
         return value;
@@ -358,7 +358,7 @@ describe.runIf(Boolean(testDatabaseUrl))('IP-007 — Incremental Payment Authori
 
     // Dá tempo real ao relay processar qualquer coisa que porventura existisse.
     for (let i = 0; i < 5; i += 1) {
-      await relay.tick();
+      await relay.drainOnce();
       await new Promise((sleep) => setTimeout(sleep, 200));
     }
 

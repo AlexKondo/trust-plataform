@@ -1,33 +1,43 @@
-import {
-  Inject,
-  Injectable,
-  OnApplicationBootstrap,
-  OnApplicationShutdown,
-} from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { DiscoveryService } from '@nestjs/core';
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { PinoLogger } from 'nestjs-pino';
-import PgBoss from 'pg-boss';
 import { AppConfigService } from '../config/app-config.service';
 import { DRIZZLE, Database } from '../database/database.module';
 import { OUTBOX_STATUS, OutboxEventRow, outboxEvents, processedEvents } from '../database/schema';
 import { EventConsumer } from './event-consumer';
 import { ConsumedEvent } from './event-envelope';
-import { readPersistedEvent } from './legacy-event-compat';
 
 /**
- * Publica eventos PENDING do outbox no pg-boss (at-least-once).
- * Consumidores DEVEM ser idempotentes por eventId (DOC-005): se o processo cair
- * entre publicar e marcar PUBLISHED, o evento é reenviado no próximo ciclo.
- * Após OUTBOX_MAX_ATTEMPTS falhas o evento vira FAILED e exige reprocesso manual.
+ * Drena eventos PENDING do outbox de forma síncrona e sem estado entre
+ * chamadas (at-least-once). Cada linha é entregue diretamente aos consumers
+ * REGISTRADOS NO MOMENTO DA CHAMADA (via DiscoveryService) que assinam seu
+ * `eventType` — sem broker/fila intermediária.
+ *
+ * Migração Render → Vercel (2026-09-17): removido pg-boss (fila persistente +
+ * worker de longa duração, incompatível com funções serverless). `drainOnce()`
+ * é chamado por um endpoint HTTP disparado externamente (GitHub Actions cron
+ * a cada 5min) em vez de um `setInterval` de processo residente.
+ *
+ * Semântica de status por linha (decisão de design, ver Completion Report):
+ * - uma linha só vira PUBLISHED quando TODOS os consumers atualmente
+ *   registrados para seu eventType têm uma linha em `processedEvents`
+ *   (dedupe idempotente, verificado após a tentativa desta chamada);
+ * - se algum consumer falhar, a linha permanece PENDING (retry na próxima
+ *   invocação) até `outboxMaxAttempts`, quando vira FAILED;
+ * - consumers que já processaram com sucesso em uma tentativa anterior NÃO
+ *   são re-executados numa nova tentativa da mesma linha — o filtro usa
+ *   `processedEvents` para pular quem já tem dedupe gravado.
+ * - risco conhecido (documentado no Completion Report): se um NOVO consumer
+ *   para um eventType for implantado depois que linhas antigas desse tipo já
+ *   foram marcadas PUBLISHED sob a semântica antiga (pg-boss), essas linhas
+ *   antigas não serão automaticamente re-entregues a ele — isso já era
+ *   verdade antes (pg-boss também não replaying jobs antigos) e não piora
+ *   com esta migração, mas segue sendo uma limitação estrutural do outbox
+ *   atual (não há "replay from history" automático).
  */
 @Injectable()
-export class OutboxRelayService implements OnApplicationBootstrap, OnApplicationShutdown {
-  private boss?: PgBoss;
-  private timer?: NodeJS.Timeout;
-  private ticking = false;
-  private readonly ensuredQueues = new Set<string>();
-
+export class OutboxRelayService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly config: AppConfigService,
@@ -37,55 +47,163 @@ export class OutboxRelayService implements OnApplicationBootstrap, OnApplication
     this.logger.setContext(OutboxRelayService.name);
   }
 
-  async onApplicationBootstrap(): Promise<void> {
-    this.boss = new PgBoss({
-      connectionString: this.config.databaseUrl,
-      schema: 'pgboss',
-      max: Math.min(2, this.config.dbPoolMax),
-    });
-    this.boss.on('error', (error) =>
-      this.logger.error({ err: error }, 'pg-boss reported an error.'),
-    );
-    await this.boss.start();
-    await this.registerConsumers();
-    this.timer = setInterval(() => void this.tick(), this.config.outboxPollIntervalMs);
-    this.logger.info(
-      { operation: 'OutboxRelayStart', pollIntervalMs: this.config.outboxPollIntervalMs },
-      'Outbox relay started.',
-    );
-  }
-
-  /**
-   * Descobre todos os providers que estendem EventConsumer e os registra no
-   * pg-boss. Cada consumo roda em transação com dedupe por (consumer, eventId).
-   */
-  private async registerConsumers(): Promise<void> {
-    const consumers = this.discovery
+  private getConsumers(): EventConsumer[] {
+    return this.discovery
       .getProviders()
       .map((wrapper) => wrapper.instance as unknown)
       .filter((instance): instance is EventConsumer => instance instanceof EventConsumer);
+  }
 
+  /**
+   * Drena até `outboxBatchSize` linhas PENDING, entregando cada uma a todos
+   * os consumers registrados para seu `eventType`. Respeita um orçamento de
+   * tempo (`maxDurationMs`) para caber no limite de execução de uma função
+   * serverless — linhas restantes ficam PENDING e são pegas na próxima
+   * invocação (cron a cada 5min).
+   *
+   * Substitui o antigo `tick()` (que apenas publicava no pg-boss) — agora a
+   * entrega É o processamento, não apenas o enfileiramento.
+   */
+  async drainOnce(options?: { maxDurationMs?: number }): Promise<{ processed: number }> {
+    const consumers = this.getConsumers();
+    const consumersByEventType = new Map<string, EventConsumer[]>();
     for (const consumer of consumers) {
-      // Fan-out: fila própria por consumer, inscrita no evento — cada consumer
-      // recebe SUA cópia do evento (pg-boss é fila de jobs, não pub/sub por queue)
-      await this.ensureQueue(consumer.consumerName);
-      await this.boss!.subscribe(consumer.eventType, consumer.consumerName);
-      await this.boss!.work(consumer.consumerName, async (jobs: PgBoss.Job<unknown>[]) => {
-        for (const job of jobs) {
-          // Caminho tolerante (PACK-00 v1.1 §11): jobs enfileirados antes da
-          // migration 0024 carregam o envelope legado (eventName, sem agregado).
-          await this.consume(consumer, readPersistedEvent(job.data));
-        }
-      });
-      this.logger.info(
-        {
-          operation: 'ConsumerRegistered',
-          eventType: consumer.eventType,
-          consumerName: consumer.consumerName,
-        },
-        'Event consumer registered.',
-      );
+      const list = consumersByEventType.get(consumer.eventType) ?? [];
+      list.push(consumer);
+      consumersByEventType.set(consumer.eventType, list);
     }
+
+    const deadline = Date.now() + (options?.maxDurationMs ?? 50_000);
+    let processed = 0;
+
+    for (;;) {
+      if (Date.now() >= deadline) {
+        break;
+      }
+      const batch = await this.db
+        .select()
+        .from(outboxEvents)
+        .where(eq(outboxEvents.status, OUTBOX_STATUS.PENDING))
+        .orderBy(asc(outboxEvents.createdAt))
+        .limit(this.config.outboxBatchSize)
+        .for('update', { skipLocked: true });
+
+      if (batch.length === 0) {
+        break;
+      }
+
+      for (const row of batch) {
+        if (Date.now() >= deadline) {
+          return { processed };
+        }
+        await this.drainRow(row, consumersByEventType.get(row.eventType) ?? []);
+        processed += 1;
+      }
+
+      if (batch.length < this.config.outboxBatchSize) {
+        break;
+      }
+    }
+
+    return { processed };
+  }
+
+  private async drainRow(row: OutboxEventRow, consumers: EventConsumer[]): Promise<void> {
+    if (consumers.length === 0) {
+      // Nenhum consumer registrado para este eventType (ex.: evento apenas de
+      // auditoria/analytics futura) — nada a entregar; marca PUBLISHED.
+      await this.finalizeRow(row, true);
+      return;
+    }
+
+    const envelope = this.toEnvelope(row);
+
+    const alreadyProcessed = await this.db
+      .select({ consumerName: processedEvents.consumerName })
+      .from(processedEvents)
+      .where(
+        and(
+          eq(processedEvents.eventId, row.eventId),
+          inArray(
+            processedEvents.consumerName,
+            consumers.map((c) => c.consumerName),
+          ),
+        ),
+      );
+    const doneNames = new Set(alreadyProcessed.map((r) => r.consumerName));
+
+    let allSucceeded = true;
+    for (const consumer of consumers) {
+      if (doneNames.has(consumer.consumerName)) {
+        continue;
+      }
+      try {
+        await this.consume(consumer, envelope);
+      } catch {
+        allSucceeded = false;
+        // segue tentando os demais consumers desta linha; a linha só some do
+        // PENDING quando TODOS tiverem processedEvents gravado
+      }
+    }
+
+    await this.finalizeRow(row, allSucceeded);
+  }
+
+  private async finalizeRow(row: OutboxEventRow, succeeded: boolean): Promise<void> {
+    if (succeeded) {
+      await this.db
+        .update(outboxEvents)
+        .set({
+          status: OUTBOX_STATUS.PUBLISHED,
+          publishedAt: new Date(),
+          attempts: row.attempts + 1,
+          updatedAt: new Date(),
+        })
+        .where(eq(outboxEvents.id, row.id));
+      return;
+    }
+
+    const attempts = row.attempts + 1;
+    const failed = attempts >= this.config.outboxMaxAttempts;
+    await this.db
+      .update(outboxEvents)
+      .set({
+        status: failed ? OUTBOX_STATUS.FAILED : OUTBOX_STATUS.PENDING,
+        attempts,
+        lastError: 'One or more consumers failed; see logs for eventId/consumerName.',
+        updatedAt: new Date(),
+      })
+      .where(eq(outboxEvents.id, row.id));
+    this.logger.error(
+      {
+        operation: 'OutboxDrain',
+        eventId: row.eventId,
+        eventType: row.eventType,
+        correlationId: row.correlationId,
+        attempts,
+        result: failed ? 'FAILED_PERMANENT' : 'FAILURE',
+      },
+      failed
+        ? 'Outbox event permanently failed after max attempts — manual reprocess required.'
+        : 'Outbox event partially failed; will retry.',
+    );
+  }
+
+  private toEnvelope(row: OutboxEventRow): ConsumedEvent {
+    // Linhas anteriores à migration 0024 não têm identidade de agregado; o Pack
+    // proíbe fabricá-la, então o envelope publicado a omite (PACK-00 v1.1 §11).
+    return {
+      eventId: row.eventId,
+      eventType: row.eventType,
+      eventVersion: row.eventVersion,
+      occurredAt: row.occurredAt.toISOString(),
+      producer: row.producer,
+      aggregateType: row.aggregateType ?? undefined,
+      aggregateId: row.aggregateId ?? undefined,
+      correlationId: row.correlationId ?? row.eventId,
+      causationId: row.causationId ?? undefined,
+      payload: row.payload as Record<string, unknown>,
+    };
   }
 
   private async consume(consumer: EventConsumer, envelope: ConsumedEvent): Promise<void> {
@@ -128,7 +246,7 @@ export class OutboxRelayService implements OnApplicationBootstrap, OnApplication
           correlationId: envelope.correlationId,
           result: 'FAILURE',
         },
-        'Event consumer failed; pg-boss will retry.',
+        'Event consumer failed; outbox row stays PENDING and will retry.',
       );
       throw error;
     }
@@ -164,116 +282,6 @@ export class OutboxRelayService implements OnApplicationBootstrap, OnApplication
       .insert(processedEvents)
       .values({ consumerName: consumer.consumerName, eventId: envelope.eventId })
       .onConflictDoNothing();
-  }
-
-  async onApplicationShutdown(): Promise<void> {
-    if (this.timer) {
-      clearInterval(this.timer);
-    }
-    await this.boss?.stop({ graceful: true, timeout: 5000 });
-  }
-
-  /** Um ciclo de publicação; exposto para testes de integração. */
-  async tick(): Promise<void> {
-    if (this.ticking || !this.boss) {
-      return;
-    }
-    this.ticking = true;
-    try {
-      await this.db.transaction(async (tx) => {
-        const batch = await tx
-          .select()
-          .from(outboxEvents)
-          .where(eq(outboxEvents.status, OUTBOX_STATUS.PENDING))
-          .orderBy(asc(outboxEvents.createdAt))
-          .limit(this.config.outboxBatchSize)
-          .for('update', { skipLocked: true });
-
-        for (const row of batch) {
-          await this.publishRow(tx, row);
-        }
-      });
-    } catch (error) {
-      this.logger.error({ err: error, operation: 'OutboxRelayTick' }, 'Outbox tick failed.');
-    } finally {
-      this.ticking = false;
-    }
-  }
-
-  private async publishRow(
-    tx: Pick<Database, 'update'>,
-    row: OutboxEventRow,
-  ): Promise<void> {
-    // Linhas anteriores à migration 0024 não têm identidade de agregado; o Pack
-    // proíbe fabricá-la, então o envelope publicado a omite (PACK-00 v1.1 §11).
-    const envelope: ConsumedEvent = {
-      eventId: row.eventId,
-      eventType: row.eventType,
-      eventVersion: row.eventVersion,
-      occurredAt: row.occurredAt.toISOString(),
-      producer: row.producer,
-      aggregateType: row.aggregateType ?? undefined,
-      aggregateId: row.aggregateId ?? undefined,
-      correlationId: row.correlationId ?? row.eventId,
-      causationId: row.causationId ?? undefined,
-      payload: row.payload as Record<string, unknown>,
-    };
-
-    try {
-      // publish = fan-out para todas as filas inscritas no evento (0..N consumers);
-      // singletonKey = eventId → o broker deduplica reenvios do relay por fila
-      await this.boss!.publish(row.eventType, envelope, { singletonKey: row.eventId });
-      await tx
-        .update(outboxEvents)
-        .set({
-          status: OUTBOX_STATUS.PUBLISHED,
-          publishedAt: new Date(),
-          attempts: row.attempts + 1,
-          updatedAt: new Date(),
-        })
-        .where(eq(outboxEvents.id, row.id));
-    } catch (error) {
-      const attempts = row.attempts + 1;
-      const failed = attempts >= this.config.outboxMaxAttempts;
-      await tx
-        .update(outboxEvents)
-        .set({
-          status: failed ? OUTBOX_STATUS.FAILED : OUTBOX_STATUS.PENDING,
-          attempts,
-          lastError: error instanceof Error ? error.message : String(error),
-          updatedAt: new Date(),
-        })
-        .where(eq(outboxEvents.id, row.id));
-      this.logger.error(
-        {
-          err: error,
-          operation: 'OutboxPublish',
-          eventId: row.eventId,
-          eventType: row.eventType,
-          correlationId: row.correlationId,
-          attempts,
-          result: failed ? 'FAILED_PERMANENT' : 'FAILURE',
-        },
-        failed
-          ? 'Outbox event permanently failed after max attempts — manual reprocess required.'
-          : 'Outbox event publish failed; will retry.',
-      );
-    }
-  }
-
-  private async ensureQueue(name: string): Promise<void> {
-    if (this.ensuredQueues.has(name)) {
-      return;
-    }
-    // Retry com backoff exponencial (2s, 4s, 8s…) — dependências entre consumers
-    // (ex.: score ainda não criado quando a verificação pontua) se resolvem rápido
-    await this.boss!.createQueue(name, {
-      name,
-      retryLimit: 12,
-      retryDelay: 2,
-      retryBackoff: true,
-    });
-    this.ensuredQueues.add(name);
   }
 
   /** Reprocesso manual de eventos FAILED (uso administrativo/operacional). */

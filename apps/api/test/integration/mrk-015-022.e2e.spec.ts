@@ -66,7 +66,7 @@ describe.runIf(Boolean(testDatabaseUrl))('MRK-015..022 — Ciclo do pedido e2e',
     const startedAt = Date.now();
     let last = -1;
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const [score] = await db
         .select()
         .from(trustScores)
@@ -87,7 +87,7 @@ describe.runIf(Boolean(testDatabaseUrl))('MRK-015..022 — Ciclo do pedido e2e',
     const startedAt = Date.now();
     let last = -1;
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const [score] = await db
         .select()
         .from(trustScores)
@@ -112,7 +112,7 @@ describe.runIf(Boolean(testDatabaseUrl))('MRK-015..022 — Ciclo do pedido e2e',
     const startedAt = Date.now();
     let last = '';
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const response = await app.inject({
         method: 'GET',
         url: `/api/v1/marketplace/orders/${orderId}`,
@@ -376,7 +376,7 @@ describe.runIf(Boolean(testDatabaseUrl))('MRK-015..022 — Ciclo do pedido e2e',
     const startedAt = Date.now();
     let listingStatus = '';
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const view = await app.inject({
         method: 'GET',
         url: `/api/v1/marketplace/listings/${listingId}`,

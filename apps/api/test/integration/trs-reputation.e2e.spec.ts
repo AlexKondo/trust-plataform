@@ -60,7 +60,7 @@ describe.runIf(Boolean(testDatabaseUrl))('TRS-012..020 — Reputação pública 
   async function waitForBadge(identityId: string): Promise<void> {
     const startedAt = Date.now();
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const [score] = await db
         .select()
         .from(trustScores)

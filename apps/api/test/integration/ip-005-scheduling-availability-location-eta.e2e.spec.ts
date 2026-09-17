@@ -63,12 +63,12 @@ describe.runIf(Boolean(testDatabaseUrl))('IP-005 — Scheduling, Availability, L
 
   /** MRK-003 BR-005: publicar HOME_REPAIRS exige reputação BRONZE mínima — uma
    * identidade recém-criada só chega lá depois que o consumer assíncrono do
-   * Trust Score processa o evento de cadastro (`relay.tick()` é o "worker" em
+   * Trust Score processa o evento de cadastro (`relay.drainOnce()` é o "worker" em
    * teste, não roda sozinho como em produção). */
   async function waitForBronze(identityId: string): Promise<void> {
     const startedAt = Date.now();
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const [score] = await db.select().from(trustScores).where(eq(trustScores.identityId, identityId));
       if (score && score.score >= 25) {
         return;

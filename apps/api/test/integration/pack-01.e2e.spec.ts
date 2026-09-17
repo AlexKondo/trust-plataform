@@ -68,7 +68,7 @@ describe.runIf(Boolean(testDatabaseUrl))('PACK-01 — Custódia e liberação', 
   async function waitForScore(identityId: string, expected: number): Promise<void> {
     const startedAt = Date.now();
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const [score] = await db
         .select()
         .from(trustScores)
@@ -85,7 +85,7 @@ describe.runIf(Boolean(testDatabaseUrl))('PACK-01 — Custódia e liberação', 
   async function waitFor<T>(check: () => Promise<T | undefined>, what: string): Promise<T> {
     const startedAt = Date.now();
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const value = await check();
       if (value !== undefined) {
         return value;
@@ -273,7 +273,7 @@ describe.runIf(Boolean(testDatabaseUrl))('PACK-01 — Custódia e liberação', 
 
     // Vários ciclos do relay não podem multiplicar a custódia (UNIQUE + dedupe).
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      await relay.tick();
+      await relay.drainOnce();
     }
     const rows = await db.select().from(trustCustodies).where(eq(trustCustodies.orderId, orderId));
     expect(rows).toHaveLength(1);
@@ -313,7 +313,7 @@ describe.runIf(Boolean(testDatabaseUrl))('PACK-01 — Custódia e liberação', 
     }
 
     for (let attempt = 0; attempt < 6; attempt += 1) {
-      await relay.tick();
+      await relay.drainOnce();
       await new Promise((sleep) => setTimeout(sleep, 300));
     }
 

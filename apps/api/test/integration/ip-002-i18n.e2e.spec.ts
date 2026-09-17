@@ -92,7 +92,7 @@ describe.runIf(Boolean(testDatabaseUrl))('IP-002 — Internacionalização e2e',
   async function waitForScore(identityId: string, expected: number): Promise<void> {
     const startedAt = Date.now();
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const [score] = await db.select().from(trustScores).where(eq(trustScores.identityId, identityId));
       if (score?.score === expected) {
         return;
@@ -199,7 +199,7 @@ describe.runIf(Boolean(testDatabaseUrl))('IP-002 — Internacionalização e2e',
     const startedAt = Date.now();
     let sellerNotificationLocale: string | undefined;
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const [row] = await db
         .select()
         .from(notifications)

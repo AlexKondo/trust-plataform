@@ -70,7 +70,7 @@ describe.runIf(Boolean(testDatabaseUrl))('PACK-00 v1.1 — baseline canônico', 
   async function waitForScore(identityId: string, expected: number): Promise<void> {
     const startedAt = Date.now();
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const [score] = await db
         .select()
         .from(trustScores)
@@ -181,7 +181,7 @@ describe.runIf(Boolean(testDatabaseUrl))('PACK-00 v1.1 — baseline canônico', 
     const startedAt = Date.now();
     let paymentId: string | undefined;
     while (Date.now() - startedAt < 40000 && !paymentId) {
-      await relay.tick();
+      await relay.drainOnce();
       const [row] = await db.select().from(payments).where(eq(payments.orderId, orderId));
       paymentId = row?.id;
       if (!paymentId) {
@@ -223,7 +223,7 @@ describe.runIf(Boolean(testDatabaseUrl))('PACK-00 v1.1 — baseline canônico', 
 
     let row: typeof outboxEvents.$inferSelect | undefined;
     for (let attempt = 0; attempt < 20; attempt += 1) {
-      await relay.tick();
+      await relay.drainOnce();
       [row] = await db.select().from(outboxEvents).where(eq(outboxEvents.eventId, eventId));
       if (row?.status === 'PUBLISHED') {
         break;

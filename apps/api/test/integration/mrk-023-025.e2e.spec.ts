@@ -71,7 +71,7 @@ describe.runIf(Boolean(testDatabaseUrl))('MRK-023..025 — Disputas e avaliaçõ
     const startedAt = Date.now();
     let last = -1;
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const [score] = await db
         .select()
         .from(trustScores)
@@ -95,7 +95,7 @@ describe.runIf(Boolean(testDatabaseUrl))('MRK-023..025 — Disputas e avaliaçõ
     const startedAt = Date.now();
     let last = '';
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const response = await app.inject({
         method: 'GET',
         url: `/api/v1/marketplace/orders/${orderId}`,
@@ -507,9 +507,9 @@ describe.runIf(Boolean(testDatabaseUrl))('MRK-023..025 — Disputas e avaliaçõ
     expect(resolved.statusCode).toBe(200);
 
     // Nenhum dos dois perde pontos
-    await relay.tick();
+    await relay.drainOnce();
     await new Promise((sleep) => setTimeout(sleep, 1500));
-    await relay.tick();
+    await relay.drainOnce();
     const [sellerScore] = await db
       .select()
       .from(trustScores)

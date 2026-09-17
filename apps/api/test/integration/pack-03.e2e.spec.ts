@@ -111,7 +111,7 @@ describe.runIf(Boolean(testDatabaseUrl))('PACK-03 — Trust Change Order & Time 
   async function waitFor<T>(check: () => Promise<T | undefined>, what: string): Promise<T> {
     const startedAt = Date.now();
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const value = await check();
       if (value !== undefined) {
         return value;
@@ -124,7 +124,7 @@ describe.runIf(Boolean(testDatabaseUrl))('PACK-03 — Trust Change Order & Time 
   async function waitForBronze(identityId: string): Promise<void> {
     const startedAt = Date.now();
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const [score] = await db
         .select()
         .from(trustScores)
@@ -762,7 +762,7 @@ describe.runIf(Boolean(testDatabaseUrl))('PACK-03 — Trust Change Order & Time 
       url: `/api/v1/marketplace/change-orders/${changeOrderId}/approve`,
       headers: contract.buyer.auth,
     });
-    await relay.tick();
+    await relay.drainOnce();
 
     // §9 (item PARADO e reportado): o Change Order aprovado NÃO altera Payment
     // nem custódia. O delta fica autorizado e explicitamente fora da custódia.

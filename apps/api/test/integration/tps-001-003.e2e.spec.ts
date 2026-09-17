@@ -60,7 +60,7 @@ describe.runIf(Boolean(testDatabaseUrl))('TPS-001..003 — Trust Passport e2e', 
   async function waitForPassport(identityId: string, timeoutMs = 40000): Promise<void> {
     const startedAt = Date.now();
     while (Date.now() - startedAt < timeoutMs) {
-      await relay.tick();
+      await relay.drainOnce();
       const [row] = await db
         .select({ id: trustPassports.id })
         .from(trustPassports)

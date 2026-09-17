@@ -84,7 +84,7 @@ describe.runIf(Boolean(testDatabaseUrl))('VRF-001..006 — Verification e2e', ()
   async function waitForPassport(identityId: string): Promise<void> {
     const startedAt = Date.now();
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const [row] = await db
         .select({ id: trustPassports.id })
         .from(trustPassports)
@@ -225,7 +225,7 @@ describe.runIf(Boolean(testDatabaseUrl))('VRF-001..006 — Verification e2e', ()
       const startedAt = Date.now();
       let synced = false;
       while (Date.now() - startedAt < 40000 && !synced) {
-        await relay.tick();
+        await relay.drainOnce();
         const [passport] = await db
           .select()
           .from(trustPassports)
@@ -245,7 +245,7 @@ describe.runIf(Boolean(testDatabaseUrl))('VRF-001..006 — Verification e2e', ()
       const startedAt = Date.now();
       let scored = false;
       while (Date.now() - startedAt < 40000 && !scored) {
-        await relay.tick();
+        await relay.drainOnce();
         const me = await app.inject({
           method: 'GET',
           url: '/api/v1/trust-scores/me',

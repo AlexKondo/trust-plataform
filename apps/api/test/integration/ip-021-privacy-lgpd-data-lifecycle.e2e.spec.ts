@@ -69,7 +69,7 @@ describe.runIf(Boolean(testDatabaseUrl))('IP-021 — Privacidade, LGPD e ciclo d
   async function waitForScore(identityId: string, minimum: number): Promise<void> {
     const startedAt = Date.now();
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const [score] = await db.select().from(trustScores).where(eq(trustScores.identityId, identityId));
       if (score && score.score >= minimum) {
         return;

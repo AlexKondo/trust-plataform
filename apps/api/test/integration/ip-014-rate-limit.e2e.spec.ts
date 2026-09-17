@@ -77,7 +77,7 @@ describe.runIf(Boolean(testDatabaseUrl))('IP-014 — rate limiter retorna 429 re
     const { trustScores } = await import('../../src/shared/database/schema/index.js');
     const startedAt = Date.now();
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const [score] = await db
         .select()
         .from(trustScores)

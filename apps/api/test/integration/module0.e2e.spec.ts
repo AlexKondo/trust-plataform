@@ -89,7 +89,7 @@ describe.runIf(Boolean(testDatabaseUrl))('Módulo 0 — e2e', () => {
     // dev com backlog pode levar mais de um ciclo até chegar neste evento.
     let row: typeof outboxEvents.$inferSelect | undefined;
     for (let i = 0; i < 20; i += 1) {
-      await relay.tick();
+      await relay.drainOnce();
       [row] = await db
         .select()
         .from(outboxEvents)

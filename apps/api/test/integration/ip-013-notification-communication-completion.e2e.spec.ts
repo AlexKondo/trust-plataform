@@ -81,7 +81,7 @@ describe.runIf(Boolean(testDatabaseUrl))('IP-013 — Notification & Communicatio
   async function waitForScore(identityId: string, expected: number): Promise<void> {
     const startedAt = Date.now();
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const [score] = await db.select().from(trustScores).where(eq(trustScores.identityId, identityId));
       if (score?.score === expected) {
         return;
@@ -105,7 +105,7 @@ describe.runIf(Boolean(testDatabaseUrl))('IP-013 — Notification & Communicatio
     const startedAt = Date.now();
     let seen: string[] = [];
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const items = await listNotifications(user);
       seen = items.map((item) => item.type);
       const found = items.find((item) => item.type === type);
@@ -170,7 +170,7 @@ describe.runIf(Boolean(testDatabaseUrl))('IP-013 — Notification & Communicatio
 
     const startedAt = Date.now();
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const [row] = await db.select().from(payments).where(eq(payments.orderId, orderId));
       if (row) {
         return { orderId, paymentId: row.id, seller, buyer };
@@ -240,7 +240,7 @@ describe.runIf(Boolean(testDatabaseUrl))('IP-013 — Notification & Communicatio
     const paymentRow = await (async () => {
       const startedAt = Date.now();
       while (Date.now() - startedAt < 40000) {
-        await relay.tick();
+        await relay.drainOnce();
         const [row] = await db.select().from(payments).where(eq(payments.orderId, orderId));
         if (row) {
           return row;
@@ -264,7 +264,7 @@ describe.runIf(Boolean(testDatabaseUrl))('IP-013 — Notification & Communicatio
     await (async () => {
       const startedAt = Date.now();
       while (Date.now() - startedAt < 40000) {
-        await relay.tick();
+        await relay.drainOnce();
         const [custody] = await db
           .select()
           .from(trustCustodies)

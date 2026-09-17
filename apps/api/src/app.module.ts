@@ -24,6 +24,8 @@ import { TrustPassportModule } from './modules/trust-passport/trust-passport.mod
 import { TrustScoreModule } from './modules/trust-score/trust-score.module';
 import { VerificationModule } from './modules/verification/verification.module';
 import { AiModule } from './modules/ai/ai.module';
+import { AdminOpsModule } from './modules/admin-ops/admin-ops.module';
+import { InternalJobsModule } from './modules/internal-jobs/internal-jobs.module';
 
 @Module({
   imports: [
@@ -47,6 +49,8 @@ import { AiModule } from './modules/ai/ai.module';
     PrivacyModule,
     AnalyticsModule,
     AiModule,
+    AdminOpsModule,
+    InternalJobsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

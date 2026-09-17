@@ -72,7 +72,7 @@ describe.runIf(Boolean(testDatabaseUrl))('NTF-001 — Notificações e2e', () =>
   async function waitForScore(identityId: string, expected: number): Promise<void> {
     const startedAt = Date.now();
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const [score] = await db
         .select()
         .from(trustScores)
@@ -90,7 +90,7 @@ describe.runIf(Boolean(testDatabaseUrl))('NTF-001 — Notificações e2e', () =>
     const startedAt = Date.now();
     let seen: string[] = [];
     while (Date.now() - startedAt < 40000) {
-      await relay.tick();
+      await relay.drainOnce();
       const response = await app.inject({
         method: 'GET',
         url: '/api/v1/notifications',
@@ -108,7 +108,7 @@ describe.runIf(Boolean(testDatabaseUrl))('NTF-001 — Notificações e2e', () =>
   }
 
   async function listNotifications(user: TestUser): Promise<NotificationItem[]> {
-    await relay.tick();
+    await relay.drainOnce();
     const response = await app.inject({
       method: 'GET',
       url: '/api/v1/notifications',
