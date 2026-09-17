@@ -68,6 +68,18 @@ export const envSchema = z.object({
   ASAAS_API_KEY: z.string().optional(),
   ASAAS_ENVIRONMENT: z.enum(['sandbox', 'production']).default('sandbox'),
   ASAAS_WEBHOOK_TOKEN: z.string().optional(),
+
+  // --- AI Assistance Layer (IP-019) ---
+  // Feature flag: default OFF. Nenhuma AI_PROVIDER_API_KEY existe em nenhum
+  // ambiente hoje (ver .env.example) — o adapter é sempre fail-closed
+  // (NotConfiguredAiAssistanceAdapter) até um provedor real ser contratado e
+  // verificado, mesma barra do Asaas (IP-009).
+  AI_ASSISTANCE_ENABLED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+  AI_PROVIDER_API_KEY: z.string().optional(),
+  AI_ASSISTANCE_TIMEOUT_MS: z.coerce.number().int().min(1).default(8000),
 });
 
 export type Env = z.infer<typeof envSchema>;

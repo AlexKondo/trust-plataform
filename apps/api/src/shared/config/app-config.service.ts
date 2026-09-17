@@ -134,4 +134,18 @@ export class AppConfigService {
   get asaasWebhookToken(): string | undefined {
     return this.config.get('ASAAS_WEBHOOK_TOKEN', { infer: true });
   }
+
+  /** IP-019 — feature flag da camada de assistência por IA. Default `false`. */
+  get aiAssistanceEnabled(): boolean {
+    return this.config.get('AI_ASSISTANCE_ENABLED', { infer: true });
+  }
+
+  /** IP-019 — nunca configurada em nenhum ambiente até um provedor real ser contratado. */
+  get aiProviderApiKey(): string | undefined {
+    return this.config.get('AI_PROVIDER_API_KEY', { infer: true });
+  }
+
+  get aiAssistanceTimeoutMs(): number {
+    return this.config.get('AI_ASSISTANCE_TIMEOUT_MS', { infer: true });
+  }
 }

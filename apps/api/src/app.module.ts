@@ -23,6 +23,7 @@ import { PrivacyModule } from './modules/privacy/privacy.module';
 import { TrustPassportModule } from './modules/trust-passport/trust-passport.module';
 import { TrustScoreModule } from './modules/trust-score/trust-score.module';
 import { VerificationModule } from './modules/verification/verification.module';
+import { AiModule } from './modules/ai/ai.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { VerificationModule } from './modules/verification/verification.module';
     PaymentModule,
     PrivacyModule,
     AnalyticsModule,
+    AiModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
