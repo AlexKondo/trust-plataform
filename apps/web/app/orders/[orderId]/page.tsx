@@ -17,18 +17,31 @@ import {
 import { Banner, Field, Icon, PrimaryButton, SecondaryButton } from '../../../components/ui';
 import { ApiError, authApi } from '../../../lib/api';
 import {
+  CHANGE_ORDER_STATUS_LABEL,
+  CHANGE_ORDER_TYPE_LABEL,
   DISPUTE_CATEGORY_LABEL,
   DISPUTE_STATUS_LABEL,
   DECISION_TYPE_LABEL,
+  EXECUTION_EVIDENCE_TYPE_LABEL,
   NEXT_ACTION_LABEL,
   ORDER_STATUS_LABEL,
   REVIEW_CRITERION_LABEL,
   TIMELINE_LABEL,
+  TRAVEL_STATUS_LABEL,
   formatCurrency,
   formatDateTime,
   formatDuration,
 } from '../../../lib/labels';
-import type { Dispute, OrderDetails, Review } from '../../../lib/types';
+import type {
+  ChangeOrder,
+  Dispute,
+  ExecutionEvidence,
+  OrderDetails,
+  PaymentDetails,
+  Review,
+  ServiceNote,
+  TravelStatus,
+} from '../../../lib/types';
 
 const CRITERIA = ['quality', 'communication', 'punctuality', 'costBenefit', 'organization'];
 const REVIEWABLE = ['COMPLETED', 'CLOSED', 'DISPUTE_RESOLVED'];
@@ -51,8 +64,14 @@ function OrderContent() {
   const [order, setOrder] = useState<OrderDetails | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [disputes, setDisputes] = useState<Dispute[]>([]);
+  const [changeOrders, setChangeOrders] = useState<ChangeOrder[]>([]);
+  const [payment, setPayment] = useState<PaymentDetails | null>(null);
+  const [travelStatus, setTravelStatus] = useState<TravelStatus | null>(null);
+  const [evidences, setEvidences] = useState<ExecutionEvidence[]>([]);
+  const [serviceNotes, setServiceNotes] = useState<ServiceNote[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [changeOrderBusyId, setChangeOrderBusyId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
   const [panel, setPanel] = useState<Panel>(null);
 
@@ -67,16 +86,37 @@ function OrderContent() {
 
   const load = useCallback(async () => {
     try {
-      const [details, reviewList, disputeList] = await Promise.all([
-        authApi<OrderDetails>(`/marketplace/orders/${params.orderId}`),
-        authApi<Review[]>(`/marketplace/orders/${params.orderId}/reviews`).catch(() => [] as Review[]),
-        authApi<Dispute[]>(`/marketplace/orders/${params.orderId}/disputes`).catch(
-          () => [] as Dispute[],
-        ),
-      ]);
+      const [details, reviewList, disputeList, changeOrderList, paymentDetails, travel, evidenceList, noteList] =
+        await Promise.all([
+          authApi<OrderDetails>(`/marketplace/orders/${params.orderId}`),
+          authApi<Review[]>(`/marketplace/orders/${params.orderId}/reviews`).catch(() => [] as Review[]),
+          authApi<Dispute[]>(`/marketplace/orders/${params.orderId}/disputes`).catch(
+            () => [] as Dispute[],
+          ),
+          // PACK-03 — Trust Change Order: rascunhos, pendentes de aprovação e decididos.
+          authApi<ChangeOrder[]>(`/marketplace/orders/${params.orderId}/change-orders`).catch(
+            () => [] as ChangeOrder[],
+          ),
+          // IP-007 — autorizações incrementais + custódia (breakdown original + mudanças aprovadas).
+          authApi<PaymentDetails>(`/payments/by-order/${params.orderId}`).catch(() => null),
+          // IP-005 — status de deslocamento / ETA do Partner.
+          authApi<TravelStatus>(`/marketplace/orders/${params.orderId}/travel-status`).catch(() => null),
+          // IP-006 — evidência de execução e notas de serviço (Trust Evidence).
+          authApi<ExecutionEvidence[]>(`/marketplace/orders/${params.orderId}/execution-evidences`).catch(
+            () => [] as ExecutionEvidence[],
+          ),
+          authApi<ServiceNote[]>(`/marketplace/orders/${params.orderId}/service-notes`).catch(
+            () => [] as ServiceNote[],
+          ),
+        ]);
       setOrder(details);
       setReviews(reviewList);
       setDisputes(disputeList);
+      setChangeOrders(changeOrderList);
+      setPayment(paymentDetails);
+      setTravelStatus(travel);
+      setEvidences(evidenceList);
+      setServiceNotes(noteList);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Não foi possível carregar o pedido.');
     }
@@ -106,6 +146,34 @@ function OrderContent() {
       });
     } finally {
       setBusy(false);
+    }
+  };
+
+  /**
+   * PACK-03 §6.1/§12 — só o Trust Member decide um Change Order PENDING_APPROVAL.
+   * Nenhuma regra de elegibilidade/valor é calculada aqui: a API é a única
+   * fonte de verdade, este botão só chama `approve`/`reject`.
+   */
+  const decideChangeOrder = async (changeOrderId: string, decision: 'approve' | 'reject') => {
+    setChangeOrderBusyId(changeOrderId);
+    setFeedback(null);
+    try {
+      await authApi(`/marketplace/change-orders/${changeOrderId}/${decision}`, {
+        method: 'POST',
+        body: decision === 'reject' ? {} : undefined,
+      });
+      await load();
+      setFeedback({
+        kind: 'success',
+        text: decision === 'approve' ? 'Alteração aprovada e autorizada.' : 'Alteração recusada.',
+      });
+    } catch (err) {
+      setFeedback({
+        kind: 'error',
+        text: err instanceof ApiError ? err.message : 'Não foi possível decidir essa alteração agora.',
+      });
+    } finally {
+      setChangeOrderBusyId(null);
     }
   };
 
@@ -234,6 +302,160 @@ function OrderContent() {
             </ol>
           </Card>
 
+          {/* IP-005 — status de deslocamento / ETA do Partner */}
+          {travelStatus && travelStatus.status !== 'NOT_STARTED' ? (
+            <Card>
+              <SectionTitle icon="local_shipping" title="Chegada do prestador" />
+              <div className="flex items-center justify-between">
+                <Pill tone={toneForStatus(travelStatus.status)}>
+                  {TRAVEL_STATUS_LABEL[travelStatus.status] ?? travelStatus.status}
+                </Pill>
+                {travelStatus.estimatedArrivalAt ? (
+                  <p className="body-sm text-on-surface-variant">
+                    Previsão de chegada: {formatDateTime(travelStatus.estimatedArrivalAt)}
+                  </p>
+                ) : null}
+              </div>
+              {travelStatus.declaredEtaMinutes !== null && travelStatus.status === 'EN_ROUTE' ? (
+                <p className="body-sm mt-2 text-on-surface-variant">
+                  ETA declarado pelo prestador: {travelStatus.declaredEtaMinutes} min
+                </p>
+              ) : null}
+            </Card>
+          ) : null}
+
+          {/* PACK-03 §6.1/§12 — Change Orders pendentes de aprovação do Trust Member */}
+          {changeOrders.filter((changeOrder) => changeOrder.status === 'PENDING_APPROVAL').length > 0 ? (
+            <Card>
+              <SectionTitle
+                icon="fact_check"
+                title="Alterações aguardando sua aprovação"
+                hint="Confira o valor original do pedido e o quanto esta alteração adiciona antes de decidir."
+              />
+              <ul className="flex flex-col gap-4">
+                {changeOrders
+                  .filter((changeOrder) => changeOrder.status === 'PENDING_APPROVAL')
+                  .map((changeOrder) => (
+                    <li key={changeOrder.changeOrderId} className="rounded-lg border border-outline-variant p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="body-lg font-medium text-on-surface">
+                          {CHANGE_ORDER_TYPE_LABEL[changeOrder.type] ?? changeOrder.type}
+                        </span>
+                        <Pill tone={toneForStatus(changeOrder.status)}>
+                          {CHANGE_ORDER_STATUS_LABEL[changeOrder.status] ?? changeOrder.status}
+                        </Pill>
+                      </div>
+                      <p className="body-sm mt-2 text-on-surface">{changeOrder.reason}</p>
+                      {changeOrder.description ? (
+                        <p className="body-sm mt-1 text-on-surface-variant">{changeOrder.description}</p>
+                      ) : null}
+
+                      {/* Financeiro explícito: valor original + mudança aprovada + total final (§9 Shared Standards) */}
+                      <dl className="mt-3 grid grid-cols-1 gap-2 rounded-lg bg-surface-container-low p-3 sm:grid-cols-3">
+                        <div>
+                          <dt className="body-sm text-on-surface-variant">Valor original do pedido</dt>
+                          <dd className="body-md font-medium text-on-surface">
+                            {formatCurrency(order.amount, order.currency)}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="body-sm text-on-surface-variant">Esta alteração adiciona</dt>
+                          <dd className="body-md font-medium text-on-surface">
+                            + {formatCurrency(changeOrder.changeGrossAmount, changeOrder.currency)}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="body-sm text-on-surface-variant">Total autorizado se aprovar</dt>
+                          <dd className="body-lg font-semibold text-on-surface">
+                            {formatCurrency(order.amount + changeOrder.changeGrossAmount, changeOrder.currency)}
+                          </dd>
+                        </div>
+                      </dl>
+                      {changeOrder.additionalMinutes !== null ? (
+                        <p className="body-sm mt-2 text-on-surface-variant">
+                          Tempo adicional: {formatDuration(changeOrder.additionalMinutes)}
+                        </p>
+                      ) : null}
+
+                      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                        <PrimaryButton
+                          type="button"
+                          loading={changeOrderBusyId === changeOrder.changeOrderId}
+                          onClick={() => void decideChangeOrder(changeOrder.changeOrderId, 'approve')}
+                        >
+                          Aprovar alteração
+                        </PrimaryButton>
+                        <SecondaryButton
+                          disabled={changeOrderBusyId === changeOrder.changeOrderId}
+                          onClick={() => void decideChangeOrder(changeOrder.changeOrderId, 'reject')}
+                        >
+                          Recusar
+                        </SecondaryButton>
+                      </div>
+                    </li>
+                  ))}
+              </ul>
+            </Card>
+          ) : null}
+
+          {/* Histórico de Change Orders já decididos */}
+          {changeOrders.filter((changeOrder) => changeOrder.status !== 'PENDING_APPROVAL' && changeOrder.status !== 'DRAFT')
+            .length > 0 ? (
+            <Card>
+              <SectionTitle icon="history" title="Alterações do pedido" />
+              <ul className="flex flex-col gap-3">
+                {changeOrders
+                  .filter((changeOrder) => changeOrder.status !== 'PENDING_APPROVAL' && changeOrder.status !== 'DRAFT')
+                  .map((changeOrder) => (
+                    <li
+                      key={changeOrder.changeOrderId}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-outline-variant p-3"
+                    >
+                      <div>
+                        <p className="body-sm font-medium text-on-surface">
+                          {CHANGE_ORDER_TYPE_LABEL[changeOrder.type] ?? changeOrder.type}
+                        </p>
+                        <p className="body-sm text-on-surface-variant">
+                          {formatCurrency(changeOrder.changeGrossAmount, changeOrder.currency)}
+                        </p>
+                      </div>
+                      <Pill tone={toneForStatus(changeOrder.status)}>
+                        {CHANGE_ORDER_STATUS_LABEL[changeOrder.status] ?? changeOrder.status}
+                      </Pill>
+                    </li>
+                  ))}
+              </ul>
+            </Card>
+          ) : null}
+
+          {/* IP-006 — evidências de execução e notas de serviço (Trust Evidence) */}
+          {evidences.length > 0 || serviceNotes.length > 0 ? (
+            <Card>
+              <SectionTitle icon="photo_library" title="Evidências e notas do serviço" />
+              {evidences.length > 0 ? (
+                <ul className="flex flex-wrap gap-2">
+                  {evidences.map((evidence) => (
+                    <li key={evidence.evidenceId}>
+                      <Pill icon="attach_file">
+                        {EXECUTION_EVIDENCE_TYPE_LABEL[evidence.type] ?? evidence.type} · {evidence.fileName}
+                      </Pill>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {serviceNotes.length > 0 ? (
+                <ul className="mt-4 flex flex-col gap-3">
+                  {serviceNotes.map((note) => (
+                    <li key={note.noteId} className="rounded-lg bg-surface-container-low p-3">
+                      <p className="body-sm text-on-surface">{note.body}</p>
+                      <p className="body-sm mt-1 text-on-surface-variant">{formatDateTime(note.createdAt)}</p>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </Card>
+          ) : null}
+
           {/* Avaliações */}
           {reviews.length > 0 ? (
             <Card>
@@ -342,6 +564,61 @@ function OrderContent() {
               <Icon name="arrow_forward" size={16} />
             </Link>
           </Card>
+
+          {/* IP-007 — autorizações incrementais: nunca mostra só o total original quando há Change Order aprovado */}
+          {payment?.custodySummary ? (
+            <Card>
+              <SectionTitle
+                icon="account_balance_wallet"
+                title="Pagamento autorizado"
+                hint="Original + alterações aprovadas = total autorizado."
+              />
+              <dl className="flex flex-col gap-3">
+                <div className="flex justify-between">
+                  <dt className="body-sm text-on-surface-variant">Valor original</dt>
+                  <dd className="body-sm text-on-surface">
+                    {formatCurrency(payment.custodySummary.originalAmount, payment.custodySummary.currency)}
+                  </dd>
+                </div>
+                {payment.custodySummary.incrementalTranches.map((tranche) => (
+                  <div key={tranche.incrementalAuthorizationId} className="flex justify-between">
+                    <dt className="body-sm text-on-surface-variant">
+                      Alteração aprovada ({tranche.authorizationStatus === 'AUTHORIZED' ? 'autorizada' : tranche.authorizationStatus.toLowerCase()})
+                    </dt>
+                    <dd className="body-sm text-on-surface">
+                      + {formatCurrency(tranche.amount, payment.custodySummary!.currency)}
+                    </dd>
+                  </div>
+                ))}
+                <div className="flex justify-between border-t border-outline-variant pt-3">
+                  <dt className="body-md font-medium text-on-surface">Total autorizado</dt>
+                  <dd className="body-lg font-semibold text-on-surface">
+                    {formatCurrency(
+                      payment.custodySummary.totalCommerciallyAuthorized,
+                      payment.custodySummary.currency,
+                    )}
+                  </dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="body-sm text-on-surface-variant">Em custódia hoje</dt>
+                  <dd className="body-sm text-on-surface">
+                    {formatCurrency(payment.custodySummary.totalHeld, payment.custodySummary.currency)}
+                  </dd>
+                </div>
+                {payment.custodySummary.amountAuthorizedNotInCustody > 0 ? (
+                  <div className="flex justify-between">
+                    <dt className="body-sm text-on-surface-variant">Autorizado, ainda não custodiado</dt>
+                    <dd className="body-sm text-on-surface">
+                      {formatCurrency(
+                        payment.custodySummary.amountAuthorizedNotInCustody,
+                        payment.custodySummary.currency,
+                      )}
+                    </dd>
+                  </div>
+                ) : null}
+              </dl>
+            </Card>
+          ) : null}
 
           <Card>
             <SectionTitle icon="bolt" title="Ações" />

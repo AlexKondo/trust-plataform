@@ -15,6 +15,7 @@ export const messages = {
     trustPassport: 'Trust Passport',
     verifications: 'Verifications',
     marketplace: 'Marketplace',
+    serviceRequests: 'My requests',
     conversations: 'Conversations',
     orders: 'Orders',
     moderation: 'Moderation',

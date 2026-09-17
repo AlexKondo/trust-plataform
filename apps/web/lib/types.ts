@@ -324,3 +324,234 @@ export interface ReviewCatalog {
   decisionTypes: string[];
   reviewCriteria: string[];
 }
+
+// ── IP-003: pedidos de serviço (ServiceRequest) ─────────────────────────────
+export interface ServiceRequest {
+  serviceRequestId: string;
+  memberId: string;
+  title: string;
+  description: string;
+  category: string | null;
+  categoryName: string | null;
+  locationLabel: string;
+  radiusKm: number | null;
+  urgency: string;
+  preferredDate: string | null;
+  budgetMinAmount: number | null;
+  budgetMaxAmount: number | null;
+  currency: string;
+  minimumTrustLevel: string | null;
+  status: string;
+  expiresAt: string;
+  matchedAt: string | null;
+  closedAt: string | null;
+  cancelledAt: string | null;
+  cancellationReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ServiceRequestSummary {
+  serviceRequestId: string;
+  title: string;
+  category: string | null;
+  locationLabel: string;
+  urgency: string;
+  status: string;
+  createdAt: string;
+}
+
+// ── IP-003/IP-004: descoberta e comparação de propostas ────────────────────
+export interface ServiceRequestMatch {
+  listingId: string;
+  title: string;
+  excerpt: string | null;
+  category: string | null;
+  categoryName: string | null;
+  price: number | null;
+  currency: string;
+  location: string | null;
+  imageUrl: string | null;
+  partner: { identityId: string; trustScore: number | null; trustLevel: string | null };
+  alreadyEngaged: boolean;
+}
+
+export interface ServiceRequestEngagement {
+  serviceRequestId: string;
+  listingId: string;
+  partnerId: string;
+  conversationId: string;
+  engagedAt: string;
+}
+
+export interface OfferComparisonTerms {
+  offerId: string;
+  status: string;
+  createdBy: string;
+  pricingModel: string;
+  currency: string;
+  quantity: number;
+  amount: number;
+  estimatedTotalBasis: 'FIXED_TOTAL' | 'HOURLY_MINIMUM_COMMITMENT';
+  hourlyRateAmount: number | null;
+  minimumMinutes: number | null;
+  billingIncrementMinutes: number | null;
+  notes: string | null;
+  expiresAt: string;
+  createdAt: string;
+  roundCount: number;
+}
+
+export interface ServiceRequestOfferComparisonItem {
+  engagementId: string;
+  listingId: string;
+  listingTitle: string | null;
+  partner: { identityId: string; trustScore: number | null; trustLevel: string | null };
+  conversationId: string;
+  conversationStatus: string | null;
+  engagedAt: string;
+  hasOffer: boolean;
+  offer: OfferComparisonTerms | null;
+}
+
+export interface ServiceRequestOfferComparison {
+  serviceRequestId: string;
+  serviceRequestStatus: string;
+  items: ServiceRequestOfferComparisonItem[];
+}
+
+// ── IP-005: status de deslocamento / ETA ────────────────────────────────────
+export interface TravelStatus {
+  orderId: string;
+  status: string;
+  declaredEtaMinutes: number | null;
+  estimatedArrivalAt: string | null;
+  etaSource: string | null;
+  enRouteAt: string | null;
+  arrivedAt: string | null;
+}
+
+// ── PACK-03 / IP-006: Change Order, evidências e Service Summary ───────────
+export interface ChangeOrderEvidence {
+  evidenceId: string;
+  type: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  uploadedBy: string;
+  uploadedAt: string;
+}
+
+/**
+ * Campos de economia interna do Partner (`trustFeeRateBps`, `changeTrustFeeAmount`,
+ * `changeProviderNetBeforePspFees`) existem no DTO da API mas são OPCIONAIS e
+ * só preenchidos para quem chama como Partner/admin. O frontend do Trust
+ * Member nunca deve ler nem renderizar esses campos.
+ */
+export interface ChangeOrder {
+  changeOrderId: string;
+  orderId: string;
+  proposedBy: string;
+  type: string;
+  status: string;
+  currency: string;
+  additionalMinutes: number | null;
+  serviceDeltaAmount: number;
+  materialCostDeltaAmount: number;
+  materialMarkupDeltaAmount: number;
+  changeGrossAmount: number;
+  reason: string;
+  description: string | null;
+  expiresAt: string | null;
+  submittedAt: string | null;
+  decidedAt: string | null;
+  decidedBy: string | null;
+  decisionReason: string | null;
+  evidences: ChangeOrderEvidence[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExecutionEvidence {
+  evidenceId: string;
+  type: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  uploadedBy: string;
+  uploadedAt: string;
+}
+
+export interface ServiceNote {
+  noteId: string;
+  body: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface ServiceSummary {
+  orderId: string;
+  listingTitle: string | null;
+  buyerId: string;
+  sellerId: string;
+  pricingModel: string;
+  currency: string;
+  status: string;
+  initialAuthorizedAmount: number;
+  approvedChangesAmount: number;
+  currentAuthorizedGrossAmount: number;
+  currentServiceAmount: number;
+  currentMaterialCostAmount: number;
+  currentMaterialMarkupAmount: number;
+  amountInCustody: number;
+  amountAuthorizedNotInCustody: number;
+  approvedChangeOrders: ChangeOrder[];
+  pendingChangeOrders: ChangeOrder[];
+  rejectedChangeOrders: ChangeOrder[];
+  customerConfirmedAt: string | null;
+  completedAt: string | null;
+}
+
+// ── IP-007: pagamento / custódia incremental ────────────────────────────────
+export interface IncrementalTranche {
+  changeOrderId: string;
+  incrementalAuthorizationId: string;
+  amount: number;
+  authorizationStatus: string;
+  custodyStatus: string;
+}
+
+export interface CustodySummary {
+  currency: string;
+  originalAmount: number;
+  originalCustodyStatus: string;
+  totalCommerciallyAuthorized: number;
+  totalHeld: number;
+  amountAuthorizedNotInCustody: number;
+  incrementalTranches: IncrementalTranche[];
+}
+
+export interface PaymentDetails {
+  paymentId: string;
+  orderId: string;
+  buyerId: string;
+  sellerId: string;
+  amount: number;
+  currency: string;
+  status: string;
+  refundedAmount: number;
+  refundableAmount: number;
+  paymentProviderId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  authorizations: Array<{
+    authorizationId: string;
+    status: string;
+    authorizedAmount: number;
+    authorizedAt: string | null;
+    expiresAt: string | null;
+    createdAt: string;
+  }>;
+  refunds: Array<{ refundId: string; amount: number; status: string; requestedAt: string }>;
+  custodySummary?: CustodySummary;
+}

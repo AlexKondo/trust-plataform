@@ -24,6 +24,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     { href: '/trust-passport', icon: 'badge', label: t('nav.trustPassport') },
     { href: '/verifications', icon: 'fact_check', label: t('nav.verifications') },
     { href: '/marketplace', icon: 'storefront', label: t('nav.marketplace') },
+    { href: '/service-requests', icon: 'assignment_add', label: t('nav.serviceRequests') },
     { href: '/conversations', icon: 'forum', label: t('nav.conversations') },
     { href: '/orders', icon: 'receipt_long', label: t('nav.orders') },
   ];

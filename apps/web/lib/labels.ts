@@ -159,6 +159,69 @@ export const LISTING_TYPE_LABEL: Record<string, string> = {
   PRODUCT: 'Produto',
 };
 
+// ── IP-003: pedido de serviço (ServiceRequest) ──────────────────────────────
+export const URGENCY_LABEL: Record<string, string> = {
+  IMMEDIATE: 'Imediata',
+  THIS_WEEK: 'Esta semana',
+  FLEXIBLE: 'Sou flexível',
+};
+
+export const SERVICE_REQUEST_STATUS_LABEL: Record<string, string> = {
+  OPEN: 'Em aberto',
+  MATCHED: 'Com propostas',
+  ENGAGED: 'Em negociação',
+  CLOSED: 'Encerrado',
+  CANCELLED: 'Cancelado',
+  EXPIRED: 'Expirado',
+};
+
+// ── IP-005: status de deslocamento do Partner ───────────────────────────────
+export const TRAVEL_STATUS_LABEL: Record<string, string> = {
+  NOT_STARTED: 'Ainda não saiu',
+  EN_ROUTE: 'A caminho',
+  ARRIVED: 'Chegou ao local',
+};
+
+// ── PACK-03: Trust Change Order ─────────────────────────────────────────────
+export const CHANGE_ORDER_TYPE_LABEL: Record<string, string> = {
+  ADDITIONAL_TIME: 'Tempo adicional',
+  ADDITIONAL_MATERIAL: 'Material adicional',
+  SCOPE_CHANGE: 'Mudança de escopo',
+};
+
+export const CHANGE_ORDER_STATUS_LABEL: Record<string, string> = {
+  DRAFT: 'Rascunho',
+  PENDING_APPROVAL: 'Aguardando sua aprovação',
+  APPROVED: 'Aprovado',
+  REJECTED: 'Recusado',
+  CANCELLED: 'Cancelado',
+  EXPIRED: 'Expirado',
+};
+
+// ── IP-006: evidência de execução ───────────────────────────────────────────
+export const EXECUTION_EVIDENCE_TYPE_LABEL: Record<string, string> = {
+  BEFORE_PHOTO: 'Foto de antes',
+  AFTER_PHOTO: 'Foto de depois',
+  DOCUMENT: 'Documento',
+  OTHER: 'Outro',
+};
+
+// ── IP-007: status de autorização/custódia incremental ──────────────────────
+export const AUTHORIZATION_STATUS_LABEL: Record<string, string> = {
+  PENDING: 'Pendente',
+  AUTHORIZED: 'Autorizado',
+  DECLINED: 'Recusado',
+  EXPIRED: 'Expirado',
+};
+
+export const CUSTODY_STATUS_LABEL: Record<string, string> = {
+  NOT_APPLICABLE: 'Não aplicável',
+  PENDING: 'Pendente',
+  HELD: 'Em custódia',
+  RELEASED: 'Liberado',
+  REFUNDED: 'Reembolsado',
+};
+
 /** Sempre PT-BR aqui — mesmo output de antes, só que passando pelo utilitário compartilhado. */
 export function formatCurrency(value: number | null, currency = 'BRL'): string {
   return formatCurrencyForLocale(value, 'pt-BR', currency);
