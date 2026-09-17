@@ -8,17 +8,23 @@ import { AuthenticatedIdentity } from '../../../../shared/security/authenticated
 import { CurrentIdentity } from '../../../../shared/security/current-identity.decorator';
 import { RequestMeta } from '../../application/dto/marketplace.dtos';
 import {
+  AddServiceNoteRequest,
   CreateChangeOrderRequest,
   PauseExecutionRequest,
   RejectChangeOrderRequest,
+  addServiceNoteRequestSchema,
   changeOrderEvidenceTypeSchema,
   createChangeOrderRequestSchema,
+  executionEvidenceTypeSchema,
   pauseExecutionRequestSchema,
   rejectChangeOrderRequestSchema,
 } from '../../application/dto/trust-change-order.dtos';
 import { ManageChangeOrderUseCase } from '../../application/usecases/manage-change-order.usecase';
 import { ServiceExecutionUseCase } from '../../application/usecases/service-execution.usecase';
-import { ChangeOrderEvidenceTooLargeException } from '../../domain/exceptions/marketplace.exceptions';
+import {
+  ChangeOrderEvidenceTooLargeException,
+  ExecutionEvidenceTooLargeException,
+} from '../../domain/exceptions/marketplace.exceptions';
 
 type RequestWithContext = FastifyRequest & { requestContext?: RequestContext };
 
@@ -183,6 +189,83 @@ export class MarketplaceChangeOrderController {
     @Req() request: RequestWithContext,
   ) {
     return this.serviceExecution.resume(identity.identityId, orderId, this.meta(request));
+  }
+
+  /**
+   * IP-006 — Trust Evidence de execução (multipart: campo `type` + arquivo
+   * `file`), mesmo padrão do VRF-002 e do Change Order (§13). Sempre opcional:
+   * nada aqui é exigido para check-in/pausa/check-out prosseguirem.
+   */
+  @Post('orders/:orderId/execution-evidences')
+  @HttpCode(HttpStatus.CREATED)
+  async submitExecutionEvidence(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('orderId', new ZodValidationPipe(orderIdSchema)) orderId: string,
+    @Req() request: RequestWithContext,
+  ) {
+    const file = await request.file().catch(() => null);
+    if (!file) {
+      throw new ValidationException(
+        new z.ZodError([
+          { code: 'custom', path: ['file'], message: 'multipart file field "file" is required' },
+        ]),
+      );
+    }
+    const typeField = file.fields.type;
+    const rawType =
+      typeField && 'value' in typeField ? String((typeField as { value: unknown }).value) : '';
+    const parsedType = executionEvidenceTypeSchema.safeParse(rawType);
+    if (!parsedType.success) {
+      throw new ValidationException(parsedType.error);
+    }
+
+    let content: Buffer;
+    try {
+      content = await file.toBuffer();
+    } catch {
+      throw new ExecutionEvidenceTooLargeException(0);
+    }
+
+    return this.serviceExecution.uploadEvidence(
+      identity.identityId,
+      {
+        orderId,
+        evidenceType: parsedType.data,
+        fileName: file.filename ?? 'evidence',
+        mimeType: file.mimetype,
+        content,
+      },
+      this.meta(request),
+    );
+  }
+
+  /** IP-006 — evidência de execução, nunca pública: só participantes do pedido. */
+  @Get('orders/:orderId/execution-evidences')
+  async listExecutionEvidences(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('orderId', new ZodValidationPipe(orderIdSchema)) orderId: string,
+  ) {
+    return this.serviceExecution.listEvidences(identity.identityId, orderId);
+  }
+
+  /** IP-006 — o Trust Partner registra em texto o que foi feito. */
+  @Post('orders/:orderId/service-notes')
+  @HttpCode(HttpStatus.CREATED)
+  async addServiceNote(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('orderId', new ZodValidationPipe(orderIdSchema)) orderId: string,
+    @Body(new ZodValidationPipe(addServiceNoteRequestSchema)) body: AddServiceNoteRequest,
+    @Req() request: RequestWithContext,
+  ) {
+    return this.serviceExecution.addNote(identity.identityId, orderId, body, this.meta(request));
+  }
+
+  @Get('orders/:orderId/service-notes')
+  async listServiceNotes(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('orderId', new ZodValidationPipe(orderIdSchema)) orderId: string,
+  ) {
+    return this.serviceExecution.listNotes(identity.identityId, orderId);
   }
 
   /** §15 — "o que contratei + o que aprovei depois = o total". */

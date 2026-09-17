@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, eq, isNull } from 'drizzle-orm';
 import { DRIZZLE, Database, DatabaseExecutor } from '../../../../shared/database/database.module';
 import {
+  ExecutionEvidenceType,
   ExecutionSessionStatus,
   PauseReasonCode,
 } from '../../domain/entities/marketplace-types';
@@ -9,10 +10,18 @@ import {
   ServiceExecutionPause,
   ServiceExecutionSession,
 } from '../../domain/entities/service-execution-session';
-import { ServiceExecutionRepository } from '../../domain/repositories/service-execution.repository';
 import {
+  ExecutionEvidenceRecord,
+  ServiceExecutionRepository,
+  ServiceNoteRecord,
+} from '../../domain/repositories/service-execution.repository';
+import {
+  ServiceExecutionEvidenceRow,
+  ServiceExecutionNoteRow,
   ServiceExecutionPauseRow,
   ServiceExecutionSessionRow,
+  serviceExecutionEvidences,
+  serviceExecutionNotes,
   serviceExecutionPauses,
   serviceExecutionSessions,
 } from './service-execution.schema';
@@ -129,6 +138,67 @@ export class DrizzleServiceExecutionRepository extends ServiceExecutionRepositor
       .orderBy(asc(serviceExecutionPauses.pausedAt));
     return rows.map(toPause);
   }
+
+  async addEvidence(
+    record: ExecutionEvidenceRecord,
+    executor?: DatabaseExecutor,
+  ): Promise<void> {
+    const target = executor ?? this.db;
+    await target.insert(serviceExecutionEvidences).values(record);
+  }
+
+  async listEvidences(
+    orderId: string,
+    executor?: DatabaseExecutor,
+  ): Promise<ExecutionEvidenceRecord[]> {
+    const target = executor ?? this.db;
+    const rows = await target
+      .select()
+      .from(serviceExecutionEvidences)
+      .where(eq(serviceExecutionEvidences.orderId, orderId))
+      .orderBy(asc(serviceExecutionEvidences.uploadedAt));
+    return rows.map(toEvidence);
+  }
+
+  async addNote(record: ServiceNoteRecord, executor?: DatabaseExecutor): Promise<void> {
+    const target = executor ?? this.db;
+    await target.insert(serviceExecutionNotes).values(record);
+  }
+
+  async listNotes(orderId: string, executor?: DatabaseExecutor): Promise<ServiceNoteRecord[]> {
+    const target = executor ?? this.db;
+    const rows = await target
+      .select()
+      .from(serviceExecutionNotes)
+      .where(eq(serviceExecutionNotes.orderId, orderId))
+      .orderBy(asc(serviceExecutionNotes.createdAt));
+    return rows.map(toNote);
+  }
+}
+
+function toEvidence(row: ServiceExecutionEvidenceRow): ExecutionEvidenceRecord {
+  return {
+    id: row.id,
+    orderId: row.orderId,
+    type: row.type as ExecutionEvidenceType,
+    storageKey: row.storageKey,
+    fileName: row.fileName,
+    mimeType: row.mimeType,
+    fileSize: row.fileSize,
+    checksum: row.checksum,
+    uploadedBy: row.uploadedBy,
+    uploadedAt: row.uploadedAt,
+  };
+}
+
+function toNote(row: ServiceExecutionNoteRow): ServiceNoteRecord {
+  return {
+    id: row.id,
+    orderId: row.orderId,
+    body: row.body,
+    createdBy: row.createdBy,
+    createdAt: row.createdAt,
+  };
 }
 
 function toSession(row: ServiceExecutionSessionRow): ServiceExecutionSession {

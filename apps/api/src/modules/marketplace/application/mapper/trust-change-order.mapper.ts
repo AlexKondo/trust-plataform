@@ -3,12 +3,18 @@ import {
   ServiceExecutionSession,
 } from '../../domain/entities/service-execution-session';
 import { TrustChangeOrder } from '../../domain/entities/trust-change-order';
+import {
+  ExecutionEvidenceRecord,
+  ServiceNoteRecord,
+} from '../../domain/repositories/service-execution.repository';
 import { ChangeOrderEvidenceRecord } from '../../domain/repositories/trust-change-order.repository';
 import {
   ChangeOrderEvidenceResponse,
   ChangeOrderResponse,
+  ExecutionEvidenceResponse,
   ExecutionPauseResponse,
   ExecutionSessionResponse,
+  ServiceNoteResponse,
 } from '../dto/trust-change-order.dtos';
 
 export function toChangeOrderEvidenceResponse(
@@ -98,5 +104,30 @@ export function toExecutionSessionResponse(
     billableMinutes,
     authorizedMinutes,
     pauses: pauses.map(toPauseResponse),
+  };
+}
+
+/** IP-006 — Trust Evidence de execução. */
+export function toExecutionEvidenceResponse(
+  record: ExecutionEvidenceRecord,
+): ExecutionEvidenceResponse {
+  return {
+    evidenceId: record.id,
+    type: record.type,
+    fileName: record.fileName,
+    mimeType: record.mimeType,
+    fileSize: record.fileSize,
+    uploadedBy: record.uploadedBy,
+    uploadedAt: record.uploadedAt.toISOString(),
+  };
+}
+
+/** IP-006 — nota de serviço do Partner. */
+export function toServiceNoteResponse(record: ServiceNoteRecord): ServiceNoteResponse {
+  return {
+    noteId: record.id,
+    body: record.body,
+    createdBy: record.createdBy,
+    createdAt: record.createdAt.toISOString(),
   };
 }

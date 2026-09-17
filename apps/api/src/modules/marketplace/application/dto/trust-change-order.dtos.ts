@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   CHANGE_ORDER_TYPES,
   CHANGE_ORDER_EVIDENCE_TYPES,
+  EXECUTION_EVIDENCE_TYPES,
   PAUSE_REASON_CODES,
 } from '../../domain/entities/marketplace-types';
 
@@ -55,6 +56,27 @@ export const ALLOWED_CHANGE_ORDER_EVIDENCE_MIME_TYPES = [
   'image/webp',
   'application/pdf',
 ] as const;
+
+/**
+ * IP-006 — evidência de execução (foto de antes/depois). Sempre OPCIONAL: nada
+ * aqui bloqueia check-in/check-out/service-summary — é contextual, nunca
+ * obrigatória para um serviço normal.
+ */
+export const executionEvidenceTypeSchema = z.enum(EXECUTION_EVIDENCE_TYPES);
+
+/** IP-006 — mesmos tipos aceitos pela evidência de Change Order (§13 do PACK-03). */
+export const ALLOWED_EXECUTION_EVIDENCE_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'application/pdf',
+] as const;
+
+/** IP-006 — nota de serviço do Partner: texto livre, separado de disputa/avaliação. */
+export const addServiceNoteRequestSchema = z.object({
+  body: z.string().trim().min(1, 'body is required').max(2000),
+});
+export type AddServiceNoteRequest = z.infer<typeof addServiceNoteRequestSchema>;
 
 // ── Respostas ───────────────────────────────────────────────────────────────
 
@@ -123,6 +145,25 @@ export interface ExecutionSessionResponse {
   pauses: ExecutionPauseResponse[];
 }
 
+/** IP-006 — Trust Evidence de execução, nunca pública: só participantes do pedido. */
+export interface ExecutionEvidenceResponse {
+  evidenceId: string;
+  type: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  uploadedBy: string;
+  uploadedAt: string;
+}
+
+/** IP-006 — nota de serviço do Partner. */
+export interface ServiceNoteResponse {
+  noteId: string;
+  body: string;
+  createdBy: string;
+  createdAt: string;
+}
+
 /**
  * PACK-03 §15 — Service Summary. O princípio é o da última seção: o Member tem
  * que ver "o que contratei + o que aprovei depois = o total".
@@ -157,4 +198,7 @@ export interface ServiceSummaryResponse {
   rejectedChangeOrders: ChangeOrderResponse[];
   customerConfirmedAt: string | null;
   completedAt: string | null;
+  /** IP-006 — completion handoff: evidência e notas relevantes às duas partes. */
+  evidences: ExecutionEvidenceResponse[];
+  notes: ServiceNoteResponse[];
 }

@@ -1,8 +1,32 @@
 import { DatabaseExecutor } from '../../../../shared/database/database.module';
+import { ExecutionEvidenceType } from '../entities/marketplace-types';
 import {
   ServiceExecutionPause,
   ServiceExecutionSession,
 } from '../entities/service-execution-session';
+
+/** IP-006 — metadado da Trust Evidence de execução; o binário mora no storage. */
+export interface ExecutionEvidenceRecord {
+  id: string;
+  orderId: string;
+  type: ExecutionEvidenceType;
+  storageKey: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  checksum: string;
+  uploadedBy: string;
+  uploadedAt: Date;
+}
+
+/** IP-006 — nota de serviço do Partner, append-only. */
+export interface ServiceNoteRecord {
+  id: string;
+  orderId: string;
+  body: string;
+  createdBy: string;
+  createdAt: Date;
+}
 
 export abstract class ServiceExecutionRepository {
   abstract saveSession(
@@ -47,4 +71,20 @@ export abstract class ServiceExecutionRepository {
     sessionId: string,
     executor?: DatabaseExecutor,
   ): Promise<ServiceExecutionPause[]>;
+
+  /** IP-006 — Trust Evidence de execução: anexa foto opcional (antes/depois). */
+  abstract addEvidence(
+    record: ExecutionEvidenceRecord,
+    executor?: DatabaseExecutor,
+  ): Promise<void>;
+
+  abstract listEvidences(
+    orderId: string,
+    executor?: DatabaseExecutor,
+  ): Promise<ExecutionEvidenceRecord[]>;
+
+  /** IP-006 — nota de serviço do Partner. */
+  abstract addNote(record: ServiceNoteRecord, executor?: DatabaseExecutor): Promise<void>;
+
+  abstract listNotes(orderId: string, executor?: DatabaseExecutor): Promise<ServiceNoteRecord[]>;
 }

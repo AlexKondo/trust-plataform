@@ -1,4 +1,5 @@
 import {
+  bigint,
   index,
   integer,
   pgTable,
@@ -82,5 +83,62 @@ export const serviceExecutionPauses = pgTable(
   ],
 );
 
+/**
+ * IP-006 — Trust Evidence de execução (foto opcional de antes/depois). Amarrada
+ * diretamente ao PEDIDO, não à sessão: fotos "antes" podem ser tiradas antes do
+ * check-in existir, e o histórico deve sobreviver mesmo para pedidos que nunca
+ * tiveram sessão (criados antes do PACK-03). Tabela própria — reaproveita só o
+ * port `EvidenceStorageService` do shared kernel (mesmo padrão de
+ * `trust_change_order_evidences`), nunca `verification_evidences`.
+ * Append-only: sem `updated_at`, sem endpoint de edição/remoção.
+ */
+export const serviceExecutionEvidences = pgTable(
+  'service_execution_evidences',
+  {
+    id: uuid('id').primaryKey(),
+    orderId: uuid('order_id')
+      .notNull()
+      .references(() => marketplaceOrders.id, { onUpdate: 'restrict', onDelete: 'restrict' }),
+    /** BEFORE | AFTER | OTHER */
+    type: varchar('type', { length: 20 }).notNull(),
+    storageKey: varchar('storage_key', { length: 300 }).notNull(),
+    fileName: varchar('file_name', { length: 255 }).notNull(),
+    mimeType: varchar('mime_type', { length: 100 }).notNull(),
+    fileSize: bigint('file_size', { mode: 'number' }).notNull(),
+    checksum: varchar('checksum', { length: 64 }).notNull(),
+    uploadedBy: uuid('uploaded_by').notNull(),
+    uploadedAt: timestamp('uploaded_at', { withTimezone: true, mode: 'date' })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index('idx_service_execution_evidence_order').on(table.orderId, table.uploadedAt)],
+);
+
+/**
+ * IP-006 — nota de serviço: o Partner registra em texto o que foi feito,
+ * separado do fluxo de disputa/avaliação (que já existe em outro módulo).
+ * Amarrada ao pedido, append-only, visível às duas partes (§ acceptance
+ * criteria: "Member/Partner can complete operational journey").
+ */
+export const serviceExecutionNotes = pgTable(
+  'service_execution_notes',
+  {
+    id: uuid('id').primaryKey(),
+    orderId: uuid('order_id')
+      .notNull()
+      .references(() => marketplaceOrders.id, { onUpdate: 'restrict', onDelete: 'restrict' }),
+    body: text('body').notNull(),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => identities.id, { onUpdate: 'restrict', onDelete: 'restrict' }),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index('idx_service_execution_note_order').on(table.orderId, table.createdAt)],
+);
+
 export type ServiceExecutionSessionRow = typeof serviceExecutionSessions.$inferSelect;
 export type ServiceExecutionPauseRow = typeof serviceExecutionPauses.$inferSelect;
+export type ServiceExecutionEvidenceRow = typeof serviceExecutionEvidences.$inferSelect;
+export type ServiceExecutionNoteRow = typeof serviceExecutionNotes.$inferSelect;

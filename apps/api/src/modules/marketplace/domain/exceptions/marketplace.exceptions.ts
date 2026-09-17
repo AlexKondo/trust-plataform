@@ -508,6 +508,28 @@ export class ServiceSummaryUnavailableException extends BusinessRuleViolationExc
   }
 }
 
+// ── Field Execution & Trust Evidence Hardening (IP-006) ─────────────────────
+
+/** IP-006: tipo de arquivo não aceito como Trust Evidence de execução → 415. */
+export class ExecutionEvidenceMediaTypeException extends DomainException {
+  readonly code = 'UNSUPPORTED_MEDIA_TYPE';
+  override readonly httpStatus = 415;
+
+  constructor(mimeType: string) {
+    super(`Media type "${mimeType}" is not allowed for service execution evidence.`);
+  }
+}
+
+/** IP-006: arquivo acima do limite configurado → 413. */
+export class ExecutionEvidenceTooLargeException extends DomainException {
+  readonly code = 'FILE_TOO_LARGE';
+  override readonly httpStatus = 413;
+
+  constructor(maxBytes: number) {
+    super(`Service execution evidence exceeds the maximum allowed size of ${maxBytes} bytes.`);
+  }
+}
+
 // ── Service Request, Discovery & Matching (IP-003) ──────────────────────────
 
 export class ServiceRequestNotFoundException extends EntityNotFoundException {

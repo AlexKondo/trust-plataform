@@ -302,6 +302,27 @@ export const PAUSE_REASON_CODES = [
   PAUSE_REASON_CODE.OTHER_NON_BILLABLE,
 ] as const;
 
+/**
+ * IP-006 — Trust Evidence de execução (foto opcional de antes/depois do
+ * serviço). Nunca obrigatória para um serviço normal (§4/§out-of-scope);
+ * é contextual, do mesmo jeito que a evidência de Change Order (§13 do
+ * PACK-03), só que amarrada diretamente ao pedido, não a uma proposta.
+ */
+export const EXECUTION_EVIDENCE_TYPE = {
+  BEFORE: 'BEFORE',
+  AFTER: 'AFTER',
+  OTHER: 'OTHER',
+} as const;
+
+export type ExecutionEvidenceType =
+  (typeof EXECUTION_EVIDENCE_TYPE)[keyof typeof EXECUTION_EVIDENCE_TYPE];
+
+export const EXECUTION_EVIDENCE_TYPES = [
+  EXECUTION_EVIDENCE_TYPE.BEFORE,
+  EXECUTION_EVIDENCE_TYPE.AFTER,
+  EXECUTION_EVIDENCE_TYPE.OTHER,
+] as const;
+
 // ── IP-003 — Service Request, Discovery & Matching ──────────────────────────
 
 /**

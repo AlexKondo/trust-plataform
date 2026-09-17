@@ -1954,6 +1954,80 @@ paths:
         '403': { description: Não é participante do pedido }
         '422': { description: Pedido sem snapshot comercial (anterior ao PACK-02) }
 
+  # ── IP-006 — Field Execution & Trust Evidence Hardening ───────────────────
+  /marketplace/orders/{orderId}/execution-evidences:
+    post:
+      tags: [Marketplace]
+      summary: IP-006 — Trust Evidence de execução (foto opcional antes/depois, multipart)
+      description: >
+        Campos `type` (BEFORE/AFTER/OTHER) e arquivo `file`. Só o Trust
+        Partner do pedido. SEMPRE opcional: nenhuma outra operação de
+        execução (check-in/pausa/check-out) exige evidência. Amarrada
+        diretamente ao pedido (não à sessão), reaproveita a mesma abstração
+        de storage do shared kernel com bucket e tabela próprios
+        (`service-execution-evidences` / `service_execution_evidences`) —
+        não vai para `verification_evidences` nem
+        `trust_change_order_evidences`.
+      operationId: submitServiceExecutionEvidence
+      parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [type, file]
+              properties:
+                type: { type: string, enum: [BEFORE, AFTER, OTHER] }
+                file: { type: string, format: binary }
+      responses:
+        '201': { description: Evidência anexada }
+        '403': { description: Não é o Trust Partner do pedido }
+        '413': { description: Arquivo acima do limite }
+        '415': { description: Tipo de arquivo não permitido }
+    get:
+      tags: [Marketplace]
+      summary: IP-006 — Lista Trust Evidence de execução (privada aos participantes)
+      description: >
+        Nunca pública: só Member e Partner do pedido (mesma checagem de
+        `loadForParticipant` do Service Summary). Um terceiro recebe 403.
+      operationId: listServiceExecutionEvidences
+      parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Lista de evidências (pode ser vazia) }
+        '403': { description: Não é participante do pedido }
+
+  /marketplace/orders/{orderId}/service-notes:
+    post:
+      tags: [Marketplace]
+      summary: IP-006 — Nota de serviço do Partner
+      description: >
+        Texto livre sobre o que foi feito, separado do fluxo de
+        disputa/avaliação (que já existe em outro módulo). Só o Trust
+        Partner escreve; append-only.
+      operationId: addServiceNote
+      parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body: { type: string, maxLength: 2000 }
+            example: { body: Troquei o disjuntor e testei a instalação. }
+      responses:
+        '201': { description: Nota registrada }
+        '403': { description: Não é o Trust Partner do pedido }
+    get:
+      tags: [Marketplace]
+      summary: IP-006 — Lista notas de serviço (privada aos participantes)
+      operationId: listServiceNotes
+      parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Lista de notas (pode ser vazia) }
+        '403': { description: Não é participante do pedido }
 
   # ── Disputas e avaliações (Módulo 9 — MRK-023..025) ───────────────────────
   /marketplace/review-catalog:

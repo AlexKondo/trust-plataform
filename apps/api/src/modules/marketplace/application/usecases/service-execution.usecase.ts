@@ -1,14 +1,21 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { PinoLogger } from 'nestjs-pino';
+import { v7 as uuidv7 } from 'uuid';
 import { AuditLogService } from '../../../../shared/audit/audit-log.service';
+import { AppConfigService } from '../../../../shared/config/app-config.service';
 import { DRIZZLE, Database, DatabaseExecutor } from '../../../../shared/database/database.module';
 import { OutboxService } from '../../../../shared/events/outbox.service';
+import { RateLimitService } from '../../../../shared/safety/rate-limit.service';
+import { EvidenceStorageService } from '../../../../shared/storage/evidence-storage.service';
 import {
   ServiceExecutionPause,
   ServiceExecutionSession,
   minutesBetween,
 } from '../../domain/entities/service-execution-session';
 import {
+  ExecutionEvidenceMediaTypeException,
+  ExecutionEvidenceTooLargeException,
   ServiceExecutionSessionNotFoundException,
   ServiceExecutionTransitionException,
   ServiceSummaryUnavailableException,
@@ -22,19 +29,39 @@ import {
   calculateAuthorizedTotals,
   calculateBillableMinutes,
 } from '../../domain/services/authorized-commercial.service';
-import { CHANGE_ORDER_STATUS } from '../../domain/entities/marketplace-types';
+import {
+  CHANGE_ORDER_STATUS,
+  ExecutionEvidenceType,
+} from '../../domain/entities/marketplace-types';
 import { RequestMeta } from '../dto/marketplace.dtos';
 import {
+  ALLOWED_EXECUTION_EVIDENCE_MIME_TYPES,
+  AddServiceNoteRequest,
+  ExecutionEvidenceResponse,
   ExecutionSessionResponse,
   PauseExecutionRequest,
+  ServiceNoteResponse,
   ServiceSummaryResponse,
 } from '../dto/trust-change-order.dtos';
 import {
   toChangeOrderResponse,
+  toExecutionEvidenceResponse,
   toExecutionSessionResponse,
+  toServiceNoteResponse,
 } from '../mapper/trust-change-order.mapper';
 import { MRK_PRODUCER } from './create-listing.usecase';
 import { OrderLifecycleService } from './order-lifecycle.service';
+
+/** IP-006 — bucket próprio; a Trust Evidence de execução não mistura com VRF/Change Order. */
+const EXECUTION_EVIDENCE_BUCKET = 'service-execution-evidences';
+
+export interface UploadExecutionEvidenceInput {
+  orderId: string;
+  evidenceType: ExecutionEvidenceType;
+  fileName: string;
+  mimeType: string;
+  content: Buffer;
+}
 
 /** Resultado do check-out já calculado, pronto para entrar na transação do pedido. */
 export interface PreparedCheckOut {
@@ -67,6 +94,9 @@ export class ServiceExecutionUseCase {
     private readonly lifecycle: OrderLifecycleService,
     private readonly outboxService: OutboxService,
     private readonly auditLogService: AuditLogService,
+    private readonly rateLimitService: RateLimitService,
+    private readonly storage: EvidenceStorageService,
+    private readonly config: AppConfigService,
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly logger: PinoLogger,
   ) {
@@ -275,6 +305,157 @@ export class ServiceExecutionUseCase {
     return this.presentSession(orderId, session);
   }
 
+  // ── IP-006 — Trust Evidence de execução (foto opcional antes/depois) ───────
+  /**
+   * Nunca obrigatória: nenhuma outra operação (check-in/pausa/check-out) exige
+   * evidência para acontecer. Restrita ao Trust Partner do pedido — é ele quem
+   * documenta o serviço, o mesmo ator do Change Order (§13 do PACK-03).
+   */
+  async uploadEvidence(
+    identityId: string,
+    input: UploadExecutionEvidenceInput,
+    meta: RequestMeta = {},
+  ): Promise<ExecutionEvidenceResponse> {
+    try {
+      await this.rateLimitService.assertWithinLimit(identityId, 'SubmitServiceExecutionEvidence', {
+        maxAttempts: this.config.sensitiveActionRateLimitMaxAttempts,
+        windowMinutes: this.config.sensitiveActionRateLimitWindowMinutes,
+      });
+    } catch (error) {
+      await this.auditLogService.recordSafe({
+        identityId,
+        operation: 'SubmitServiceExecutionEvidence',
+        resource: 'MarketplaceOrder',
+        resourceId: input.orderId,
+        result: 'DENIED',
+        ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
+        correlationId: meta.correlationId,
+        requestId: meta.requestId,
+        metadata: { reason: 'RATE_LIMIT_EXCEEDED' },
+      });
+      throw error;
+    }
+
+    // Só o Trust Partner do pedido anexa evidência de execução; nunca pública.
+    await this.lifecycle.loadForSeller(input.orderId, identityId);
+
+    if (
+      !ALLOWED_EXECUTION_EVIDENCE_MIME_TYPES.includes(
+        input.mimeType as (typeof ALLOWED_EXECUTION_EVIDENCE_MIME_TYPES)[number],
+      )
+    ) {
+      throw new ExecutionEvidenceMediaTypeException(input.mimeType);
+    }
+    if (input.content.length > this.config.evidenceMaxFileBytes) {
+      throw new ExecutionEvidenceTooLargeException(this.config.evidenceMaxFileBytes);
+    }
+
+    const evidenceId = uuidv7();
+    const safeName = input.fileName.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 100);
+    const storageKey = `orders/${input.orderId}/${evidenceId}-${safeName}`;
+    const checksum = createHash('sha256').update(input.content).digest('hex');
+
+    // Upload ANTES da transação: se o storage falhar, nada é persistido e não
+    // fica metadado apontando para arquivo inexistente (mesmo padrão do §13).
+    await this.storage.upload({
+      bucket: EXECUTION_EVIDENCE_BUCKET,
+      storageKey,
+      content: input.content,
+      mimeType: input.mimeType,
+    });
+
+    const uploadedAt = new Date();
+    const record = {
+      id: evidenceId,
+      orderId: input.orderId,
+      type: input.evidenceType,
+      storageKey,
+      fileName: safeName,
+      mimeType: input.mimeType,
+      fileSize: input.content.length,
+      checksum,
+      uploadedBy: identityId,
+      uploadedAt,
+    };
+    await this.db.transaction(async (tx) => {
+      await this.executionRepository.addEvidence(record, tx);
+      await this.auditLogService.record(
+        {
+          identityId,
+          operation: 'SubmitServiceExecutionEvidence',
+          resource: 'MarketplaceOrder',
+          resourceId: input.orderId,
+          result: 'SUCCESS',
+          ipAddress: meta.ipAddress,
+          userAgent: meta.userAgent,
+          correlationId: meta.correlationId,
+          requestId: meta.requestId,
+          // Nunca o conteúdo — só metadados (trust-logging).
+          metadata: { evidenceType: input.evidenceType, fileSize: input.content.length },
+        },
+        tx,
+      );
+    });
+
+    return toExecutionEvidenceResponse(record);
+  }
+
+  /** Lida a qualquer participante — nunca pública (§ acceptance: evidência privada e autorizada). */
+  async listEvidences(
+    identityId: string,
+    orderId: string,
+  ): Promise<ExecutionEvidenceResponse[]> {
+    await this.lifecycle.loadForParticipant(orderId, identityId);
+    const records = await this.executionRepository.listEvidences(orderId);
+    return records.map(toExecutionEvidenceResponse);
+  }
+
+  // ── IP-006 — Nota de serviço do Partner ─────────────────────────────────────
+  /** Texto livre sobre o que foi feito, separado do fluxo de disputa/avaliação. */
+  async addNote(
+    identityId: string,
+    orderId: string,
+    body: AddServiceNoteRequest,
+    meta: RequestMeta = {},
+  ): Promise<ServiceNoteResponse> {
+    await this.lifecycle.loadForSeller(orderId, identityId);
+
+    const record = {
+      id: uuidv7(),
+      orderId,
+      body: body.body,
+      createdBy: identityId,
+      createdAt: new Date(),
+    };
+    await this.db.transaction(async (tx) => {
+      await this.executionRepository.addNote(record, tx);
+      await this.auditLogService.record(
+        {
+          identityId,
+          operation: 'AddServiceNote',
+          resource: 'MarketplaceOrder',
+          resourceId: orderId,
+          result: 'SUCCESS',
+          ipAddress: meta.ipAddress,
+          userAgent: meta.userAgent,
+          correlationId: meta.correlationId,
+          requestId: meta.requestId,
+          metadata: {},
+        },
+        tx,
+      );
+    });
+
+    return toServiceNoteResponse(record);
+  }
+
+  async listNotes(identityId: string, orderId: string): Promise<ServiceNoteResponse[]> {
+    await this.lifecycle.loadForParticipant(orderId, identityId);
+    const records = await this.executionRepository.listNotes(orderId);
+    return records.map(toServiceNoteResponse);
+  }
+
   // ── §15 — Service Summary ──────────────────────────────────────────────────
   async getServiceSummary(
     identityId: string,
@@ -284,12 +465,15 @@ export class ServiceExecutionUseCase {
     const { order, role } = await this.lifecycle.loadForParticipant(orderId, identityId);
     const isPartner = role === 'SELLER';
 
-    const [snapshot, changeOrders, session, listing] = await Promise.all([
-      this.snapshotRepository.findByOrderId(orderId),
-      this.changeOrderRepository.listByOrder(orderId),
-      this.executionRepository.findSessionByOrder(orderId),
-      this.listingRepository.findById(order.listingId),
-    ]);
+    const [snapshot, changeOrders, session, listing, executionEvidences, serviceNotes] =
+      await Promise.all([
+        this.snapshotRepository.findByOrderId(orderId),
+        this.changeOrderRepository.listByOrder(orderId),
+        this.executionRepository.findSessionByOrder(orderId),
+        this.listingRepository.findById(order.listingId),
+        this.executionRepository.listEvidences(orderId),
+        this.executionRepository.listNotes(orderId),
+      ]);
     if (!snapshot) {
       throw new ServiceSummaryUnavailableException();
     }
@@ -374,6 +558,10 @@ export class ServiceExecutionUseCase {
       rejectedChangeOrders: rejected,
       customerConfirmedAt: order.customerConfirmedAt?.toISOString() ?? null,
       completedAt: order.completedAt?.toISOString() ?? null,
+      // IP-006 — completion handoff: fotos e notas relevantes às duas partes,
+      // sempre presentes mesmo quando vazias ([]) — nunca obrigatórias.
+      evidences: executionEvidences.map(toExecutionEvidenceResponse),
+      notes: serviceNotes.map(toServiceNoteResponse),
     };
   }
 
