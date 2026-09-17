@@ -710,9 +710,13 @@ paths:
               example:
                 success: true
                 data:
-                  - { id: '019fe7…', eventName: Verification.Approved, points: 150, occurredAt: '2026-08-09T13:15:00.000Z' }
-                  - { id: '019fe7…', eventName: TrustPassport.Created, points: 25, occurredAt: '2026-08-09T13:10:00.000Z' }
+                  - { id: '019fe7…', eventName: Verification.Approved, points: 150, reason: 'Documento de identidade verificado', reasonKey: null, occurredAt: '2026-08-09T13:15:00.000Z' }
+                  - { id: '019fe7…', eventName: TrustPassport.Created, points: 25, reason: 'Trust Passport criado', reasonKey: null, occurredAt: '2026-08-09T13:10:00.000Z' }
                 pagination: { page: 1, pageSize: 20, totalItems: 2, totalPages: 1 }
+      description: |
+        IP-011 explainability: cada linha carrega `reason` (texto da `trust_score_rules.description`
+        que efetivamente pontuou) ou, quando nenhuma regra casou (0 pontos), `reasonKey` (chave i18n
+        IP-002 a resolver no client, ex.: `trustTimeline.default`).
 
   /admin/trust-score-rules:
     get:
@@ -838,12 +842,39 @@ paths:
       tags: [Trust Score]
       summary: TRS-016 — Minhas políticas de visibilidade pública
       operationId: getVisibility
-      responses: { '200': { description: '{showScore, showLevel, showBadges, showVerifications} (default tudo true)' } }
+      responses: { '200': { description: '{showScore, showLevel, showBadges, showVerifications, showSignals} (default tudo true; showSignals é IP-011)' } }
     put:
       tags: [Trust Score]
       summary: TRS-016 — Atualizar o que aparece no perfil público
       operationId: updateVisibility
       responses: { '200': { description: Política atualizada } }
+
+  /trust-signals/me:
+    get:
+      tags: [Trust Score]
+      summary: IP-011 — Meus Trust Signals (fatos objetivos, sem efeito no Trust Score)
+      description: Registry tipado/versionado, paginado. Nunca inclui pontos — sinal não pontua (ver 04_APPROVED_PRODUCT_DECISIONS).
+      operationId: getMyTrustSignals
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, minimum: 1, maximum: 100 } }
+      responses: { '200': { description: '[{id, signalType, signalVersion, visibility, reasonKey, occurredAt}] + pagination' } }
+
+  /public/trust-profile/{token}/signals:
+    get:
+      tags: [Trust Score]
+      summary: IP-011 — Trust Signals PÚBLICOS via link compartilhado (sem auth)
+      description: Só sinais com visibility=PUBLIC e apenas se a Visibility Policy do dono tem showSignals=true.
+      operationId: getSharedTrustSignals
+      security: []
+      parameters:
+        - { name: token, in: path, required: true, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, minimum: 1, maximum: 100 } }
+      responses:
+        '200': { description: '[{signalType, reasonKey, occurredAt}] + pagination (vazio se showSignals=false)' }
+        '404': { description: Link inexistente/forjado (SHARE_NOT_FOUND) }
+        '410': { description: Link expirado ou revogado (SHARE_LINK_GONE) }
 
   /trust-profile/shares:
     post:

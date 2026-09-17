@@ -64,6 +64,8 @@ export const trustVisibilityPolicies = pgTable(
     showLevel: boolean('show_level').notNull().default(true),
     showBadges: boolean('show_badges').notNull().default(true),
     showVerifications: boolean('show_verifications').notNull().default(true),
+    /** IP-011 — mostra sinais PUBLIC no perfil compartilhado (default true, aditivo). */
+    showSignals: boolean('show_signals').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
   },

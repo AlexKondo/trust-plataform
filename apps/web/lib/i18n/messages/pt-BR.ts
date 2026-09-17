@@ -84,6 +84,20 @@ export const messages = {
     DISPUTE_RESOLVED: 'Disputa resolvida',
     REFUNDED: 'Reembolsado',
   },
+  // IP-011 — fallback quando a timeline não tem uma regra com descrição
+  // (trust_score_rules.description já cobre o caso normal; isto é o caso
+  // raro de um evento pontuado sem regra correspondente, ex.: dado legado).
+  trustTimeline: {
+    default: 'Evento de reputação registrado.',
+  },
+  // IP-011 — Trust Signals: fatos objetivos, sem efeito no Trust Score
+  // (04_APPROVED_PRODUCT_DECISIONS: "a signal is not automatically fraud").
+  trustSignals: {
+    CHANGE_ORDER_SUBMITTED: 'Alteração de escopo proposta ao Trust Member.',
+    CHANGE_ORDER_APPROVED: 'Alteração de escopo aprovada pelo Trust Member.',
+    CHANGE_ORDER_REJECTED: 'Alteração de escopo recusada pelo Trust Member.',
+    FUNDS_REFUND_COMPLETED: 'Reembolso processado neste pedido.',
+  },
 };
 
 export type Messages = typeof messages;

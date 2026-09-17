@@ -18,6 +18,7 @@ import { LoggingEmailService } from '../../src/modules/identity/infrastructure/e
 import { DRIZZLE, Database } from '../../src/shared/database/database.module';
 import { OutboxRelayService } from '../../src/shared/events/outbox-relay.service';
 import { awardedBadges, trustScores } from '../../src/shared/database/schema';
+import { TrustSignalRepository } from '../../src/modules/trust-score/infrastructure/persistence/drizzle-trust-signal.repository';
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 const PASSWORD = 'Correct#Horse7Battery';
@@ -124,7 +125,13 @@ describe.runIf(Boolean(testDatabaseUrl))('TRS-012..020 — Reputação pública 
       method: 'PUT',
       url: '/api/v1/trust-profile/visibility',
       headers: auth,
-      payload: { showScore: false, showLevel: true, showBadges: true, showVerifications: true },
+      payload: {
+        showScore: false,
+        showLevel: true,
+        showBadges: true,
+        showVerifications: true,
+        showSignals: true,
+      },
     });
     expect(vis.statusCode).toBe(200);
 
@@ -193,5 +200,74 @@ describe.runIf(Boolean(testDatabaseUrl))('TRS-012..020 — Reputação pública 
     // lista de shares mostra o status
     const shares = await app.inject({ method: 'GET', url: '/api/v1/trust-profile/shares', headers: auth });
     expect(shares.json<{ data: Array<{ status: string }> }>().data[0]?.status).toBe('REVOKED');
+  });
+
+  // IP-011 — Trust Signals: registry is observational only, never scores.
+  it('trust signals: default visibility on, timeline explainability, idempotent + score untouched', async () => {
+    const user = await createActiveUser();
+    await waitForBadge(user.identityId);
+    const auth = { authorization: `Bearer ${user.accessToken}` };
+
+    // Additive column: existing GET visibility now also reports showSignals (default true).
+    const visibility = await app.inject({
+      method: 'GET',
+      url: '/api/v1/trust-profile/visibility',
+      headers: auth,
+    });
+    expect(visibility.json<{ data: { showSignals: boolean } }>().data.showSignals).toBe(true);
+
+    // No signal recorded yet — empty, paginated, 200 (not a 404/error).
+    const emptySignals = await app.inject({ method: 'GET', url: '/api/v1/trust-signals/me', headers: auth });
+    expect(emptySignals.statusCode).toBe(200);
+    expect(emptySignals.json<{ pagination: { totalItems: number } }>().pagination.totalItems).toBe(0);
+
+    const [score] = await db.select().from(trustScores).where(eq(trustScores.identityId, user.identityId));
+    const scoreBefore = score!.score;
+
+    const signalRepository = app.get(TrustSignalRepository);
+    const sourceEventId = uuidv7();
+    const record = {
+      id: uuidv7(),
+      trustPassportId: score!.trustPassportId,
+      identityId: user.identityId,
+      signalType: 'CHANGE_ORDER_APPROVED',
+      signalVersion: '1',
+      sourceEventId,
+      sourceEventName: 'TrustChangeOrder.Approved',
+      payload: { orderId: uuidv7() },
+      visibility: 'PRIVATE' as const,
+      occurredAt: new Date(),
+    };
+
+    // First insert succeeds; a redelivery with the SAME sourceEventId is a
+    // silent no-op (idx_trust_signal_source) — same idempotency contract as
+    // trust_events.source_event_id.
+    const firstInsert = await signalRepository.insertSignal(record);
+    const duplicateInsert = await signalRepository.insertSignal(record);
+    expect(firstInsert).toBe(true);
+    expect(duplicateInsert).toBe(false);
+
+    const withSignal = await app.inject({ method: 'GET', url: '/api/v1/trust-signals/me', headers: auth });
+    const signalBody = withSignal.json<{
+      data: Array<{ signalType: string; reasonKey: string }>;
+      pagination: { totalItems: number };
+    }>();
+    expect(signalBody.pagination.totalItems).toBe(1); // not 2 — the duplicate never landed
+    expect(signalBody.data[0]).toMatchObject({
+      signalType: 'CHANGE_ORDER_APPROVED',
+      reasonKey: 'trustSignals.CHANGE_ORDER_APPROVED',
+    });
+
+    // The whole point of IP-011: recording a signal NEVER touches Score/Level
+    // (only RegisterTrustEventUseCase, via trust_score_rules, may do that).
+    const [scoreAfter] = await db.select().from(trustScores).where(eq(trustScores.identityId, user.identityId));
+    expect(scoreAfter!.score).toBe(scoreBefore);
+
+    // TRS-006 explainability: an already-scored event (badge trigger) now
+    // carries a human-readable `reason` pulled from trust_score_rules.
+    const timeline = await app.inject({ method: 'GET', url: '/api/v1/trust-scores/me/timeline', headers: auth });
+    const timelineBody = timeline.json<{ data: Array<{ eventName: string; reason: string | null }> }>();
+    expect(timelineBody.data.length).toBeGreaterThan(0);
+    expect(timelineBody.data.every((row) => typeof row.reason === 'string' && row.reason.length > 0)).toBe(true);
   });
 });

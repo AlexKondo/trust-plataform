@@ -113,15 +113,38 @@ export class TrustScoreRepository {
     return map;
   }
 
+  /**
+   * IP-011 explainability fix: TRS-006 previously returned only
+   * `eventName`/`points` — the timeline never surfaced *why* an event
+   * scored what it scored. This joins the rule that actually matched
+   * (`trust_events.rule_id`) to pull its human-readable `description`
+   * (same text an admin sees in TRS-009), so every row is self-explanatory.
+   * `reason` is `null` only when no rule matched (0 points, e.g. an
+   * unmapped/legacy event) — callers should fall back to an i18n-keyed
+   * generic label for `eventName` (see `trustTimeline.*` in the web catalog).
+   */
   async listTimeline(
     trustPassportId: string,
     page: number,
     pageSize: number,
-  ): Promise<{ items: TrustEventRow[]; totalItems: number }> {
+  ): Promise<{ items: (TrustEventRow & { reason: string | null })[]; totalItems: number }> {
     const [items, [total]] = await Promise.all([
       this.db
-        .select()
+        .select({
+          id: trustEvents.id,
+          trustPassportId: trustEvents.trustPassportId,
+          identityId: trustEvents.identityId,
+          eventName: trustEvents.eventName,
+          sourceEventId: trustEvents.sourceEventId,
+          payload: trustEvents.payload,
+          ruleId: trustEvents.ruleId,
+          points: trustEvents.points,
+          occurredAt: trustEvents.occurredAt,
+          createdAt: trustEvents.createdAt,
+          reason: trustScoreRules.description,
+        })
         .from(trustEvents)
+        .leftJoin(trustScoreRules, eq(trustEvents.ruleId, trustScoreRules.id))
         .where(eq(trustEvents.trustPassportId, trustPassportId))
         .orderBy(desc(trustEvents.occurredAt))
         .limit(pageSize)
@@ -131,7 +154,7 @@ export class TrustScoreRepository {
         .from(trustEvents)
         .where(eq(trustEvents.trustPassportId, trustPassportId)),
     ]);
-    return { items, totalItems: total?.count ?? 0 };
+    return { items: items.map((item) => ({ ...item, reason: item.reason ?? null })), totalItems: total?.count ?? 0 };
   }
 
   async listActiveScoreRules(): Promise<ScoreRule[]> {

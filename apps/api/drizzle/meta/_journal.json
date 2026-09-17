@@ -274,6 +274,13 @@
       "when": 1799000000000,
       "tag": "0038_ip010_ledger_settlement_reconciliation",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1800000000000,
+      "tag": "0039_ip011_trust_signals_reputation_completion",
+      "breakpoints": true
     }
   ]
 }

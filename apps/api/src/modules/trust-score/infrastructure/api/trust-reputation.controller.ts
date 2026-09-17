@@ -36,6 +36,7 @@ import {
 } from '../../application/usecases/trust-profile.service';
 import { ShareTokenService } from '../../domain/services/share-token.service';
 import { TrustReputationRepository } from '../persistence/drizzle-trust-reputation.repository';
+import { TrustSignalRepository } from '../persistence/drizzle-trust-signal.repository';
 
 class ShareNotFoundException extends EntityNotFoundException {
   readonly code = 'SHARE_NOT_FOUND';
@@ -77,6 +78,7 @@ const visibilitySchema = z.object({
   showLevel: z.boolean(),
   showBadges: z.boolean(),
   showVerifications: z.boolean(),
+  showSignals: z.boolean(),
 });
 
 const createShareSchema = z.object({
@@ -96,6 +98,7 @@ export class TrustReputationController {
     private readonly shareTokenService: ShareTokenService,
     private readonly auditLogService: AuditLogService,
     private readonly config: AppConfigService,
+    private readonly signalRepository: TrustSignalRepository,
   ) {}
 
   private async myPassportId(identityId: string): Promise<string> {
@@ -119,8 +122,41 @@ export class TrustReputationController {
   async getVisibility(@CurrentIdentity() identity: AuthenticatedIdentity) {
     const passportId = await this.myPassportId(identity.identityId);
     const policy = await this.profileService.getVisibility(passportId);
-    const { showScore, showLevel, showBadges, showVerifications } = policy;
-    return { showScore, showLevel, showBadges, showVerifications };
+    const { showScore, showLevel, showBadges, showVerifications, showSignals } = policy;
+    return { showScore, showLevel, showBadges, showVerifications, showSignals };
+  }
+
+  // ── IP-011 — Trust Signals (objective facts, no score effect) ─────────────
+  /** Owner view: every signal recorded for me, regardless of visibility. */
+  @Get('trust-signals/me')
+  async getMySignals(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Query('page', new ZodValidationPipe(paginationSchema)) page = 1,
+    @Query('pageSize', new ZodValidationPipe(paginationSchema)) pageSize = 20,
+  ) {
+    const passportId = await this.myPassportId(identity.identityId);
+    const size = Math.min(pageSize, 100);
+    const { items, totalItems } = await this.signalRepository.listByPassportId(
+      passportId,
+      page,
+      size,
+      false,
+    );
+    return PaginatedResult.of(
+      items.map((signal) => ({
+        id: signal.id,
+        signalType: signal.signalType,
+        signalVersion: signal.signalVersion,
+        visibility: signal.visibility,
+        // i18n key (IP-002) — copy lives in the web catalog under
+        // `trustSignals.<signalType>`, never hardcoded server-side text.
+        reasonKey: `trustSignals.${signal.signalType}`,
+        occurredAt: signal.occurredAt.toISOString(),
+      })),
+      page,
+      size,
+      totalItems,
+    );
   }
 
   @Put('trust-profile/visibility')
@@ -267,6 +303,43 @@ export class TrustReputationController {
       userAgent: (request.headers['user-agent'] ?? '').slice(0, 500) || null,
     });
     return this.profileService.buildByPassportId(share.trustPassportId, 'PUBLIC_VIEW');
+  }
+
+  /**
+   * IP-011 — signals visible on a shared profile: only `visibility=PUBLIC`
+   * rows, and only when the owner's Visibility Policy has `showSignals` on
+   * (defense in depth: even a PUBLIC-tagged signal stays hidden if the owner
+   * turned the whole category off — same precedence as `showBadges` etc.).
+   */
+  @Public()
+  @Get('public/trust-profile/:token/signals')
+  async getSharedSignals(
+    @Param('token', new ZodValidationPipe(shareTokenSchema)) token: string,
+    @Query('page', new ZodValidationPipe(paginationSchema)) page = 1,
+    @Query('pageSize', new ZodValidationPipe(paginationSchema)) pageSize = 20,
+  ) {
+    const share = await this.resolveShare(token);
+    const visibility = await this.profileService.getVisibility(share.trustPassportId);
+    if (!visibility.showSignals) {
+      return PaginatedResult.of([], page, pageSize, 0);
+    }
+    const size = Math.min(pageSize, 100);
+    const { items, totalItems } = await this.signalRepository.listByPassportId(
+      share.trustPassportId,
+      page,
+      size,
+      true,
+    );
+    return PaginatedResult.of(
+      items.map((signal) => ({
+        signalType: signal.signalType,
+        reasonKey: `trustSignals.${signal.signalType}`,
+        occurredAt: signal.occurredAt.toISOString(),
+      })),
+      page,
+      size,
+      totalItems,
+    );
   }
 
   /** TRS-018 — verificação de autenticidade do link (HMAC + estado). */

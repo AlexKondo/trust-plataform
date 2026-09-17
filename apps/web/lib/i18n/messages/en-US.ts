@@ -81,4 +81,13 @@ export const messages = {
     DISPUTE_RESOLVED: 'Dispute resolved',
     REFUNDED: 'Refunded',
   },
+  trustTimeline: {
+    default: 'Reputation event recorded.',
+  },
+  trustSignals: {
+    CHANGE_ORDER_SUBMITTED: 'Scope change proposed to the Trust Member.',
+    CHANGE_ORDER_APPROVED: 'Scope change approved by the Trust Member.',
+    CHANGE_ORDER_REJECTED: 'Scope change rejected by the Trust Member.',
+    FUNDS_REFUND_COMPLETED: 'A refund was processed for this order.',
+  },
 } satisfies Messages;

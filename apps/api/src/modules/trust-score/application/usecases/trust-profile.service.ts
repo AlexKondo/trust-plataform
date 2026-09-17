@@ -44,6 +44,7 @@ const DEFAULT_VISIBILITY = {
   showLevel: true,
   showBadges: true,
   showVerifications: true,
+  showSignals: true,
 };
 
 /**

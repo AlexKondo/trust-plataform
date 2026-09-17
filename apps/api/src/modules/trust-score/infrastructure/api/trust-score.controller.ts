@@ -119,6 +119,12 @@ export class TrustScoreController {
         id: event.id,
         eventName: event.eventName,
         points: event.points,
+        // IP-011 explainability (acceptance criteria: "score changes explain
+        // why"): the rule description that matched, when one did. Falls back
+        // to an i18n key (`trustTimeline.<eventName>`) the client resolves
+        // for events that scored 0 with no matching rule.
+        reason: event.reason,
+        reasonKey: event.reason ? null : `trustTimeline.${event.eventName}`,
         occurredAt: event.occurredAt.toISOString(),
       })),
       page,

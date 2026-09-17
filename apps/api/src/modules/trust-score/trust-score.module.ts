@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { IdentityModule } from '../identity/identity.module';
 import { TrustPassportModule } from '../trust-passport/trust-passport.module';
+import { RecordTrustSignalUseCase } from './application/usecases/record-trust-signal.usecase';
 import { RegisterTrustEventUseCase } from './application/usecases/register-trust-event.usecase';
 import { TrustProfileService } from './application/usecases/trust-profile.service';
 import { ShareTokenService } from './domain/services/share-token.service';
@@ -18,8 +19,15 @@ import {
   VerificationApprovedScoringConsumer,
   VerificationRejectedScoringConsumer,
 } from './infrastructure/consumers/trust-score.consumers';
+import {
+  ChangeOrderApprovedSignalConsumer,
+  ChangeOrderRejectedSignalConsumer,
+  ChangeOrderSubmittedSignalConsumer,
+  FundsRefundCompletedSignalConsumer,
+} from './infrastructure/consumers/trust-signal.consumers';
 import { TrustReputationRepository } from './infrastructure/persistence/drizzle-trust-reputation.repository';
 import { TrustScoreRepository } from './infrastructure/persistence/drizzle-trust-score.repository';
+import { TrustSignalRepository } from './infrastructure/persistence/drizzle-trust-signal.repository';
 
 @Module({
   imports: [IdentityModule, TrustPassportModule],
@@ -27,7 +35,9 @@ import { TrustScoreRepository } from './infrastructure/persistence/drizzle-trust
   providers: [
     TrustScoreRepository,
     TrustReputationRepository,
+    TrustSignalRepository,
     RegisterTrustEventUseCase,
+    RecordTrustSignalUseCase,
     TrustProfileService,
     ShareTokenService,
     TrustPassportCreatedConsumer,
@@ -38,6 +48,10 @@ import { TrustScoreRepository } from './infrastructure/persistence/drizzle-trust
     OrderCancelledScoringConsumer,
     ReviewCreatedScoringConsumer,
     DisputeResolvedScoringConsumer,
+    ChangeOrderSubmittedSignalConsumer,
+    ChangeOrderApprovedSignalConsumer,
+    ChangeOrderRejectedSignalConsumer,
+    FundsRefundCompletedSignalConsumer,
   ],
   // TrustProfileService é exportado para o Marketplace montar o resumo público
   // do anunciante respeitando as Visibility Policies (MRK-005 BR-003/005).
