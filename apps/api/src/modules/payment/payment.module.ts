@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
+import { IdentityModule } from '../identity/identity.module';
 import { MarketplaceModule } from '../marketplace/marketplace.module';
+import { LedgerPostingService } from './application/services/ledger-posting.service';
+import { LedgerReconciliationService } from './application/services/ledger-reconciliation.service';
 import { AuthorizePaymentUseCase } from './application/usecases/authorize-payment.usecase';
 import { CreateIncrementalAuthorizationUseCase } from './application/usecases/create-incremental-authorization.usecase';
 import { GetPaymentUseCase } from './application/usecases/get-payment.usecase';
@@ -7,6 +10,7 @@ import { HoldFundsUseCase } from './application/usecases/hold-funds.usecase';
 import { RefundPaymentUseCase } from './application/usecases/refund-payment.usecase';
 import { ReleaseFundsUseCase } from './application/usecases/release-funds.usecase';
 import { FundsRefundRepository } from './domain/repositories/funds-refund.repository';
+import { LedgerRepository } from './domain/repositories/ledger.repository';
 import { IncrementalTrustCustodyRepository } from './domain/repositories/incremental-trust-custody.repository';
 import { PaymentIncrementalAuthorizationRepository } from './domain/repositories/payment-incremental-authorization.repository';
 import { PaymentAuthorizationRepository } from './domain/repositories/payment-authorization.repository';
@@ -15,6 +19,7 @@ import { TrustCustodyRepository } from './domain/repositories/trust-custody.repo
 import { ChangeOrderCommercialQuery } from './domain/services/change-order-commercial.query';
 import { OrderDisputeQuery } from './domain/services/order-dispute.query';
 import { PaymentGateway } from './domain/services/payment-gateway';
+import { LedgerAdminController } from './infrastructure/api/ledger-admin.controller';
 import { PaymentController } from './infrastructure/api/payment.controller';
 import { CreateIncrementalAuthorizationOnChangeOrderApprovedConsumer } from './infrastructure/consumers/create-incremental-authorization.consumer';
 import { CreatePaymentOnOrderConsumer } from './infrastructure/consumers/create-payment.consumer';
@@ -23,11 +28,15 @@ import { HoldFundsOnAuthorizedConsumer } from './infrastructure/consumers/hold-f
 import { PrepareReleaseOnCustomerConfirmedConsumer } from './infrastructure/consumers/release-funds.consumer';
 import { RefundPaymentOnDisputeResolvedConsumer } from './infrastructure/consumers/refund-payment-on-dispute-resolved.consumer';
 import { RefundPaymentOnOrderCancelledConsumer } from './infrastructure/consumers/refund-payment-on-order-cancelled.consumer';
+import { PostLedgerOnPaymentAuthorizedConsumer } from './infrastructure/consumers/post-ledger-on-payment-authorized.consumer';
+import { PostLedgerOnFundsReleasedConsumer } from './infrastructure/consumers/post-ledger-on-funds-released.consumer';
+import { PostLedgerOnRefundCompletedConsumer } from './infrastructure/consumers/post-ledger-on-refund-completed.consumer';
 import { PaymentProviderResolver } from './infrastructure/gateway/payment-provider.resolver';
 import { SandboxPaymentGateway } from './infrastructure/gateway/sandbox-payment.gateway';
 import { MarketplaceChangeOrderCommercialQuery } from './infrastructure/marketplace/change-order-commercial.query';
 import { MarketplaceOrderDisputeQuery } from './infrastructure/marketplace/marketplace-dispute.query';
 import { DrizzleFundsRefundRepository } from './infrastructure/persistence/drizzle-funds-refund.repository';
+import { DrizzleLedgerRepository } from './infrastructure/persistence/drizzle-ledger.repository';
 import { DrizzleIncrementalTrustCustodyRepository } from './infrastructure/persistence/drizzle-incremental-trust-custody.repository';
 import { DrizzlePaymentIncrementalAuthorizationRepository } from './infrastructure/persistence/drizzle-payment-incremental-authorization.repository';
 import { DrizzlePaymentAuthorizationRepository } from './infrastructure/persistence/drizzle-payment-authorization.repository';
@@ -49,8 +58,10 @@ import { DrizzleTrustCustodyRepository } from './infrastructure/persistence/driz
   // Leitura da disputa para a política de liberação (PACK-01 §10). O sentido é
   // só este: Payments lê Marketplace; o Marketplace continua sem conhecer
   // Payments, e tudo que vai na direção contrária vai por evento.
-  imports: [MarketplaceModule],
-  controllers: [PaymentController],
+  // IP-010 — `IdentityModule` resolve `AdminGuard` para `LedgerAdminController`
+  // (mesmo padrão de `AnalyticsModule`).
+  imports: [MarketplaceModule, IdentityModule],
+  controllers: [PaymentController, LedgerAdminController],
   providers: [
     SandboxPaymentGateway,
     PaymentProviderResolver,
@@ -58,6 +69,11 @@ import { DrizzleTrustCustodyRepository } from './infrastructure/persistence/driz
     HoldFundsOnAuthorizedConsumer,
     PrepareReleaseOnCustomerConfirmedConsumer,
     FinalizeReleaseConsumer,
+    // IP-010 — postam no ledger a partir dos MESMOS eventos que já movem
+    // custódia/pagamento; nunca substituem esses consumers, só os espelham.
+    PostLedgerOnPaymentAuthorizedConsumer,
+    PostLedgerOnFundsReleasedConsumer,
+    PostLedgerOnRefundCompletedConsumer,
     // IP-007 — gatilho canônico da autorização incremental.
     CreateIncrementalAuthorizationOnChangeOrderApprovedConsumer,
     // IP-008 — consequência financeira de cancelamento antes da execução e
@@ -70,6 +86,8 @@ import { DrizzleTrustCustodyRepository } from './infrastructure/persistence/driz
     ReleaseFundsUseCase,
     CreateIncrementalAuthorizationUseCase,
     RefundPaymentUseCase,
+    LedgerPostingService,
+    LedgerReconciliationService,
     { provide: PaymentRepository, useClass: DrizzlePaymentRepository },
     {
       provide: PaymentAuthorizationRepository,
@@ -85,6 +103,7 @@ import { DrizzleTrustCustodyRepository } from './infrastructure/persistence/driz
       useClass: DrizzleIncrementalTrustCustodyRepository,
     },
     { provide: FundsRefundRepository, useClass: DrizzleFundsRefundRepository },
+    { provide: LedgerRepository, useClass: DrizzleLedgerRepository },
     { provide: OrderDisputeQuery, useClass: MarketplaceOrderDisputeQuery },
     { provide: ChangeOrderCommercialQuery, useClass: MarketplaceChangeOrderCommercialQuery },
     // O port resolve para o adapter padrão; operações que precisam voltar ao
@@ -98,6 +117,7 @@ import { DrizzleTrustCustodyRepository } from './infrastructure/persistence/driz
     PaymentIncrementalAuthorizationRepository,
     IncrementalTrustCustodyRepository,
     FundsRefundRepository,
+    LedgerRepository,
     PaymentProviderResolver,
   ],
 })

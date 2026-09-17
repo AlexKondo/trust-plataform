@@ -28,6 +28,7 @@ tags:
   - name: Payment
   - name: Privacy
   - name: Analytics
+  - name: Ledger
 
 paths:
   /health:
@@ -2526,6 +2527,64 @@ paths:
                   - { cohortMonth: '2026-08', cohortSize: 63, retainedMonth1: 18, retainedMonth2: 0, retentionRateMonth1: 0.2857, retentionRateMonth2: 0 }
         '401': { description: Sem token ou token inválido/expirado (INVALID_TOKEN) }
         '403': { description: ADMIN_REQUIRED }
+
+  /admin/ledger/balances:
+    get:
+      tags: [Ledger]
+      summary: IP-010 — Saldo por conta do ledger imutável (ADMIN)
+      description: >
+        Soma pura de `ledger_entries` por conta — prova o critério de aceite
+        "relatórios financeiros derivam do ledger": nenhuma outra tabela é
+        lida. Ver `apps/api/src/modules/payment/domain/entities/ledger-entry.ts`
+        para a semântica de cada conta (convenção de conta de ATIVO: saldo
+        positivo = valor atualmente retido/pago/devolvido).
+      operationId: getLedgerBalances
+      responses:
+        '200':
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  accounts:
+                    - { account: MEMBER_FUNDING_CLEARING, balanceCents: -152000 }
+                    - { account: CUSTODY_HELD, balanceCents: 42000 }
+                    - { account: PARTNER_PAYABLE, balanceCents: 96000 }
+                    - { account: REFUND_ISSUED, balanceCents: 14000 }
+        '401': { description: Sem token ou token inválido/expirado (INVALID_TOKEN) }
+        '403': { description: ADMIN_REQUIRED }
+
+  /admin/ledger/reconcile/{paymentId}:
+    get:
+      tags: [Ledger]
+      summary: IP-010 — Reconciliação domínio × ledger de um Payment (ADMIN)
+      description: >
+        Compara `Payment.refundableCents` (domínio) com o saldo derivado do
+        próprio ledger para o mesmo Payment. Reconciliação domínio × PSP
+        (webhook/transação real) NÃO está disponível: IP-009 permanece
+        `BLOCKED_EXTERNAL` (sem credenciais Asaas reais) — ver
+        `IP-010-COMPLETION-REPORT.md` §5.
+      operationId: reconcileLedgerPayment
+      parameters:
+        - { name: paymentId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  paymentId: '019fe8f0-0000-7000-8000-000000000a01'
+                  status: OK
+                  domainRefundableCents: 15000
+                  ledgerOutstandingCents: 15000
+                  ledgerCustodyHeldCents: 15000
+                  ledgerPartnerPayableCents: 0
+                  ledgerRefundIssuedCents: 0
+                  discrepancyCents: 0
+        '401': { description: Sem token ou token inválido/expirado (INVALID_TOKEN) }
+        '403': { description: ADMIN_REQUIRED }
+        '404': { description: PAYMENT_NOT_FOUND }
 
 components:
   securitySchemes:

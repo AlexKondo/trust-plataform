@@ -145,3 +145,21 @@ export class RefundTransitionException extends StateConflictException {
     super(`Refund cannot move from ${from} to ${to}.`);
   }
 }
+
+/** IP-010 — postagem de ledger desbalanceada ou com valor inválido → 422. */
+export class LedgerValidationException extends BusinessRuleViolationException {
+  readonly code = 'LEDGER_INVALID';
+
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+/** IP-010 — ledger diverge do estado de domínio para um Payment → 409 (nunca corrigido silenciosamente). */
+export class LedgerReconciliationException extends StateConflictException {
+  readonly code = 'LEDGER_RECONCILIATION_MISMATCH';
+
+  constructor(message: string) {
+    super(message);
+  }
+}
