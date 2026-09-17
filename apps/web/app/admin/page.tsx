@@ -54,6 +54,30 @@ function AdminHome() {
       count: null,
       countLabel: '',
     },
+    {
+      href: '/admin/risk-flags',
+      icon: 'shield',
+      title: 'Sinais de risco',
+      description: 'Sinais determinísticos de abuso/fraude aguardando decisão humana (IP-014).',
+      count: null,
+      countLabel: '',
+    },
+    {
+      href: '/admin/support',
+      icon: 'support_agent',
+      title: 'Busca de suporte',
+      description: 'Rastreie uma identidade, pedido ou pagamento de ponta a ponta por e-mail/ID.',
+      count: null,
+      countLabel: '',
+    },
+    {
+      href: '/admin/audit-logs',
+      icon: 'history',
+      title: 'Trilha de auditoria',
+      description: 'Busque a trilha append-only por ator, operação ou recurso.',
+      count: null,
+      countLabel: '',
+    },
   ];
 
   return (

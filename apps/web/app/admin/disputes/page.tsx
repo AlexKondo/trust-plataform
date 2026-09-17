@@ -119,6 +119,13 @@ function AdminDisputesContent() {
                     Ver o pedido
                     <Icon name="arrow_forward" size={14} />
                   </Link>
+                  <Link
+                    href={`/admin/evidence/${dispute.orderId}`}
+                    className="body-sm flex items-center gap-1 text-primary hover:underline"
+                  >
+                    Ver evidência do pedido
+                    <Icon name="arrow_forward" size={14} />
+                  </Link>
                 </div>
                 <Pill tone={toneForStatus(dispute.status)}>
                   {DISPUTE_STATUS_LABEL[dispute.status] ?? dispute.status}

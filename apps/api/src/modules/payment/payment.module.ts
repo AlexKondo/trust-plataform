@@ -19,6 +19,7 @@ import { TrustCustodyRepository } from './domain/repositories/trust-custody.repo
 import { ChangeOrderCommercialQuery } from './domain/services/change-order-commercial.query';
 import { OrderDisputeQuery } from './domain/services/order-dispute.query';
 import { PaymentGateway } from './domain/services/payment-gateway';
+import { AdminPaymentController } from './infrastructure/api/admin-payment.controller';
 import { LedgerAdminController } from './infrastructure/api/ledger-admin.controller';
 import { PaymentController } from './infrastructure/api/payment.controller';
 import { CreateIncrementalAuthorizationOnChangeOrderApprovedConsumer } from './infrastructure/consumers/create-incremental-authorization.consumer';
@@ -61,7 +62,7 @@ import { DrizzleTrustCustodyRepository } from './infrastructure/persistence/driz
   // IP-010 — `IdentityModule` resolve `AdminGuard` para `LedgerAdminController`
   // (mesmo padrão de `AnalyticsModule`).
   imports: [MarketplaceModule, IdentityModule],
-  controllers: [PaymentController, LedgerAdminController],
+  controllers: [PaymentController, LedgerAdminController, AdminPaymentController],
   providers: [
     SandboxPaymentGateway,
     PaymentProviderResolver,

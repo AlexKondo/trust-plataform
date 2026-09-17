@@ -54,6 +54,7 @@ import { MarketplaceConversationController } from './infrastructure/api/marketpl
 import { MarketplaceListingController } from './infrastructure/api/marketplace-listing.controller';
 import { MarketplaceOfferController } from './infrastructure/api/marketplace-offer.controller';
 import { MarketplaceServiceRequestController } from './infrastructure/api/marketplace-service-request.controller';
+import { AdminEvidenceController } from './infrastructure/api/admin-evidence.controller';
 import { MarketplaceChangeOrderController } from './infrastructure/api/marketplace-change-order.controller';
 import { MarketplaceOrderController } from './infrastructure/api/marketplace-order.controller';
 import { MarketplacePartnerAvailabilityController } from './infrastructure/api/marketplace-partner-availability.controller';
@@ -100,6 +101,7 @@ import { DeclaredEtaAdapter } from './infrastructure/eta/declared-eta.adapter';
     MarketplaceOrderController,
     MarketplacePartnerAvailabilityController,
     MarketplaceChangeOrderController,
+    AdminEvidenceController,
     MarketplaceReviewController,
     MarketplaceDisputeAdminController,
   ],

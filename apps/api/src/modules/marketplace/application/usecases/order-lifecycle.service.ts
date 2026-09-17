@@ -65,6 +65,19 @@ export class OrderLifecycleService {
     return { order, role: order.sellerId === identityId ? 'SELLER' : 'BUYER' };
   }
 
+  /**
+   * IP-018 — carrega o pedido SEM checar participante, para uso exclusivo de
+   * rotas `AdminGuard` (ex.: revisão de evidência para disputa). Nunca chamar
+   * a partir de um endpoint acessível a um participante comum.
+   */
+  async loadForAdmin(orderId: string): Promise<MarketplaceOrder> {
+    const order = await this.orderRepository.findById(orderId);
+    if (!order) {
+      throw new MarketplaceOrderNotFoundException();
+    }
+    return order;
+  }
+
   /** Exige que o chamador seja o prestador (check-in/check-out são dele). */
   async loadForSeller(orderId: string, identityId: string): Promise<MarketplaceOrder> {
     const { order, role } = await this.loadForParticipant(orderId, identityId);

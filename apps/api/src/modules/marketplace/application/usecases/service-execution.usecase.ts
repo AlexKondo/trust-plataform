@@ -456,6 +456,85 @@ export class ServiceExecutionUseCase {
     return records.map(toServiceNoteResponse);
   }
 
+  /**
+   * IP-018 — fecha o gap identificado no Completion Report do IP-006:
+   * "no admin/mediator read route exists anywhere in marketplace/** for
+   * evidence". Consolida execution evidence + service notes + evidência de
+   * change order do pedido, para revisão de disputa. Só chamável por rota
+   * `AdminGuard` (nunca exposta a participante comum) — auditada porque é
+   * acesso administrativo a conteúdo de terceiros (trust-security).
+   */
+  async listEvidenceForAdminReview(
+    adminIdentityId: string,
+    orderId: string,
+    meta: RequestMeta = {},
+  ): Promise<{
+    orderId: string;
+    executionEvidences: ExecutionEvidenceResponse[];
+    serviceNotes: ServiceNoteResponse[];
+    changeOrderEvidences: Array<{
+      changeOrderId: string;
+      evidences: Array<{
+        evidenceId: string;
+        type: string;
+        fileName: string;
+        mimeType: string;
+        fileSize: number;
+        uploadedBy: string;
+        uploadedAt: string;
+      }>;
+    }>;
+  }> {
+    await this.lifecycle.loadForAdmin(orderId);
+
+    const [executionEvidenceRecords, noteRecords, changeOrders] = await Promise.all([
+      this.executionRepository.listEvidences(orderId),
+      this.executionRepository.listNotes(orderId),
+      this.changeOrderRepository.listByOrder(orderId),
+    ]);
+
+    const changeOrderEvidences = await Promise.all(
+      changeOrders.map(async (changeOrder) => ({
+        changeOrderId: changeOrder.id,
+        evidences: (await this.changeOrderRepository.listEvidences(changeOrder.id)).map(
+          (record) => ({
+            evidenceId: record.id,
+            type: record.type,
+            fileName: record.fileName,
+            mimeType: record.mimeType,
+            fileSize: record.fileSize,
+            uploadedBy: record.uploadedBy,
+            uploadedAt: record.uploadedAt.toISOString(),
+          }),
+        ),
+      })),
+    );
+
+    await this.auditLogService.recordSafe({
+      identityId: adminIdentityId,
+      operation: 'AdminReviewEvidence',
+      resource: 'MarketplaceOrder',
+      resourceId: orderId,
+      result: 'SUCCESS',
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+      correlationId: meta.correlationId,
+      requestId: meta.requestId,
+      metadata: {
+        executionEvidenceCount: executionEvidenceRecords.length,
+        serviceNoteCount: noteRecords.length,
+        changeOrderCount: changeOrders.length,
+      },
+    });
+
+    return {
+      orderId,
+      executionEvidences: executionEvidenceRecords.map(toExecutionEvidenceResponse),
+      serviceNotes: noteRecords.map(toServiceNoteResponse),
+      changeOrderEvidences,
+    };
+  }
+
   // ── §15 — Service Summary ──────────────────────────────────────────────────
   async getServiceSummary(
     identityId: string,
