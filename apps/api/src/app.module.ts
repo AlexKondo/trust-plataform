@@ -26,6 +26,7 @@ import { VerificationModule } from './modules/verification/verification.module';
 import { AiModule } from './modules/ai/ai.module';
 import { AdminOpsModule } from './modules/admin-ops/admin-ops.module';
 import { InternalJobsModule } from './modules/internal-jobs/internal-jobs.module';
+import { WebhooksModule } from './modules/integrations/webhooks/webhooks.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { InternalJobsModule } from './modules/internal-jobs/internal-jobs.module
     AiModule,
     AdminOpsModule,
     InternalJobsModule,
+    WebhooksModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

@@ -31,3 +31,5 @@ export * from '../../../modules/payment/infrastructure/persistence/payment-incre
 export * from '../../../modules/payment/infrastructure/persistence/funds-refund.schema';
 export * from '../../../modules/payment/infrastructure/persistence/ledger.schema';
 export * from '../../../modules/privacy/infrastructure/persistence/privacy-requests.schema';
+export * from '../../../modules/integrations/webhooks/infrastructure/persistence/webhook-subscriptions.schema';
+export * from '../../../modules/integrations/webhooks/infrastructure/persistence/webhook-deliveries.schema';

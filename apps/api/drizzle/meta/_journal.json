@@ -281,6 +281,13 @@
       "when": 1800000000000,
       "tag": "0039_ip011_trust_signals_reputation_completion",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1801000000000,
+      "tag": "0040_ip023_external_integrations_webhooks",
+      "breakpoints": true
     }
   ]
 }
