@@ -33,3 +33,4 @@ export * from '../../../modules/payment/infrastructure/persistence/ledger.schema
 export * from '../../../modules/privacy/infrastructure/persistence/privacy-requests.schema';
 export * from '../../../modules/integrations/webhooks/infrastructure/persistence/webhook-subscriptions.schema';
 export * from '../../../modules/integrations/webhooks/infrastructure/persistence/webhook-deliveries.schema';
+export * from '../../../modules/growth/infrastructure/persistence/growth.schema';

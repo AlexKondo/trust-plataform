@@ -23,6 +23,17 @@ export const createIdentityRequestSchema = z
     password: passwordPolicySchema,
     confirmPassword: z.string({ required_error: 'confirmPassword is required' }),
     acceptTerms: z.boolean({ required_error: 'acceptTerms is required' }),
+    // IP-012 — código de referral opcional. Formato validado aqui na borda
+    // (mesmo shape de `ReferralCode` no domínio); a atribuição em si
+    // (existe o código? é auto-referência? já foi usado?) é decidida no
+    // `AttributeReferralUseCase`, nunca aqui — um código desconhecido ou
+    // malformado NUNCA bloqueia o cadastro (best-effort, ver use case).
+    referralCode: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .regex(/^[A-Z0-9]{6,12}$/)
+      .optional(),
   })
   .superRefine((data, ctx) => {
     if (data.password !== data.confirmPassword) {

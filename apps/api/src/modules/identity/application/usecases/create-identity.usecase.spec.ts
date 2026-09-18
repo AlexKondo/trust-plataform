@@ -1,7 +1,9 @@
+import { ModuleRef } from '@nestjs/core';
 import { PinoLogger } from 'nestjs-pino';
 import { describe, expect, it, vi } from 'vitest';
 import { AuditLogService } from '../../../../shared/audit/audit-log.service';
 import { Database } from '../../../../shared/database/database.module';
+import { AttributeReferralUseCase } from '../../../growth/application/usecases/referral.usecases';
 import { IDENTITY_STATUS } from '../../domain/entities/identity-status';
 import { EmailAlreadyExistsException } from '../../domain/exceptions/email-already-exists.exception';
 import { IdentityRepository } from '../../domain/repositories/identity.repository';
@@ -42,11 +44,21 @@ function makeUseCase(overrides: { emailExists?: boolean } = {}) {
   const db = {
     transaction: vi.fn(async (fn: (tx: unknown) => Promise<void>) => fn(fakeTx)),
   } as unknown as Database;
-  const logger = { setContext: vi.fn(), info: vi.fn(), error: vi.fn() } as unknown as PinoLogger;
+  const logger = {
+    setContext: vi.fn(),
+    info: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+  } as unknown as PinoLogger;
 
   const passwordBreachService = {
     isBreached: vi.fn().mockResolvedValue(false),
   } as unknown as import('../../domain/services/password-breach.service').PasswordBreachService;
+
+  const attributeReferral = {
+    execute: vi.fn().mockResolvedValue({ attributed: true }),
+  } as unknown as AttributeReferralUseCase;
+  const moduleRef = { get: vi.fn().mockReturnValue(attributeReferral) } as unknown as ModuleRef;
 
   return {
     useCase: new CreateIdentityUseCase(
@@ -56,6 +68,7 @@ function makeUseCase(overrides: { emailExists?: boolean } = {}) {
       auditLogService,
       generateEmailVerification,
       legalConsentService,
+      moduleRef,
       db,
       logger,
     ),
@@ -64,6 +77,7 @@ function makeUseCase(overrides: { emailExists?: boolean } = {}) {
     auditLogService,
     generateEmailVerification,
     legalConsentService,
+    attributeReferral,
     fakeTx,
   };
 }
@@ -117,5 +131,33 @@ describe('CreateIdentityUseCase (IDN-001)', () => {
       result: 'SUCCESS',
       ipAddress: '10.0.0.1',
     });
+  });
+
+  // IP-012 (Quality Gate finding #1) — o signup agora é o único ponto de
+  // entrada real para atribuição de referral.
+  it('attributes a referral when a referralCode is present (IP-012 signup wiring)', async () => {
+    const { useCase, attributeReferral } = makeUseCase();
+    const response = await useCase.execute({ ...request, referralCode: 'ABC23456' });
+
+    expect(attributeReferral.execute).toHaveBeenCalledWith({
+      referralCode: 'ABC23456',
+      referredIdentityId: response.identityId,
+    });
+  });
+
+  it('does not attempt attribution when no referralCode is given', async () => {
+    const { useCase, attributeReferral } = makeUseCase();
+    await useCase.execute(request);
+
+    expect(attributeReferral.execute).not.toHaveBeenCalled();
+  });
+
+  it('never fails signup when referral attribution fails (unknown/self/already-used code — best-effort, same as the email-verification pattern)', async () => {
+    const { useCase, attributeReferral } = makeUseCase();
+    vi.mocked(attributeReferral.execute).mockRejectedValueOnce(new Error('unknown referral code'));
+
+    const response = await useCase.execute({ ...request, referralCode: 'DOESNOT1' });
+
+    expect(response.status).toBe(IDENTITY_STATUS.PENDING_EMAIL_VERIFICATION);
   });
 });

@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { PinoLogger } from 'nestjs-pino';
 import { AuditLogService } from '../../../../shared/audit/audit-log.service';
 import { DRIZZLE, Database } from '../../../../shared/database/database.module';
@@ -8,6 +9,7 @@ import {
   CURRENT_LEGAL_DOCUMENT_VERSION,
   LEGAL_DOCUMENT_TYPES,
 } from '../../../../shared/privacy/legal-documents';
+import { AttributeReferralUseCase } from '../../../growth/application/usecases/referral.usecases';
 import { Identity } from '../../domain/entities/identity';
 import { BreachedPasswordException } from '../../domain/exceptions/breached-password.exception';
 import { EmailAlreadyExistsException } from '../../domain/exceptions/email-already-exists.exception';
@@ -43,6 +45,17 @@ export class CreateIdentityUseCase {
     private readonly auditLogService: AuditLogService,
     private readonly generateEmailVerification: GenerateEmailVerificationUseCase,
     private readonly legalConsentService: LegalConsentService,
+    // IP-012 (Quality Gate finding #1) — resolvido via `ModuleRef` (tardio,
+    // container inteiro, `strict: false`), NÃO por injeção de construtor:
+    // `GrowthModule` já importa `VerificationModule`/`PaymentModule`, que
+    // por sua vez importam `IdentityModule` — injetar `AttributeReferralUseCase`
+    // no construtor aqui exigiria `IdentityModule` importar `GrowthModule`,
+    // fechando um ciclo real de MÓDULOS ES (não só de DI) que quebra o
+    // carregamento (`forwardRef` sozinho não resolve um ciclo de import de
+    // arquivo, só de resolução do Nest). `ModuleRef.get(..., {strict:false})`
+    // é o padrão oficial do Nest para exatamente este caso — nenhum import
+    // de módulo é adicionado aqui, só o tipo (para a chamada tipada).
+    private readonly moduleRef: ModuleRef,
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly logger: PinoLogger,
   ) {
@@ -113,6 +126,27 @@ export class CreateIdentityUseCase {
         { err: error, operation: 'CreateIdentity', identityId: identity.id },
         'Failed to issue verification email after registration.',
       );
+    }
+
+    // IP-012 (Quality Gate finding #1) — atribuição de referral no cadastro,
+    // best-effort: um código desconhecido, malformado ou de auto-referência
+    // (estruturalmente impossível aqui, mas defensivo) NUNCA desfaz nem
+    // bloqueia o cadastro — mesmo tratamento do e-mail de verificação acima.
+    // A recompensa (se/quando decidida) não é concedida aqui — ver Conflict
+    // Escalation TRUST-POINTS-ACCRUAL.
+    if (request.referralCode) {
+      try {
+        const attributeReferral = this.moduleRef.get(AttributeReferralUseCase, { strict: false });
+        await attributeReferral.execute({
+          referralCode: request.referralCode,
+          referredIdentityId: identity.id,
+        });
+      } catch (error) {
+        this.logger.warn(
+          { err: error, operation: 'CreateIdentity', identityId: identity.id },
+          'Referral attribution failed at signup — registration proceeds unaffected.',
+        );
+      }
     }
 
     this.logger.info(

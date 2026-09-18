@@ -26,6 +26,17 @@ export const LEDGER_ACCOUNTS = {
   REFUND_ISSUED: 'REFUND_ISSUED',
   TRUST_FEE_EARNED: 'TRUST_FEE_EARNED',
   PSP_FEE: 'PSP_FEE',
+  /**
+   * IP-012 — Cashback (Growth). Passivo da plataforma perante o Member
+   * quando uma campanha de cashback admin-configurada (`cashback_campaigns`,
+   * módulo `growth`) está ativa para o fato de origem. `CASHBACK_LIABILITY`
+   * nasce no momento do fato (ex.: pagamento liquidado); `CASHBACK_PAYABLE`
+   * é a contrapartida — o desembolso real depende de IP-009 (BLOCKED_EXTERNAL),
+   * então hoje esta conta só acumula passivo contábil, nunca é baixada por
+   * um pagamento real (ver IP-012-COMPLETION-REPORT.md).
+   */
+  CASHBACK_LIABILITY: 'CASHBACK_LIABILITY',
+  CASHBACK_PAYABLE: 'CASHBACK_PAYABLE',
 } as const;
 
 export type LedgerAccount = (typeof LEDGER_ACCOUNTS)[keyof typeof LEDGER_ACCOUNTS];

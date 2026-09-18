@@ -27,6 +27,7 @@ import { AiModule } from './modules/ai/ai.module';
 import { AdminOpsModule } from './modules/admin-ops/admin-ops.module';
 import { InternalJobsModule } from './modules/internal-jobs/internal-jobs.module';
 import { WebhooksModule } from './modules/integrations/webhooks/webhooks.module';
+import { GrowthModule } from './modules/growth/growth.module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { WebhooksModule } from './modules/integrations/webhooks/webhooks.module'
     AdminOpsModule,
     InternalJobsModule,
     WebhooksModule,
+    GrowthModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

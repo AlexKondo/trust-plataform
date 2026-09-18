@@ -120,6 +120,9 @@ import { DrizzleTrustCustodyRepository } from './infrastructure/persistence/driz
     FundsRefundRepository,
     LedgerRepository,
     PaymentProviderResolver,
+    // IP-012 (growth): reusa o único ponto de escrita do ledger para postar
+    // passivo de cashback — nenhum módulo monta um LedgerEntry manualmente.
+    LedgerPostingService,
   ],
 })
 export class PaymentModule {}
