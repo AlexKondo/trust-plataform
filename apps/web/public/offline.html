@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Trust Platform — Sem conexão</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #faf8ff;
+        color: #131b2e;
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Inter, Arial, sans-serif;
+        padding: 24px;
+      }
+      main {
+        max-width: 420px;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        align-items: center;
+      }
+      .mark {
+        width: 56px;
+        height: 56px;
+        border-radius: 9999px;
+        background: #dae2fd;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 28px;
+      }
+      h1 {
+        font-size: 20px;
+        line-height: 28px;
+        margin: 0;
+      }
+      p {
+        font-size: 15px;
+        line-height: 22px;
+        color: #434655;
+        margin: 0;
+      }
+      button {
+        margin-top: 8px;
+        font-size: 16px;
+        font-weight: 600;
+        padding: 12px 20px;
+        border-radius: 12px;
+        border: none;
+        background: #1d4ed8;
+        color: #ffffff;
+        min-height: 44px;
+        min-width: 44px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="mark" aria-hidden="true">📶</div>
+      <h1 id="title">Sem conexão no momento</h1>
+      <p id="body">
+        Não foi possível carregar esta página. Verifique sua conexão — assim que o sinal
+        voltar, tentar novamente deve funcionar normalmente. Ações como check-in, pausa e envio
+        de evidência são repetidas automaticamente algumas vezes quando o sinal está fraco.
+      </p>
+      <button id="retry" type="button">Tentar novamente</button>
+    </main>
+    <script>
+      // Sem framework/i18n aqui de propósito: esta página é servida pelo Service Worker
+      // como fallback estático quando a rede falha, fora da árvore React/LocaleProvider
+      // (IP-022 — ver nota de desvio no COMPLETION-REPORT). Alterna só entre pt-BR/en-US
+      // pelo idioma do navegador, texto fixo (não passa pelo catálogo de i18n do app).
+      if (!navigator.language || !navigator.language.toLowerCase().startsWith('pt')) {
+        document.getElementById('title').textContent = 'You are offline';
+        document.getElementById('body').textContent =
+          'This page could not be loaded. Check your connection — once signal returns, retrying should work normally. Actions like check-in, pause and evidence upload are retried automatically a few times on weak signal.';
+        document.getElementById('retry').textContent = 'Retry';
+      }
+      document.getElementById('retry').addEventListener('click', () => window.location.reload());
+    </script>
+  </body>
+</html>

@@ -70,11 +70,53 @@ interface RequestOptions {
   auth?: boolean;
   /** Enviado como multipart; ignora `body`. */
   form?: FormData;
+  /**
+   * IP-022 — Field Experience: permite retry automático (rede instável em campo) para uma
+   * mutação que NÃO é `GET`. Só marque como `true` quando o efeito do lado do servidor é
+   * protegido por uma transição de estado (guarda CAS, ex.: check-in/check-out/Trust
+   * Pause-Resume, no mesmo padrão do IP-001) — repetir uma chamada que já teve efeito deve
+   * resultar em erro "estado já mudou", nunca em duplicar o efeito. NUNCA marque como `true`
+   * uma chamada que cria um novo registro a cada sucesso (evidência, nota, avaliação,
+   * Change Order) — nessas, um retry após timeout duplicaria o registro.
+   */
+  idempotent?: boolean;
 }
 
 interface RawResult<T> {
   data: T;
   pagination?: PaginationMeta;
+}
+
+/** IP-022 — pequena espera entre tentativas (backoff exponencial, sem jitter: uso é local/limitado). */
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * IP-022 — Field Experience: um Partner em campo frequentemente está com sinal instável
+ * (check-in, pausa, upload de evidência). `fetch` rejeita com `TypeError` quando a requisição
+ * nunca chega a ter uma resposta (rede caiu, DNS falhou, timeout de conexão) — isso é
+ * diferente de um erro de negócio (4xx/5xx com corpo), que nunca é repetido aqui. Repetimos
+ * apenas: (a) sempre para `GET` (naturalmente idempotente); (b) para métodos que alteram
+ * estado somente quando o chamador declarou `idempotent: true` (ver `RequestOptions`).
+ * Bounded: no máximo 2 tentativas extras, backoff curto — não é uma fila de sincronização
+ * offline, é tolerância a uma falha de rede transitória.
+ */
+async function fetchWithRetry(url: string, init: RequestInit, retryable: boolean): Promise<Response> {
+  const maxAttempts = retryable ? 3 : 1;
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await fetch(url, init);
+    } catch (error) {
+      lastError = error;
+      if (attempt === maxAttempts) {
+        break;
+      }
+      await wait(300 * 2 ** (attempt - 1));
+    }
+  }
+  throw lastError;
 }
 
 async function rawRequest<T>(path: string, options: RequestOptions): Promise<RawResult<T>> {
@@ -85,11 +127,17 @@ async function rawRequest<T>(path: string, options: RequestOptions): Promise<Raw
   if (options.auth && tokenStore.access) {
     headers.authorization = `Bearer ${tokenStore.access}`;
   }
-  const response = await fetch(`${API_URL}${path}`, {
-    method: options.method ?? 'GET',
-    headers,
-    body: options.form ?? (options.body === undefined ? undefined : JSON.stringify(options.body)),
-  });
+  const method = options.method ?? 'GET';
+  const retryable = method === 'GET' || options.idempotent === true;
+  const response = await fetchWithRetry(
+    `${API_URL}${path}`,
+    {
+      method,
+      headers,
+      body: options.form ?? (options.body === undefined ? undefined : JSON.stringify(options.body)),
+    },
+    retryable,
+  );
 
   if (response.status === 204) {
     return { data: undefined as T };

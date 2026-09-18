@@ -50,4 +50,23 @@ export default tseslint.config(
     files: ['**/*.mjs', '**/*.js'],
     ...tseslint.configs.disableTypeChecked,
   },
+  {
+    // IP-022 — Service Worker mínimo do PWA shell (apps/web/public/sw.js): roda no escopo
+    // global de um Service Worker (window/document não existem lá), não no de um script de
+    // browser comum, então precisa dos globais próprios (self, caches, clients, fetch...)
+    // em vez dos globais padrão do navegador/Node que o resto do repo usa.
+    files: ['apps/web/public/sw.js'],
+    languageOptions: {
+      globals: {
+        self: 'readonly',
+        caches: 'readonly',
+        clients: 'readonly',
+        fetch: 'readonly',
+        Response: 'readonly',
+        Request: 'readonly',
+        URL: 'readonly',
+        Promise: 'readonly',
+      },
+    },
+  },
 );

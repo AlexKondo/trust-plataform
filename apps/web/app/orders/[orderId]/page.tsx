@@ -176,6 +176,14 @@ function OrderContent() {
     void load();
   }, [load]);
 
+  // IP-022 — `start`/`complete` (check-in/check-out) intencionalmente NÃO passam
+  // `idempotent: true` aqui: a Diff Review (F1, CRITICAL) traçou o backend e achou que
+  // `MarketplaceOrderRepository.save()` é um upsert "cego" (`ON CONFLICT DO UPDATE`, sem
+  // `WHERE status = previousStatus`/lock otimista) — diferente do CAS real que `pause`/`resume`
+  // usam. Sem CAS em nível de banco, um retry de rede pode, numa janela estreita, correr em
+  // paralelo com a requisição original ainda em voo e duplicar o evento `Started`/
+  // `ExecutionCompleted`. Retry automático fica fora de escopo para este helper até o backend
+  // ganhar uma transição condicional equivalente à de `resume`.
   const act = async (path: string, body?: unknown, successText?: string) => {
     setBusy(true);
     setFeedback(null);
@@ -265,6 +273,9 @@ function OrderContent() {
       await authApi(`/marketplace/orders/${params.orderId}/travel-status/en-route`, {
         method: 'POST',
         body: { declaredEtaMinutes: Number(etaMinutes) },
+        // IP-022 — declara um status (não cria registro incremental); repetir com o mesmo
+        // payload após falha de rede não duplica efeito.
+        idempotent: true,
       });
       setPanel(null);
       await load();
@@ -280,6 +291,9 @@ function OrderContent() {
     setBusy(true);
     setFeedback(null);
     try {
+      // IP-022 — apenas `en-route`/`pause`/`resume` são marcados `idempotent: true`; `arrived`
+      // compartilha o mesmo upsert "cego" (sem CAS em nível de banco) apontado pela Diff Review
+      // do IP-022 (F2) para `start`/`complete`, então fica sem retry automático aqui também.
       await authApi(`/marketplace/orders/${params.orderId}/travel-status/arrived`, { method: 'POST' });
       await load();
       setFeedback({ kind: 'success', text: t('partner.travelArrivedSuccess') });
@@ -298,6 +312,8 @@ function OrderContent() {
       await authApi(`/marketplace/orders/${params.orderId}/pause`, {
         method: 'POST',
         body: { reasonCode: pauseReason, note: pauseNote.trim() || undefined },
+        // IP-022 — Trust Pause é uma transição CAS (IP-001): repetir após falha de rede é seguro.
+        idempotent: true,
       });
       setPanel(null);
       setPauseNote('');
@@ -314,7 +330,11 @@ function OrderContent() {
     setBusy(true);
     setFeedback(null);
     try {
-      await authApi(`/marketplace/orders/${params.orderId}/resume`, { method: 'POST' });
+      await authApi(`/marketplace/orders/${params.orderId}/resume`, {
+        method: 'POST',
+        // IP-022 — Trust Resume é a mesma transição CAS do Trust Pause (IP-001).
+        idempotent: true,
+      });
       await load();
       setFeedback({ kind: 'success', text: t('partner.resumeSuccess') });
     } catch (err) {
@@ -1249,6 +1269,9 @@ function OrderContent() {
                     id="evidenceFile"
                     type="file"
                     accept="image/jpeg,image/png,image/webp,application/pdf"
+                    /* IP-022 — prioriza a câmera do dispositivo em campo; o navegador ainda
+                       permite escolher da galeria/arquivo quando `capture` não é suportado. */
+                    capture="environment"
                     className="tds-input"
                     onChange={(event) => setEvidenceFile(event.target.files?.[0] ?? null)}
                   />
