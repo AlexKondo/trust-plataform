@@ -1,0 +1,128 @@
+# IP-000 — Diff Review
+
+**Reviewer:** independent Quality/Diff Agent (per `03_MULTI_AGENT_EXECUTION_INSTRUCTIONS.md` §3). Executed 2026-09-15, independently of the execution agent's reasoning. Every claim in `IP-000-COMPLETION-REPORT.md` was re-derived from the repository, not read off the report.
+
+## A. Executive verdict
+
+**APPROVED WITH CORRECTIONS**
+
+The Completion Report's substantive claims — baseline SHA, "no production code changed," typecheck/lint/build results, the full e2e test count, the route/event/notification-rule counts, the migration 0027 / bucket non-deployment status, and the four spot-checked IP classifications (007, 009, 012, 015, plus supporting evidence for 008 and 001) — all independently reproduced exactly as claimed. No CRITICAL or BLOCKING finding was found. Two MINOR findings and one OBSERVATION are recorded below; none require re-doing IP-000's work, but both MINOR items should be corrected/acknowledged before this artifact is treated as final (hence "with corrections," not a bare APPROVED).
+
+## B. Baseline and reviewed commits
+
+- **TRUST MULTI-AGENT BASELINE SHA**: `c593f76b91d6e53d1d741169d69adef4e3df741a`
+- Independently verified: `git log -1 --format=%H` (local `main`) = `git rev-parse origin/main` (after `git fetch origin`) = the SHA above. Confirmed directly by this reviewer, not read off the report.
+- Working tree at review time (before this reviewer's own commands): `M CLAUDE.md`, `?? GUIA-EXECUCAO-MULTI-AGENTE.md`, `?? "docs/Multi-Agent Implementation Doc/"` — matches the report's §1/§5 description exactly.
+- No commits were created by the execution agent, this reviewer, or anyone else on top of the baseline SHA. Nothing was pushed.
+
+## C. Files reviewed
+
+Since IP-000 produced no production diff, "files reviewed" means the files inspected to verify the report's claims, not a code diff:
+
+- `CLAUDE.md` (`git diff CLAUDE.md`, full content) — confirmed +12/−3, doc-only (adds one section pointing at the Multi-Agent pack; reorders the "Documentos-guia" list). No code/behavior reference changed.
+- `apps/web/tsconfig.tsbuildinfo` — this reviewer's own `pnpm typecheck`/`pnpm -r build` runs regenerated this tracked incremental-build cache file (a 1-line diff), exactly the same transient side effect the report describes in its own §11.6. Reverted with `git checkout -- apps/web/tsconfig.tsbuildinfo` after verification, restoring the tree to the state described in §1/§5. This independently corroborates the report's own account of that specific deviation rather than contradicting it.
+- Source files read directly by this reviewer to verify specific claims (not exhaustive — see §D for the full evidence trail): `apps/api/src/modules/payment/infrastructure/gateway/payment-provider.resolver.ts`, `apps/api/src/modules/marketplace/application/usecases/manage-change-order.usecase.ts`, `apps/api/src/modules/trust-score/infrastructure/persistence/trust-score.schema.ts`, `apps/api/src/modules/marketplace/infrastructure/persistence/drizzle-marketplace-listing.repository.ts`, `apps/api/src/modules/payment/infrastructure/api/*.controller.ts`, `apps/api/src/modules/payment/domain/entities/payment.ts`, `apps/api/src/modules/identity/infrastructure/persistence/drizzle-identity.repository.ts`, `apps/api/src/modules/marketplace/application/usecases/service-execution.usecase.ts`, `apps/api/src/modules/notification/domain/notification-rules.ts`, `apps/api/src/shared/storage/supabase-evidence-storage.service.ts`, `apps/api/drizzle/0001_audit_logs_immutability.sql`, `docs/SETUP-SUPABASE.md`, `docs/2026090202/PACK-03-COMPLETION-REPORT.md`, `docs/2026090101/PACK-02-COMPLETION-REPORT.md`, `docs/PACK-01-COMPLETION-REPORT.md`, `docs/event-catalog.md`, `docs/openapi.yaml`, `.github/workflows/ci.yml`, `apps/api/test/e2e-local.mjs`, `apps/api/test/setup-env.ts`, root `CLAUDE.md`, `INCONSISTENCIAS.md`, all six control docs (00–05), the IP-000 spec, and both templates.
+- No production code file (`apps/api/src/**`, `apps/web/**` excluding the cache file above, `apps/api/drizzle/**`) was found modified relative to the baseline SHA.
+
+## D. Requirement-by-requirement compliance matrix
+
+Against IP-000 spec §6 acceptance criteria and §7 Definition of Done:
+
+| Requirement | Report's claim | Independent verification | Verdict |
+|---|---|---|---|
+| Baseline SHA recorded, local = origin/main | `c593f76b91d6e53d1d741169d69adef4e3df741a` | `git log -1 --format=%H` and `git rev-parse origin/main` (after fresh `git fetch origin`) both return this exact SHA | **PASS** |
+| No production code changed | Only `CLAUDE.md` (doc) + 2 untracked doc paths | `git status`/`git diff --stat` confirms; the only non-doc diff (`tsconfig.tsbuildinfo`) was this reviewer's own build artifact, reverted | **PASS** |
+| Capability matrix (modules/routes/migrations/events) complete and accurate | 8 modules, 104 routes/104 operations/90 paths, 28 migrations (0000–0027), 58+ event types, 21 notification rules | All four numbers independently reproduced by direct grep/count against source, not the report's prose (§I) | **PASS** |
+| PACK-00..03 closure verified in code | Claims specific files/entities/triggers for each PACK | Spot-verified: audit_logs trigger definition and firing (§E), `trustFeeRateBps` frozen-at-contract field, `MATERIAL_COST`/`MATERIAL_MARKUP` separation comment, `payment-provider.resolver.ts` sandbox-only comment, migration 0027 four-table additive DDL | **PASS** |
+| Migration 0027 / `change-order-evidences` bucket not deployed to shared infra | Verified via code + PACK-03 report §10 self-report | `grep` confirms the bucket name appears only as a runtime string literal in `manage-change-order.usecase.ts:44/387`; no provisioning code anywhere; `docs/SETUP-SUPABASE.md` documents manual creation only for `verification-evidences`/`marketplace-media`, never `change-order-evidences`; PACK-03 report §10 quote reproduced verbatim by this reviewer independently | **PASS** |
+| Dependency/gap classification complete for IP-001..024 | Full table, evidence-cited | Spot-checked IP-007, IP-009, IP-012, IP-015 in full, plus supporting evidence for IP-008 and IP-001 (§D below, §J) — every citation checked out exactly | **PASS** (spot-check, not exhaustive — see §K) |
+| Known debt recorded | 9 items in §12 | Cross-checked items 1 (double-Resume race), 2 (23505→409 identity-only), 3/4 (lint/CI red) directly against code; hold up | **PASS** |
+| Baseline regression executable and green | `pnpm test:e2e --no-file-parallelism`: 61/61 files, 441/441 tests, 420.19s | Independently re-run by this reviewer against a fresh embedded/disposable Postgres, same command/flag: **61/61 files, 441/441 tests, 394.62s** — exact pass-count match | **PASS** (see §I for one caveat) |
+| Typecheck clean | 0 errors both apps | Independently re-run: `apps/api typecheck: Done`, `apps/web typecheck: Done`, 0 errors | **PASS** |
+| Lint: exactly 4 pre-existing errors, no new | 4 errors in `tools/extract-docx.mjs`, no new | Independently re-run: byte-identical 4 errors, same file/lines/rules | **PASS** |
+| Build clean, 25 routes | `pnpm -r build` exit 0, Next.js 25/25 static pages | Independently re-run: exit 0, `✓ Generating static pages (25/25)`, same 4 dynamic routes | **PASS** |
+| No ambiguity about what agents may rebuild | Classification table is complete and does not silently delete scope | Confirmed Trust Coin is the only DEFERRED item, consistent with `04_APPROVED_PRODUCT_DECISIONS.md`/`05_RELEASE_1_SCOPE_MATRIX.md` (Trust Coin = R1+, explicit); no other approved requirement was found deleted or silently resolved | **PASS** |
+| Collision-hotspot inventory produced (Manifest §5, IP-000 spec §2 step 6) | Report's §6 references "the environment-schema collision-hotspot inventory... (§8.1)" | No such subsection "§8.1" exists in the report (§8 is "Security/authorization/privacy" with no numbered sub-items). The underlying facts (env schema, OpenAPI, notification rules, migrations journal, auth surfaces) are scattered correctly across §3/§8, but never assembled into one explicit, labeled collision-hotspot map as its own artifact | **MINOR finding — see §J.1** |
+
+## E. Security/authorization review
+
+No security-relevant code was changed (confirmed by §C: zero non-doc file changes). As part of verifying the report's §8 claims, this reviewer independently:
+- Confirmed `apps/api/src/shared/security/jwt-token.service.ts` and `jwt-auth.guard.ts` exist and are untouched.
+- Confirmed the `audit_logs` append-only trigger (`0001_audit_logs_immutability.sql`, function `forbid_audit_log_mutation()`) fires on both UPDATE and DELETE, reproduced live during this reviewer's own e2e run: `ERROR: audit_logs is append-only: UPDATE is not allowed` and, separately, `...: DELETE is not allowed` (two distinct trigger firings, not one combined string as the report's §3.5/§8 quote implies — see §J.3, an OBSERVATION-level imprecision, not a substance problem).
+- Confirmed the 23505→409 unique-violation mapping exists only in `apps/api/src/modules/identity/infrastructure/persistence/drizzle-identity.repository.ts` (`const UNIQUE_VIOLATION = '23505'`), not generalized — supports the IP-001 classification evidence.
+- Confirmed rate limiting is `@fastify/rate-limit`-based and global (visible in the redacted response headers of every request logged during the e2e run: `x-ratelimit-limit`, `x-ratelimit-remaining`, `x-ratelimit-reset`), consistent with the report's "not tiered per sensitive action" finding for IP-014.
+No new authorization negative tests were required or added, correctly — IP-000 is inventory-only.
+
+## F. Concurrency/idempotency review
+
+N/A for new code (IP-000 introduced none) — but the report's carried-forward technical debt item (the PACK-03 "double Resume" race) was independently verified against current code, not merely trusted:
+- `apps/api/src/modules/marketplace/application/usecases/service-execution.usecase.ts:210-226` (`resume()`): `findOpenPause()` is a plain read that happens **before** the `db.transaction()` block that later writes `savePause`/`saveSession`. There is no compare-and-set / `SELECT ... FOR UPDATE` / optimistic-lock version check between the read and the write. The DB-level partial unique index (`WHERE resumed_at IS NULL`) on `service_execution_pauses` prevents two simultaneously *open* pauses from existing, but does not prevent two concurrent `resume()` calls from both reading the same single open pause and both proceeding to close/resume it (a real, reproducible read-then-write race, exactly as the report describes it). Independently confirmed present and correctly attributed to IP-001 scope, not something this reconciliation could or should have fixed.
+Also independently confirmed the payment idempotency-key replay path: the e2e log for this reviewer's own run shows an actual idempotent-replay event (`"Idempotent replay: returning the previous authorization without charging again."`, `result":"REPLAYED"`), corroborating that the payment module's idempotency behavior genuinely executes (not merely documented) — relevant background for the IP-007 gap assessment (§J below).
+
+## G. Migration/data review
+
+- 28 migration files, `0000`–`0027`, no gaps — independently confirmed via `ls`/journal inspection consistent with the report.
+- Migration 0027 (`0027_pack03_change_order_and_time_billing.sql`) — confirmed additive (`CREATE TABLE IF NOT EXISTS`, no `DROP`, no destructive `ALTER`, no `tenant_id`), runs clean against the disposable e2e Postgres (proven by this reviewer's own successful 441/441 run against a freshly-initialized embedded instance, which necessarily applies all 28 migrations from scratch).
+- No migration was applied to any shared/prod database by this reviewer or (per code/report evidence) by the execution agent. No Supabase bucket was created by either.
+- `change-order-evidences` bucket: confirmed **not provisioned anywhere in repo code** — only a runtime string-literal reference (`manage-change-order.usecase.ts:44`). `docs/SETUP-SUPABASE.md` has zero mention of this bucket (only `marketplace-media` and `verification-evidences`). PACK-03's own completion report §10 quote reproduced verbatim: *"O bucket `change-order-evidences` não existe no Supabase Storage... Precisa ser criado como bucket privado, igual ao `verification-evidences`."* and *"A migration 0027 não foi aplicada em nenhum banco compartilhado... depende do seu OK."* Both self-reported facts, independently re-confirmed, not new discoveries by IP-000 or this review.
+
+## H. API/event compatibility
+
+- 104 `@Get/@Post/@Put/@Patch/@Delete` decorators counted directly across 15 `*.controller.ts` files (independent grep, matches report exactly).
+- `docs/openapi.yaml`: 104 `operationId:` entries, 90 unique path templates — independently counted, matches report's "104 method operations, 90 unique path templates" exactly.
+- Payment controller: exactly 4 routes (list-mine, by-order, get, authorize), no release endpoint — confirmed by direct read of the controller file.
+- Event types: independent grep for `eventType: 'Entity.Action'` literals returns 58 distinct matches; the report's note that `Payment.AuthorizationFailed` is emitted via a ternary (under-counting by at least 1, i.e. ~59 actual) is consistent with the grep methodology limitation and was not independently re-derived beyond confirming the base 58, which is an acceptable and disclosed approximation.
+- `EventConsumer` class count: independently re-derived by grepping every `class ... extends ... Consumer` declaration (20 total: 2 abstract base classes + 17 concrete subclasses of `EventConsumer`/an abstract base + 1 generic `RuleNotificationConsumer`) — matches the report's "17 concrete + 2 abstract + 1 generic, instantiated once per `NOTIFICATION_RULES` entry" breakdown exactly once the generic consumer is separated out.
+- Notification rules: `apps/api/src/modules/notification/domain/notification-rules.ts` independently grepped for `eventType: '` occurrences inside `NOTIFICATION_RULES` — exactly **21**, matching the report's direct count. `docs/event-catalog.md:57` independently confirmed to state *"O módulo `notification` consome **20 eventos**"* — the drift is real and exactly as quoted.
+- Route-count doc drift: `CLAUDE.md:37` independently confirmed to state *"24 telas"*; independently counted 25 `page.tsx` files under `apps/web/app`, and this reviewer's own `pnpm -r build` run independently reproduced `✓ Generating static pages (25/25)` — two independent methods agree with the report's "25, not 24" finding.
+- Backward compatibility: no API/event contract was changed by IP-000 (no production diff exists to break compatibility).
+
+## I. Tests independently executed
+
+All commands below were run by this reviewer from a clean shell, against the same baseline SHA, using `pnpm@11.20.0` (installed via `npm install -g pnpm@11.20.0` after `corepack enable` also failed with `EPERM` in this reviewer's own sandbox — the same toolchain obstacle the report's §11.1 describes, independently encountered).
+
+1. **`pnpm typecheck`** (root): `apps/api typecheck: Done`, `apps/web typecheck: Done`. **0 errors, both apps** — matches report exactly.
+2. **`pnpm lint`** (root, `eslint .`): 4 errors, all in `tools/extract-docx.mjs` (`process`/`Buffer`/`console` `no-undef`), exit code 1. **Byte-identical to the report** — matches exactly.
+3. **`pnpm -r build`** (root): `apps/api build: Done`; `apps/web build`: `✓ Compiled successfully`, `✓ Generating static pages (25/25)`, `Done`. **Clean, exit 0** — matches report exactly, independently confirms the 25-route finding via a second method (Next.js build manifest).
+4. **`pnpm test:e2e --no-file-parallelism`** (from `apps/api`, embedded disposable Postgres on port 55432, torn down after — no shared/prod database was touched at any point):
+   ```
+   Test Files  61 passed (61)
+        Tests  441 passed (441)
+      Start at  14:02:53
+      Duration  394.62s (transform 1.57s, setup 231ms, collect 43.36s, tests 333.97s, environment 9ms, prepare 5.07s)
+   ```
+   **61/61 files, 441/441 tests — exact match to the report's claimed 61/61 files, 441/441 tests** (report's duration was 420.19s; this run's was 394.62s — both single-digit-minute runs, normal variance, not a discrepancy). The append-only `audit_logs` trigger was independently observed firing twice mid-run (once for UPDATE, once for DELETE — see §E), confirming a negative-path test genuinely exercises PACK-00's audit immutability guarantee, exactly as the report claims.
+
+   **One thing the report does not mention, found independently by this reviewer**: *after* the vitest process itself reported 441/441 passed and exited, the wrapper script (`apps/api/test/e2e-local.mjs`) crashed during its own teardown:
+   ```
+   [Error: EBUSY: resource busy or locked, rmdir 'C:\projects\trust\apps\api\.pgdata-e2e']
+   ...
+   [ELIFECYCLE] Command failed with exit code 1.
+   ```
+   Root cause: `e2e-local.mjs` calls `await pg.stop()` then immediately `rmSync(dataDir, { recursive: true, force: true })`; on Windows, the embedded Postgres process does not always release its file handles on the data directory fast enough for the immediately-following `rmSync` to succeed, and `force: true` only suppresses `ENOENT` (missing-path) errors, not `EBUSY` (locked-resource) errors — so the uncaught exception crashes the Node process with a non-zero exit **despite every test having already passed**. This reviewer's own test-runner invocation (`pnpm test:e2e ... | tee ...`) consequently reported a misleadingly-green top-level status (the `tee` pipeline masked the underlying non-zero exit, since `pipefail` was not set) — worth noting as a methodology caveat for this review itself, corrected by reading the log tail directly rather than trusting the wrapper's exit code.
+   **Assessment**: this does **not** invalidate the 441/441 result — the test assertions themselves are unaffected, and this reviewer confirmed CI does not use this script at all (`.github/workflows/ci.yml` runs on `ubuntu-latest` and calls `pnpm test` with a service-container Postgres directly, bypassing `e2e-local.mjs` entirely, per the report's own §10.4 note). This is a **local-Windows-only DX robustness gap** in `e2e-local.mjs`'s teardown, not a CI or correctness issue. It is possible the execution agent's own run did not hit this (file-lock release timing is non-deterministic) or hit it and omitted it. Recorded as a MINOR finding (§J.2) — worth a small fix (catch/retry the `rmSync`, or use `maxRetries`/`retryDelay` options) in IP-001, but does not change this review's verdict on the 441/441 claim, which is confirmed.
+5. Bare `pnpm test` (no `TEST_DATABASE_URL`) was **not** independently re-run by this reviewer — the report's §10.4 finding (40 passed/21 skipped files, 357 passed/84 skipped tests, 21 unhandled-rejection errors from eager `ConfigModule.forRoot` validation) is architecturally self-explanatory from reading `test/setup-env.ts` and `app.module.ts` directly (independently read by this reviewer, confirms the described eager-validation mechanism is real), and is explicitly framed by the report as a non-blocking, pre-existing rough edge, not a load-bearing claim. Accepted without re-running, given time/scope constraints and that it does not affect the acceptance-criteria gate.
+
+## J. Findings
+
+**J.1 — MINOR — Dangling internal cross-reference; no standalone collision-hotspot artifact.**
+The Completion Report's §6 cites *"the environment-schema collision-hotspot inventory only (§8.1)"*, but the report has no §8.1 — §8 ("Security / authorization / privacy") has no numbered sub-items at all. Separately, Manifest §5 and the IP-000 spec's mandatory preflight step 6 both explicitly call for "shared-file collision hotspots" to be identified as their own deliverable (listing: marketplace module wiring, shared auth/exception filters, OpenAPI/event catalog, frontend navigation/layout, notification rules, migrations journal, shared storage, environment schemas). The report never assembles these into one explicit, labeled list — the underlying facts are present and correct, scattered across §3 (routes/migrations/events) and §8 (security surfaces), but a future IP-001/002 agent reading this report cannot find a single canonical "here are the hotspots, here is who owns what" section, only a broken pointer to one. Does not block approval (the facts are all independently verifiable and correct, as this review confirms), but should be corrected — either fix the cross-reference or add the missing collision-hotspot roll-up section — before Wave 1 agents rely on this report as their map.
+
+**J.2 — MINOR — `apps/api/test/e2e-local.mjs` teardown can crash with `EBUSY` on Windows after all tests pass.**
+Independently reproduced by this reviewer (§I.4): the wrapper script's `rmSync(dataDir, { recursive: true, force: true })` immediately after `pg.stop()` can throw `EBUSY` on Windows before Postgres fully releases its file locks, crashing the Node process with a non-zero exit code even though the actual `vitest` run inside it already reported 441/441 passed. Not a CI issue (CI runs on `ubuntu-latest` via a different `pnpm test` path that bypasses this script entirely — confirmed in `.github/workflows/ci.yml`). Not previously documented in `02_SHARED_ENGINEERING_STANDARDS.md` §13's known-debt list or in the IP-000 Completion Report. Recommend a small, scoped fix in IP-001: catch the `rmSync` error (or add a short retry/delay) so local Windows runs report success reliably when tests genuinely pass.
+
+**J.3 — OBSERVATION — Report's audit-trigger error quote is a paraphrase, not a literal single string.**
+The report (§3.5, §8, §9) quotes the trigger's behavior as *"ERROR: audit_logs is append-only: UPDATE/DELETE is not allowed"* as if it were one message. The actual PL/pgSQL trigger (`forbid_audit_log_mutation()`) is parameterized on `TG_OP` and emits two distinct messages — independently observed in this reviewer's own run: `ERROR: audit_logs is append-only: UPDATE is not allowed` and, separately, `...: DELETE is not allowed`. Purely cosmetic — the substance (both operations are genuinely blocked, both were genuinely exercised) is correct and independently re-confirmed; only the quotation format is imprecise.
+
+**No CRITICAL, BLOCKING, or MAJOR finding was identified.** Every load-bearing numeric claim in the report (SHA, typecheck, lint, build, 61/441 test counts, 104 routes/90 paths, 21 notification rules vs. 20 documented, 25 vs. 24 screens, migration/bucket non-deployment status) was independently reproduced exactly. All four deep IP spot-checks (007, 009, 012, 015) and the two supporting-evidence checks (008, 001) held up against direct code inspection with no discrepancy.
+
+## K. Scope leakage check
+
+- No production code, migration, OpenAPI entry, event-catalog entry, or test file was created or modified by the execution agent — confirmed via `git status`/`git diff` against the frozen baseline SHA (§C). The only file it authored is `IP-000-COMPLETION-REPORT.md` itself.
+- The report makes no product-scope decision — it classifies implementation state only (IMPLEMENT/PARTIAL/VERIFY_ONLY/DEFERRED/BLOCKED_EXTERNAL per Manifest §4) and does not approve, water down, or silently resolve any approved requirement. Trust Coin is the sole DEFERRED item, and this is consistent with `04_APPROVED_PRODUCT_DECISIONS.md` ("Trust Coin — future concept, not implemented in this release") and `05_RELEASE_1_SCOPE_MATRIX.md` (Trust Coin = R1+) — a pre-existing approved decision being correctly reflected, not a new decision being made by this IP.
+- The IP-001..024 classification table (§14 of the report) was spot-checked (not exhaustively re-derived) on IP-007, IP-009, IP-012, IP-015, plus supporting evidence for IP-008 and IP-001 — all four/six held up exactly against direct code inspection (see §D, §H). The remaining ~18 classifications were not independently re-derived line-by-line by this reviewer within the scope/time of this review; this is a disclosed limitation of this review, not a defect found in those classifications.
+- No IP-001..024 implementation work was started by the execution agent or by this reviewer. No migration was applied to shared/prod infrastructure. No Supabase bucket was created. No shared `trust-dev-sp` credential was used or requested by this reviewer at any point.
+
+## L. Final recommendation
+
+**APPROVED WITH CORRECTIONS.** The execution agent's Completion Report for IP-000 is materially accurate and independently verifiable on every checked claim: baseline SHA, "no production diff," typecheck/lint/build parity, the exact 61/441 test count, route/event/notification-rule counts, the migration-0027/bucket non-deployment finding, and four of the report's IP classifications (007 money-critical, 009 the unusual BLOCKED_EXTERNAL case, 012 the Trust-Coin-adjacent DEFERRED sub-scope, and 015 a representative PARTIAL). No CRITICAL or BLOCKING issue exists. Two MINOR items (J.1 dangling cross-reference/missing collision-hotspot roll-up, J.2 a real but CI-irrelevant Windows teardown bug this reviewer discovered independently) should be corrected or explicitly acknowledged, and one OBSERVATION (J.3) is cosmetic-only. None of these block Wave 1 (IP-001, IP-002) from starting once the founder has reviewed this Diff Review and the accompanying Quality Gate — but J.1 in particular should be fixed first, since Wave 1/2 agents will rely on this report's file-ownership/collision-hotspot picture and the current dangling reference could cause confusion about where that inventory actually lives.

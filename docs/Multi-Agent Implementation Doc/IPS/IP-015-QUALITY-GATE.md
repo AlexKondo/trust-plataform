@@ -1,0 +1,24 @@
+# IP-015 — Quality Gate
+
+- [x] Dependencies approved — hard dependency IP-003 is APPROVED/PASS (`IP-003-QUALITY-GATE.md`), committed to `main` at `dfd9da0`. IP-004/IP-005 (read for context only, not hard dependencies of this IP) are also APPROVED/PASS and committed.
+- [x] Completion Report complete — `IP-015-COMPLETION-REPORT.md`, all required sections present (baseline, preflight, implemented, not-implemented, files changed, migrations, APIs/events, security/privacy, financial invariants, tests, deviations, known issues, external blockers, acceptance matrix, commits, reviewer focus).
+- [x] Diff Review independent — `IP-015-DIFF-REVIEW.md`, produced by this agent without reuse of the implementation agent's reasoning; every claim re-derived directly from `git diff`, migrations, and fresh test runs.
+- [x] No CRITICAL/BLOCKING findings open — **0 CRITICAL, 0 BLOCKING, 0 MAJOR.** One MINOR (test-report accuracy, non-blocking, no code implicated) and two OBSERVATIONs (product-judgment notes, not defects) — see Diff Review §J.
+- [x] Typecheck green — independently run: `apps/api` Done, `apps/web` Done, 0 errors.
+- [x] Lint green — independently run: `eslint .`, 0 errors.
+- [x] Unit/integration green — independently run: **62 passed / 30 skipped (92 files); 504 passed / 129 skipped (633 tests)** — exact match to the Completion Report's claim.
+- [x] Required E2E green — independently run twice. First full run: 2 failed / 90 passed (92 files); 2 failed / 631 passed (633 tests) — both failures (`ip-002-i18n.e2e.spec.ts`, `mrk-015-022.e2e.spec.ts`) are `waitForScore`-timing-related, in files this IP does not touch, coincident with a logged WAL checkpoint stall. Immediate re-run with zero code change: **92/92 files, 633/633 tests, 0 failures** — confirms transient host/checkpoint contention, not a regression from this IP's diff. This IP's own 2 new test files (unit + e2e) passed clean in every run.
+- [x] Regression green — `mrk-001-008.e2e.spec.ts` (search path), `ip-003-service-request-discovery-matching.e2e.spec.ts`, `ip-004-competitive-quotes-comparison.e2e.spec.ts`, `ip-005-scheduling-availability-location-eta.e2e.spec.ts` all passed within the clean full run; no test in any PACK-00..03/IP-001..013/020/021 file was among either transient failure.
+- [x] Migrations reviewed/rehearsed — `0034_ip015_search_marketplace_retrieval.sql` read in full, confirmed additive index-only, exercised only against disposable embedded/ephemeral Postgres in this session (never shared/prod). No prior migration created this index — independently confirmed by grepping 0000–0033.
+- [x] Security/auth negative tests — N/A new negative surface (route stays `@Public()`, unchanged authorization posture); existing MRK-004 public-browse behavior reconfirmed unchanged.
+- [x] Idempotency/concurrency verified where relevant — N/A financial/state-mutating logic (this IP is a pure read path); pagination determinism explicitly tested (tied-price, two-page e2e assertion) and independently verified via code review of every `orderFor()` branch.
+- [x] OpenAPI/events/docs updated — `docs/openapi.yaml` updated for the one changed route (new param + expanded description); `docs/event-catalog.md` correctly left untouched (zero new events, this IP performs zero writes); `CLAUDE.md` updated with its own dedicated, non-colliding section.
+- [x] No out-of-scope implementation — no Elasticsearch/vector DB/AI dependency (confirmed via empty `package.json`/lockfile diff); no `DiscoverServiceRequestMatchesUseCase`/`CompareServiceRequestOffersUseCase` changes; no radius/geocoding; no frontend changes.
+- [x] No unresolved product decision hidden in code — `pricingModel` non-applicability to `MarketplaceListing` is documented, not silently assumed; `simple` vs `portuguese` FTS config and the `availableDayOfWeek` opt-in-exclusionary semantics are both explicitly flagged as judgment calls in the report and independently assessed as reasonable/well-documented in the Diff Review (§J.2, §J.3), not silently decided.
+- [ ] Merge SHA recorded — not applicable to this agent; per program rules (§5.6 of `00_READ_FIRST`), only the Architecture/Integrator Agent merges to `main` and records the merge SHA. This Quality Gate authorizes merge; it does not perform it.
+
+**Verdict:** PASS
+
+## Downstream unblock note
+
+IP-019 (AI Assistance Layer) declares hard dependencies on IP-003, IP-004, and IP-015 (`IP-019_AI_Assistance_Layer.md` line 11). IP-003 (`IP-003-QUALITY-GATE.md`, Verdict: PASS) and IP-004 (`IP-004-QUALITY-GATE.md`, Verdict: PASS) are already APPROVED and committed to `main`. With this Quality Gate now also PASS for IP-015, **all three of IP-019's hard dependencies are satisfied** — IP-019 is safely unblockable by the Orchestrator, pending only the Integrator Agent's actual merge of IP-015 to `main` and merge-SHA recording (the one unchecked item above, intentionally out of this agent's authority).
